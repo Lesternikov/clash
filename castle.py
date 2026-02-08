@@ -1,0 +1,282 @@
+HOSPITAL = "hospital"
+import random 
+from unit import PeasantGroup
+from unit import GoldTransport
+
+
+BUILDINGS = {
+    "hospital": {"cost": 200},
+    "garrison": {"cost": 150},
+    "workshop": {"cost": 250},
+    "forge": {"cost": 300},
+}
+
+class Castle:
+    def __init__(self, x, y, owner=None):
+        self.x = x
+        self.y = y
+        self.owner = owner
+        self.gold = 0
+        self.garrison = []
+        self.plague_active = False
+        self.plague_turns = 0
+        self.peasants = 100
+        self.tax_rate = 1.0        # 0.0–4.0
+        self.happiness = 50.0     # 0–100
+        self.buildings = set()
+        self.level = 1
+                # PRODUKCJA
+        self.production_unit_type = None
+        self.production_turns_left = 0
+        self.production_enabled = False
+
+    def collect_taxes(self):
+        happiness_factor = 0.5 + (self.happiness / 200)
+        income = int(self.peasants * 0.1 * self.tax_rate * happiness_factor)
+        
+        if self.plague_active:
+            return
+
+        happiness_factor = 0.5 + (self.happiness / 100) * 0.5
+        income = int(self.peasants * 0.1 * self.tax_rate * happiness_factor)
+        self.gold += income
+
+    def send_resources(self, target, peasants=0, gold=0):
+        peasants = min(peasants, self.peasants)
+        gold = min(gold, self.gold)
+
+        self.peasants -= peasants
+        self.gold -= gold
+
+        target.peasants += peasants
+        target.gold += gold
+
+
+    def position(self):
+        return (self.x, self.y)
+
+    def __repr__(self):
+        return f"Castle({self.x},{self.y})"
+    
+    def recruit(self, player):
+        if self.owner != player:
+            print("To nie jest twój zamek")
+            return None
+
+        cost = 100
+
+        if self.gold < cost:
+            print("Za mało złota")
+            return None
+
+        self.gold -= cost
+        print("Wyprodukowano jednostkę")
+    
+    def process_production(self):
+        if not self.production_enabled:
+            return
+
+        if not self.production_unit:
+            return
+
+        self.pro
+        duction_turns_left -= 1
+
+        if self.production_turns_left <= 0:
+            cost = self.production_unit.cost
+
+            if self.gold >= cost:
+                self.gold -= cost
+                self.garrison.append(self.production_unit)
+                print("Wyprodukowano:", self.production_unit.name)
+
+                self.production_turns_left = self.production_unit.production_time
+            else:
+                print("Brak złota — produkcja zatrzymana")
+                self.production_enabled = False
+
+    def start_production(self, unit_type, production_time):
+        self.production_unit_type = unit_type
+        self.production_turns_left = production_time
+        self.production_enabled = True
+
+    def stop_production(self):
+        self.production_enabled = False
+
+    def process_production(self):
+        if not self.production_enabled:
+            return
+
+        if self.production_unit_type is None:
+            return
+
+        self.production_turns_left -= 1
+
+        if self.production_turns_left <= 0:
+            cost = 10  # tymczasowo
+
+            if self.gold >= cost:
+                self.gold -= cost
+                self.garrison.append(self.production_unit_type)
+
+                print("Wyprodukowano:", self.production_unit_type)
+
+                self.production_turns_left = 3
+            else:   
+                print("Brak złota — produkcja zatrzymana")
+                self.production_enabled = False
+    
+    def start_healing_unit(self, unit):
+        if "hospital" not in self.buildings:
+            print("Brak szpitala")
+            return
+
+        if unit not in self.garrison:
+            print("Jednostka nie jest w garnizonie")
+            return
+
+        if unit.hp >= 100:
+            print("Jednostka ma pełne HP")
+            return
+
+        unit.healing = True
+        unit.healing_turns_left = 3
+
+        print("Rozpoczęto leczenie:", unit)
+
+    def process_healing(self):
+        if "hospital" not in self.buildings:
+            return
+
+        for unit in self.garrison:
+            if unit.healing:
+                unit.healing_turns_left -= 1
+
+                if unit.healing_turns_left <= 0:
+                    unit.hp = 100
+                    unit.healing = False
+                    print("Jednostka wyleczona:", unit)
+
+    def cancel_garrison_healing(self):
+        for unit in self.garrison:
+            unit.healing = False
+            unit.healing_turns_left = 0
+
+    def under_attack(self):
+        self.cancel_garrison_healing()
+
+    def build(self, building_name):
+        if building_name in self.buildings:
+            print("Budynek już istnieje")
+            return False
+
+        if building_name not in BUILDINGS:
+            print("Nieznany budynek")
+            return False
+
+        cost = BUILDINGS[building_name]["cost"]
+
+        if self.gold < cost:
+            print("Za mało złota")
+            return False
+
+        self.gold -= cost
+        self.buildings.add(building_name)
+
+        self.update_level()
+
+        print("Zbudowano:", building_name)
+       
+    def update_level(self):
+        required = {"hospital", "garrison", "workshop", "forge"}
+
+        if required.issubset(self.buildings):
+            if self.level < 2:
+                self.level = 2
+                print("Zamek osiągnął poziom 2")
+
+    def has_building(self, name):
+        return name in self.buildings
+    
+    import random
+
+    def check_plague_start(self):
+        if self.plague_active:
+            return
+
+        if self.peasants < 1400:
+            return
+
+    # rosnąca szansa wraz z populacją
+        chance = (self.peasants - 1400) / 6000
+        chance = min(0.25, chance)
+
+        if random.random() < chance:
+            self.plague_active = True
+            self.plague_turns = 5
+            print("W zamku wybuchła zaraza!")
+  
+    def process_plague(self):
+        if not self.plague_active:
+            return
+
+        loss = int(self.peasants * 0.4)
+        self.peasants -= loss
+
+        self.plague_turns -= 1
+
+        print(f"Zaraza! Populacja spadła o {loss}")
+
+        if self.plague_turns <= 0:
+            self.plague_active = False
+            print("Zaraza wygasła.")
+
+    def send_peasants(self, world, amount):
+        if amount < 10:
+            return
+
+        if amount > 1000:
+            return
+
+        if amount > self.peasants:
+            print("Brak chłopów")
+            return
+
+        self.peasants -= amount
+
+        group = PeasantGroup(self.x, self.y, self.owner, amount)
+        world.peasant_groups.append(group)
+
+        print(f"Wysłano {amount} chłopów")
+        
+    def send_gold(self, world, amount):
+        if amount <= 0:
+            return
+
+        if amount > 1000:
+            print("Max 1000 złota")
+            return
+
+        if amount > self.gold:
+            print("Brak złota")
+            return
+
+        self.gold -= amount
+
+        t = GoldTransport(self.x, self.y, self.owner, amount)
+        world.gold_transports.append(t)
+
+        print(f"Wysłano {amount} złota")
+
+
+    def next_turn(self):
+        self.update_happiness()
+        self.check_plague_start()
+        self.process_plague()
+        self.collect_taxes()
+        self.grow_population()
+        self.process_production()
+        self.process_healing()
+
+
+        return True
