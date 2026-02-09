@@ -58,7 +58,7 @@ class World:
     # jednostki startowe przy zamkach graczy
         for c in self.castles:
             if c.owner:
-                self.add_unit(Unit("light_infantry", c.x, c.y + 1, c.owner))
+                self.add_unit(Unit("lekka_piechota", c.x, c.y + 1, c.owner))
 
 
         print("DEBUG castles:", len(self.castles))
@@ -262,7 +262,7 @@ class World:
 
         if self.selected_castle.recruit(player):
             u = Unit(
-                "light_infantry",
+                "lekka_piechota",
                 self.selected_castle.x,
                 self.selected_castle.y,
                 player
@@ -412,8 +412,40 @@ class World:
             if self.selected_unit_type is not None:
                 if hasattr(self, "start_prod_button"):
                     if self.start_prod_button.collidepoint(mx, my):
-                        unit_types = ["light_infantry", "archer", "knight"]
-                        production_time = [2, 3, 5]
+                        unit_types = ["lekka_piechota", "archer", "knight"]
+                        
+                        production_time = {
+                            "pospolite_ruszenie":1,
+                            "lekka_piechota": 2,
+                            "pikinier":2,
+                            "halberdier":3,
+                            "highlander":3,
+                            "light_cavalry":3,
+                            "heavy_cavalry":4,
+                            "elephant":4,
+                            "archer":2,
+                            "crossbowman":4,
+                            "musketeer":4,
+                            "worm":3,
+                            "scorpion":3,
+                            "mag":5,
+                            "pegasus":3,
+                            "eagle":3,
+                            "ghost":3,
+                            "bones":4,
+                            "trol":4,
+                            "smok":5,
+                            "heavy_infantry":4,
+                            "leśnik":3,
+                            "budowniczy":3,
+                            "armata":4,
+                            "ważka":2,
+                            "płaszczka":5,
+                            "rycerstwo":4,
+                            "dragon":4,
+                            "cyklop":3,
+                            "katapulta":4,
+                        }
 
                         utype = unit_types[self.selected_unit_type]
                         turns = production_time[self.selected_unit_type]
@@ -617,7 +649,7 @@ class World:
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
 
-        unit_types = ["light_infantry", "archer", "knight"]
+        unit_types = ["lekka_piechota", "archer", "knight"]
 
         start_x = 400
         start_y = 120
@@ -681,7 +713,7 @@ class World:
             if rect.collidepoint(mx, my):
                 return i
     def start_recruitment(self):
-        unit_types = ["light_infantry", "archer", "knight"]
+        unit_types = ["lekka_piechota", "archer", "knight"]
 
         utype = unit_types[self.selected_unit_type]
         cost = 50
