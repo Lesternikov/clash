@@ -81,11 +81,8 @@ class World:
         self.current_player = (self.current_player + 1) % len(self.players)
         self.reset_units()
 
-        player = self.players[self.current_player]
-
         for c in self.castles:
-            if c.owner == player:
-                c.next_turn()
+            c.next_turn()
 
         self.selected_unit = None
         self.selected_castle = None
@@ -500,8 +497,18 @@ class World:
 
                 if index < len(self.selected_castle.garrison):
                     unit = self.selected_castle.garrison[index]
-                    text = font.render(unit.type, True, (255, 255, 255))
-                    screen.blit(text, (x + 4, y + 4))
+
+                    # tło jednostki
+                    pygame.draw.rect(screen, (80, 120, 200), (x+4, y+4, 56, 56))
+
+                    # prosty "X"
+                    pygame.draw.line(screen, (255,255,255), (x+8, y+8), (x+56, y+56), 2)
+                    pygame.draw.line(screen, (255,255,255), (x+56, y+8), (x+8, y+56), 2)
+
+                    # nazwa
+                    text = font.render(unit.type[:3], True, (255,255,255))
+                    screen.blit(text, (x + 6, y + 42))
+
 
     # BACK button
         self.back_button = pygame.Rect(40, 40, 120, 40)

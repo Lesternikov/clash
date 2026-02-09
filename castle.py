@@ -2,7 +2,10 @@ HOSPITAL = "hospital"
 import random 
 from unit import PeasantGroup
 from unit import GoldTransport
+# castle.py
+import pygame
 from unit import Unit
+
 
 BUILDINGS = {
     "hospital": {"cost": 200},
@@ -107,12 +110,16 @@ class Castle:
             return
 
         self.production_turns_left -= 1
+        print("Produkcja — zostało:", self.production_turns_left)
 
         if self.production_turns_left <= 0:
+            from unit import Unit
+
             cost = 10  # tymczasowo
 
             if self.gold >= cost:
                 self.gold -= cost
+
                 unit = Unit(
                     self.production_unit_type,
                     self.x,
@@ -123,10 +130,16 @@ class Castle:
                 self.garrison.append(unit)
 
                 print("Wyprodukowano:", self.production_unit_type)
-                self.production_turns_left = 3
-            else:   
-                print("Brak złota — produkcja zatrzymana")
-                self.production_enabled = False
+                print("Garrison size:", len(self.garrison))
+
+            else:
+                print("Brak złota — produkcja przerwana")
+
+            # KONIEC PRODUKCJI
+            self.production_enabled = False
+            self.production_unit_type = None
+            self.production_turns_left = 0
+
     
     def start_healing_unit(self, unit):
         if "hospital" not in self.buildings:
@@ -306,18 +319,26 @@ class Castle:
         self.process_plague()
         self.collect_taxes()
         self.grow_population()
+
         self.process_production()
         self.process_healing()
-        self.process_training()
-        if self.production_enabled:
-            self.production_turns_left -= 1
+        self.process_training()           
+   
+    def finish_production(self):
+        from unit import Unit
 
-            if self.production_turns_left <= 0:
-                u = Unit(self.production_unit_type, self.x, self.y, self.owner)
-                self.garrison.append(u)
+        new_unit = Unit(
+            self.production_unit_type,
+            self.x,
+            self.y,
+            self.owner
+        )
 
-                self.production_enabled = False
-                print("Wyprodukowano:", self.production_unit_type)
+        self.garrison.append(new_unit)
 
+        print("Wyprodukowano:", self.production_unit_type)
+
+        self.production_enabled = False
+        self.production_turns_left = 0
 
         return True
