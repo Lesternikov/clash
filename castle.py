@@ -6,7 +6,6 @@ from unit import GoldTransport
 import pygame
 from unit import Unit
 
-
 BUILDINGS = {
     "hospital": {"cost": 200},
     "garrison": {"cost": 200},
@@ -132,14 +131,11 @@ class Castle:
                 print("Wyprodukowano:", self.production_unit_type)
                 print("Garrison size:", len(self.garrison))
 
+                # restart produkcji
+                self.production_turns_left = PRODUCTION_TIME[self.production_unit_type]
+
             else:
                 print("Brak złota — produkcja przerwana")
-
-            # KONIEC PRODUKCJI
-            self.production_enabled = False
-            self.production_unit_type = None
-            self.production_turns_left = 0
-
     
     def start_healing_unit(self, unit):
         if "hospital" not in self.buildings:
@@ -309,7 +305,7 @@ class Castle:
                 unit.gain_training_exp()
                 finished.append(unit)
                 print("Szkolenie zakończone")
-
+                
         for unit in finished:
             del self.training[unit]
 
