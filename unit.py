@@ -21,15 +21,14 @@ UNIT_STATS = {
     "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,},
     "smok":{"hp":150,"moves":14,"attack":100,"defense":100,},
     "trol":{"hp":90,"moves":4,"attack":60,"defense":70,},
-    "katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 4, "tags": ["ranged"]},
-    "cyklop":{"hp":,"moves":,"attack":,"defense":,"range": 4, "tags": ["ranged"]},
-    "dragon":{"hp":,"moves":,"attack":,"defense":,"range": 4, "tags": ["ranged"]},
-    "rycerstwo":{"hp":,"moves":,"attack":,"defense":,},
-    "płaszczka":{"hp":,"moves":,"attack":,"defense":,},
-    "ważka":{"hp":,"moves":,"attack":,"defense":,},
-    "armata":{"hp":,"moves":,"attack":,"defense":,},
-    "budowniczy":{"hp":,"moves":,"attack":,"defense":,},
-
+    "katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 5, "tags": ["ranged"]},
+    "cyklop":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
+    "dragon":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
+    "rycerstwo":{"hp":80,"moves":6,"attack":60,"defense":70,},
+    "płaszczka":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 4, "tags": ["ranged"]},
+    "ważka":{"hp":80,"moves":6,"attack":60,"defense":70,},
+    "armata":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 5, "tags": ["ranged"]},
+    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,},
 }
 
 
@@ -57,6 +56,14 @@ class Unit:
         "smok":550,
         "pospolite_ruszenie":0,
         "leśnik":100,
+        "budowniczy":100,
+        "armata":100,
+        "ważka":100,
+        "płaszczka":100,
+        "rycerstwo":100,
+        "dragon":100,
+        "cyklop":100,
+        "katapulta":100,
     }
     def __init__(self, unit_type, x, y, owner):
         self.type = unit_type
