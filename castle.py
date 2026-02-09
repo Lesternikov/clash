@@ -11,10 +11,40 @@ BUILDINGS = {
     "garrison": {"cost": 200},
     "workshop": {"cost": 220},
     "forge": {"cost": 190},
-    "school": {"cost": 400},
+    "school": {"cost": 400},}
 
+PRODUCTION_TIME = {
+     "heavy_infantry": 60,
+        "light_infantry": 50,
+        "pikeman": 70,
+        "halberdier": 110,
+        "highlander": 90,
+        "light_cavalry": 120,
+        "heavy_cavalry": 180,
+        "elephant": 200,
+        "archer": 30,
+        "crossbowman": 70,
+        "musketeer": 100,
+        "worm":80,
+        "scorpion":200,
+        "mag":500,
+        "pegasus":350,
+        "eagle":200,
+        "ghost":160,
+        "bones":130,
+        "trol":130,
+        "smok":550,
+        "pospolite_ruszenie":0,
+        "leśnik":100,
+        "budowniczy":100,
+        "armata":100,
+        "ważka":100,
+        "płaszczka":100,
+        "rycerstwo":100,
+        "dragon":100,
+        "cyklop":100,
+        "katapulta":100,
 }
-
 class Castle:
     def __init__(self, x, y, owner=None):
         self.x = x
@@ -129,13 +159,13 @@ class Castle:
                 self.garrison.append(unit)
 
                 print("Wyprodukowano:", self.production_unit_type)
-                print("Garrison size:", len(self.garrison))
 
                 # restart produkcji
                 self.production_turns_left = PRODUCTION_TIME[self.production_unit_type]
 
             else:
-                print("Brak złota — produkcja przerwana")
+                print("Brak złota — produkcja zatrzymana")
+                self.production_enabled = False
     
     def start_healing_unit(self, unit):
         if "hospital" not in self.buildings:
