@@ -4,6 +4,7 @@ from player import Player
 from map_loader import load_map, load_fac_objects
 import pygame
 
+
 class World:
     def __init__(self):
         self.map = None
