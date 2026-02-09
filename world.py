@@ -48,6 +48,11 @@ class World:
             
             c = Castle(x // 5, y // 10, owner)
             c.gold = 20000
+            c.buildings.add("hospital")
+            c.buildings.add("school")
+            c.buildings.add("garrison")
+            c.buildings.add("forge")
+            c.buildings.add("workshop")
             self.castles.append(c)
 
     # jednostki startowe przy zamkach graczy
@@ -357,8 +362,12 @@ class World:
             if self.menu_open:
                 for name, rect in self.build_rects.items():
                     if rect.collidepoint(mx, my):
-                        self.selected_castle.build(name)
+                        self.selected_castle.buildings.add(name)
+                        print("Zbudowano:", name)
                         return
+
+       
+            
 
     # ================= GARRISON =================
         elif self.screen == "garrison":
@@ -563,6 +572,7 @@ class World:
         if "garrison" in self.selected_castle.buildings:
             pygame.draw.rect(screen, (240, 120, 20), self.recruit_button)
             screen.blit(font.render("RECRUIT", True, (255,255,255)), (50,390))
+            print(self.selected_castle.buildings)
 
     def draw_map(self, screen):
         tile = 32
@@ -615,7 +625,7 @@ class World:
                 (255, 255, 0),
             )
             screen.blit(gold, (40, 80))
-           
+
     # --- BUTTON: GARRISON ---
         self.garrison_button = pygame.Rect(40, 140, 160, 40)
         pygame.draw.rect(screen, (80, 80, 200), self.garrison_button)

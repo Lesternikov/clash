@@ -2,35 +2,44 @@ UNIT_STATS = {
     "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,},
     "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense": 50},
     "pikinier": {"hp": 60, "moves": 7, "attack": 80, "defense": 60},
-    "heavy_cavalry": {"hp": 160, "moves": 3, "attack": 120, "defense": 90},
-    "light_cavalry": {"hp": 80, "moves": 10, "attack": 90, "defense": 40},
     "highlander": {"hp": 100, "moves": 6, "attack": 80, "defense": 60},
-    "halberdier": {"hp": 70, "moves": 5, "attack": 90, "defense": 100},
-    "elephant": {"hp": 100, "moves": 3, "attack": 100, "defense": 0},
+    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,},
+
+    "light_cavalry": {"hp": 80, "moves": 10, "attack": 90, "defense": 40},
+
+    "archer": {"hp": 8, "moves": 8, "attack": 20, "defense": 0, "range": 3, "tags": ["ranged"]},
+    "leśnik":{"hp":100,"moves":7,"attack":90,"defense":60,"range": 4, "tags": ["ranged"]},
+
     "ważka":{"hp":80,"moves":6,"attack":60,"defense":70,},
+
+    "heavy_infantry": {"hp": 120, "moves": 8, "attack": 50, "defense": 70},
+    "halberdier": {"hp": 70, "moves": 5, "attack": 90, "defense": 100},
     "rycerstwo":{"hp":80,"moves":6,"attack":60,"defense":70,},
-    "worm":{"hp":60,"moves":5,"attack":55,"defense":10},
+    
+    "crossbowman": {"hp": 20, "moves": 6, "attack": 40, "defense": 30, "range": 4, "tags": ["ranged"]},
+
+    "dragon":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
+    "katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 5, "tags": ["ranged"]},
+    "armata":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 5, "tags": ["ranged"]},
     "scorpion":{"hp":100,"moves":8,"attack":80,"defense":80,},
-    "pegasus":{"hp":120, "moves":10, "attack":80, "defense":20},
+    "elephant": {"hp": 100, "moves": 3, "attack": 100, "defense": 0},
     "eagle":{"hp":100, "moves":11, "attack":90, "defense":30},
+
+    "trol":{"hp":90,"moves":4,"attack":60,"defense":70,},
+    "heavy_cavalry": {"hp": 160, "moves": 3, "attack": 120, "defense": 90},
+    "worm":{"hp":60,"moves":5,"attack":55,"defense":10},
+
+    "cyklop":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
+    
+    "pegasus":{"hp":120, "moves":10, "attack":80, "defense":20},
+    "płaszczka":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 4, "tags": ["ranged"]},
+
+    "musketeer": {"hp": 25, "moves": 5, "attack": 50, "defense": 30, "range": 4, "tags": ["ranged"]},
     "gohst":{"hp":100,"moves":4,"attack":80,"defense":60,},
     "bones":{"hp":90,"moves":6,"attack":60,"defense":70,},
-    "heavy_infantry": {"hp": 120, "moves": 8, "attack": 50, "defense": 70},
-    "smok":{"hp":150,"moves":14,"attack":100,"defense":100,},
-    "trol":{"hp":90,"moves":4,"attack":60,"defense":70,},
     "mag":{"hp":140,"moves":10,"attack":100,"defense":100, "range": 6, "tags": ["ranged"]},
-    "leśnik":{"hp":100,"moves":7,"attack":90,"defense":60,"range": 4, "tags": ["ranged"]},
-    "katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 5, "tags": ["ranged"]},
-    "cyklop":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
-    "dragon":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
-    "płaszczka":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 4, "tags": ["ranged"]},
-    "archer": {"hp": 8, "moves": 8, "attack": 20, "defense": 0, "range": 3, "tags": ["ranged"]},
-    "crossbowman": {"hp": 20, "moves": 6, "attack": 40, "defense": 30, "range": 4, "tags": ["ranged"]},
-    "musketeer": {"hp": 25, "moves": 5, "attack": 50, "defense": 30, "range": 4, "tags": ["ranged"]},
-    "armata":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 5, "tags": ["ranged"]},
-    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,},
+    "smok":{"hp":150,"moves":14,"attack":100,"defense":100,},
 }
-
 
 class Unit:
     UNIT_COSTS = {
