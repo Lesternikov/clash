@@ -2,13 +2,15 @@ HOSPITAL = "hospital"
 import random 
 from unit import PeasantGroup
 from unit import GoldTransport
-
+from unit import Unit
 
 BUILDINGS = {
     "hospital": {"cost": 200},
-    "garrison": {"cost": 150},
-    "workshop": {"cost": 250},
-    "forge": {"cost": 300},
+    "garrison": {"cost": 200},
+    "workshop": {"cost": 220},
+    "forge": {"cost": 190},
+    "school": {"cost": 400},
+
 }
 
 class Castle:
@@ -29,17 +31,25 @@ class Castle:
         self.production_unit_type = None
         self.production_turns_left = 0
         self.production_enabled = False
+        self.training = {}        
 
-    def collect_taxes(self):
-        happiness_factor = 0.5 + (self.happiness / 200)
-        income = int(self.peasants * 0.1 * self.tax_rate * happiness_factor)
-        
+    def collect_taxes(self):        
         if self.plague_active:
             return
 
         happiness_factor = 0.5 + (self.happiness / 100) * 0.5
         income = int(self.peasants * 0.1 * self.tax_rate * happiness_factor)
         self.gold += income
+
+    def update_happiness(self):
+        change = (self.tax_rate - 1.0) * -2
+        self.happiness += change
+        self.happiness = max(0, min(100, self.happiness))
+    
+    def grow_population(self):
+        growth = int(self.peasants * (self.happiness / 100) * 0.02)
+        self.peasants += max(1, growth)
+    
 
     def send_resources(self, target, peasants=0, gold=0):
         peasants = min(peasants, self.peasants)
@@ -69,32 +79,18 @@ class Castle:
             print("Za mało złota")
             return None
 
+        if len(self.garrison) >= 12:
+            print("Garnizon pełny")
+            return None
+
         self.gold -= cost
+        
+        unit = Unit("light_infantry", self.x, self.y, self.owner)
+        self.garrison.append(unit)
+
         print("Wyprodukowano jednostkę")
+        return unit
     
-    def process_production(self):
-        if not self.production_enabled:
-            return
-
-        if not self.production_unit:
-            return
-
-        self.pro
-        duction_turns_left -= 1
-
-        if self.production_turns_left <= 0:
-            cost = self.production_unit.cost
-
-            if self.gold >= cost:
-                self.gold -= cost
-                self.garrison.append(self.production_unit)
-                print("Wyprodukowano:", self.production_unit.name)
-
-                self.production_turns_left = self.production_unit.production_time
-            else:
-                print("Brak złota — produkcja zatrzymana")
-                self.production_enabled = False
-
     def start_production(self, unit_type, production_time):
         self.production_unit_type = unit_type
         self.production_turns_left = production_time
@@ -117,10 +113,16 @@ class Castle:
 
             if self.gold >= cost:
                 self.gold -= cost
-                self.garrison.append(self.production_unit_type)
+                unit = Unit(
+                    self.production_unit_type,
+                    self.x,
+                    self.y,
+                    self.owner
+                )
+
+                self.garrison.append(unit)
 
                 print("Wyprodukowano:", self.production_unit_type)
-
                 self.production_turns_left = 3
             else:   
                 print("Brak złota — produkcja zatrzymana")
@@ -197,8 +199,6 @@ class Castle:
 
     def has_building(self, name):
         return name in self.buildings
-    
-    import random
 
     def check_plague_start(self):
         if self.plague_active:
@@ -268,6 +268,37 @@ class Castle:
 
         print(f"Wysłano {amount} złota")
 
+    def start_training(self, unit):
+        if "school" not in self.buildings:
+            print("Brak szkoły")
+            return
+
+        if unit not in self.garrison:
+            print("Jednostka nie jest w garnizonie")
+            return
+
+        if unit.experience >= 12:
+            print("Max doświadczenie")
+            return
+        if unit in self.training:
+            return
+
+        self.training[unit] = 2
+        print("Szkolenie rozpoczęte")
+
+    def process_training(self):
+        finished = []
+
+        for unit in list(self.training):
+            self.training[unit] -= 1
+
+            if self.training[unit] <= 0:
+                unit.gain_training_exp()
+                finished.append(unit)
+                print("Szkolenie zakończone")
+
+        for unit in finished:
+            del self.training[unit]
 
     def next_turn(self):
         self.update_happiness()
@@ -277,6 +308,16 @@ class Castle:
         self.grow_population()
         self.process_production()
         self.process_healing()
+        self.process_training()
+        if self.production_enabled:
+            self.production_turns_left -= 1
+
+            if self.production_turns_left <= 0:
+                u = Unit(self.production_unit_type, self.x, self.y, self.owner)
+                self.garrison.append(u)
+
+                self.production_enabled = False
+                print("Wyprodukowano:", self.production_unit_type)
 
 
         return True

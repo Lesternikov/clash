@@ -1,34 +1,198 @@
-from unit import Unit
+UNIT_STATS = {
+    "heavy_infantry": {"hp": 120, "moves": 8, "attack": 50, "defense": 70},
+    "light_infantry": {"hp": 100, "moves": 6, "attack": 70, "defense": 50},
+    "light_cavalry": {"hp": 80, "moves": 10, "attack": 90, "defense": 40},
+    "heavy_cavalry": {"hp": 160, "moves": 3, "attack": 120, "defense": 90},
+    "pikeman": {"hp": 60, "moves": 7, "attack": 80, "defense": 60},
+    "highlander": {"hp": 100, "moves": 6, "attack": 80, "defense": 60},
+    "halberdier": {"hp": 70, "moves": 5, "attack": 90, "defense": 100},
+    "elephant": {"hp": 100, "moves": 3, "attack": 100, "defense": 0},
+    "archer": {"hp": 8, "moves": 8, "attack": 20, "defense": 0, "range": 3, "tags": ["ranged"]},
+    "crossbowman": {"hp": 20, "moves": 6, "attack": 40, "defense": 30, "range": 4, "tags": ["ranged"]},
+    "musketeer": {"hp": 25, "moves": 5, "attack": 50, "defense": 30, "range": 4, "tags": ["ranged"]},
+    "worm":{"hp":60,"moves":5,"attack":55,"defense":10},
+    "scorpion":{"hp":100,"moves":8,"attack":80,"defense":80,},
+    "mag":{"hp":140,"moves":10,"attack":100,"defense":100, "range": 6, "tags": ["ranged"]}
+}
+
+
 class Unit:
+    UNIT_COSTS = {
+        "heavy_infantry": 60,
+        "light_infantry": 50,
+        "pikeman": 70,
+        "halberdier": 110,
+        "highlander": 90,
+        "light_cavalry": 120,
+        "heavy_cavalry": 180,
+        "elephant": 200,
+        "archer": 30,
+        "crossbowman": 70,
+        "musketeer": 100,
+        "worm":80,
+        "scorpion":200,
+        "mag":500,
+    }
     def __init__(self, unit_type, x, y, owner):
         self.type = unit_type
         self.x = x
         self.y = y
         self.owner = owner
+
+        stats = UNIT_STATS.get(unit_type, {"hp": 100, "moves": 10, "attack": 10, "defense": 10})
+
+        self.base_hp = stats["hp"]
+        self.hp = self.base_hp
+        self.attack = stats["attack"]
+        self.defense = stats["defense"]
+        self.move_points = stats["moves"]
+        self.max_moves = stats["moves"]
+
+        self.morale = 100
+        self.fatigue = 0
+        self.experience = 0
+        
+        # transport
         self.carried_peasants = 0
         self.carried_gold = 0
 
-        self.hp = 100
-        self.morale = 100
-        self.fatigue = 0
-        self.moves = 10
-        self.experience = 0
+        # produkcja
         self.production_unit_type = None
         self.production_turns_left = 0
         self.production_enabled = False
 
+        # ekonomia / garnizon
+        self.gold = 0
+        self.garrison = []
         self.garrison_limit = 12
+
+        # leczenie
         self.healing = False
         self.healing_turns_left = 0
 
+    # -----------------------
+    # BASIC
+    # -----------------------
 
     def position(self):
         return (self.x, self.y)
 
     def __repr__(self):
-        return f"{self.type} ({self.x},{self.y})"
-    
-    def start_production(self, unit_type, production_time):
+        return (
+            f"{self.type} HP:{self.hp} MOR:{self.morale} "
+            f"FAT:{self.fatigue} EXP:{self.experience}"
+        )
+# -----------------------
+# EXPERIENCE SYSTEM
+# -----------------------
+
+    def veterancy_level(self):
+        return self.experience // 3
+
+    def gain_training_exp(self):
+        if self.experience >= 12:
+            return
+
+        self.experience += 1
+
+        if self.experience % 3 == 0:
+            self.attack += 2
+            self.defense += 2
+            print("Jednostka awansowała poziomem!")
+
+    def gain_battle_exp(self):
+        old_level = self.veterancy_level()
+
+        self.experience = min(12, self.experience + 3)
+
+        if self.veterancy_level() > old_level:
+            self.attack += 2
+            self.defense += 2
+            print("Jednostka awansowała po walce!")
+
+    # -----------------------
+    # DEFENSE SYSTEM
+    # -----------------------
+
+    def effective_defense(self, attacker):
+        defense = self.defense
+
+        if self.type in ["pikeman", "halberdier"] and attacker.type in [
+            "light_cavalry",
+            "heavy_cavalry",
+        ]:
+            defense *= 1.5
+
+        return defense
+
+    # -----------------------
+    # DAMAGE
+    # -----------------------
+
+    def take_damage(self, dmg):
+        self.hp = max(0, self.hp - dmg)
+
+    def is_alive(self):
+        return self.hp > 0
+
+    def morale_modifier(self):
+        if self.morale > 120:
+            return 1.2
+        elif self.morale < 80:
+            return 0.8
+        return 1.0
+
+    def exp_modifier(self):
+        return 1 + (self.experience * 0.01)
+
+    def cavalry_attack_bonus(self, target):
+        if self.type in ["pikeman", "highlander"] and target.type in ["light_cavalry", "heavy_cavalry"]:
+            return 1.5
+        return 1.0
+
+    def attack_unit(self, target, log):
+        base_attack = self.attack * self.morale_modifier() * self.exp_modifier()
+        attack_bonus = self.cavalry_attack_bonus(target)
+
+        target_def = target.effective_defense(self)
+
+        damage = int(base_attack * attack_bonus - target_def * 0.5)
+
+        attacker_stats = UNIT_STATS[self.type]
+        defender_stats = UNIT_STATS[target.type]
+
+        if "ranged" in attacker_stats.get("tags", []):
+            damage += 5
+            log.add("Bonus ranged!")
+
+        damage = max(1, damage)
+
+        target.take_damage(damage)
+
+        log.add(f"{self.type} -> {target.type} | dmg:{damage} | hp:{target.hp}")
+
+        self.gain_battle_exp()
+
+        self.fatigue = min(100, self.fatigue + 15)
+
+        if self.type == "elephant":
+            target.morale = max(0, target.morale - 10)
+            log.add("Słoń obniża morale przeciwnika!")
+
+    # -----------------------
+    # MOVEMENT
+    # -----------------------
+
+    def can_enter(self, tile):
+        if tile == "#":
+            return self.type == "highlander"
+        return tile == "."
+
+    # -----------------------
+    # PRODUCTION
+    # -----------------------
+
+    def start_production(self, unit_type, production_time=3):
         self.production_unit_type = unit_type
         self.production_turns_left = production_time
         self.production_enabled = True
@@ -72,6 +236,7 @@ class Unit:
 
             self.production_turns_left = 3
 
+
 class GoldTransport:
     def __init__(self, x, y, owner, gold):
         self.x = x
@@ -86,6 +251,7 @@ class GoldTransport:
     def __repr__(self):
         return f"Gold({self.gold})"
 
+
 class PeasantGroup:
     def __init__(self, x, y, owner, amount):
         self.x = x
@@ -99,5 +265,3 @@ class PeasantGroup:
 
     def __repr__(self):
         return f"Peasants({self.amount})"
-
-
