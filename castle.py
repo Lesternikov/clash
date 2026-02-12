@@ -14,36 +14,36 @@ BUILDINGS = {
     "school": {"cost": 400},}
 
 PRODUCTION_TIME = {
-     "heavy_infantry": 60,
-        "light_infantry": 50,
-        "pikeman": 70,
-        "halberdier": 110,
-        "highlander": 90,
-        "light_cavalry": 120,
-        "heavy_cavalry": 180,
-        "elephant": 200,
-        "archer": 30,
-        "crossbowman": 70,
-        "musketeer": 100,
-        "worm":80,
-        "scorpion":200,
-        "mag":500,
-        "pegasus":350,
-        "eagle":200,
-        "ghost":160,
-        "bones":130,
-        "trol":130,
-        "smok":550,
-        "pospolite_ruszenie":0,
-        "leśnik":100,
-        "budowniczy":100,
-        "armata":100,
-        "ważka":100,
-        "płaszczka":100,
-        "rycerstwo":100,
-        "dragon":100,
-        "cyklop":100,
-        "katapulta":100,
+    "pospolite_ruszenie":1,
+    "lekka_piechota": 2,
+    "pikinier":2,
+    "halberdier":3,
+    "highlander":3,
+    "light_cavalry":3,
+    "heavy_cavalry":4,
+    "elephant":4,
+    "archer":2,
+    "crossbowman":4,
+    "musketeer":4,
+    "worm":3,
+    "scorpion":3,
+    "mag":5,
+    "pegasus":3,
+    "eagle":3,
+    "ghost":3,
+    "bones":4,
+    "trol":4,
+    "smok":5,
+    "heavy_infantry":4,
+    "leśnik":3,
+    "budowniczy":3,
+    "armata":4,
+    "ważka":2,
+    "płaszczka":5,
+    "rycerstwo":4,
+    "dragon":4,
+    "cyklop":3,
+    "katapulta":4,
 }
 class Castle:
     def __init__(self, x, y, owner=None):
@@ -64,6 +64,9 @@ class Castle:
         self.production_turns_left = 0
         self.production_enabled = False
         self.training = {}        
+        self.production_queue = None
+        self.production_time_left = 0
+        self.garrison_limit = 12
 
     def collect_taxes(self):        
         if self.plague_active:
@@ -123,10 +126,21 @@ class Castle:
         print("Wyprodukowano jednostkę")
         return unit
     
-    def start_production(self, unit_type, production_time):
-        self.production_unit_type = unit_type
-        self.production_turns_left = production_time
+    def start_production(self, unit_type):
+        if self.production_enabled:
+            print("Produkcja już trwa")
+            return
+
+        if unit_type not in PRODUCTION_TIME:
+            print("Nieznany typ jednostki:", unit_type)
+            return
+
         self.production_enabled = True
+        self.production_unit_type = unit_type
+        self.production_turns_left = PRODUCTION_TIME[unit_type]
+
+        print("Start produkcji:", unit_type)
+
 
     def stop_production(self):
         self.production_enabled = False
@@ -138,13 +152,17 @@ class Castle:
         if self.production_unit_type is None:
             return
 
+        # zatrzymaj gdy garnizon pełny
+        if len(self.garrison) >= self.garrison_limit:
+            print("Garnizon pełny — produkcja zatrzymana")
+            self.production_enabled = False
+            return
+
         self.production_turns_left -= 1
         print("Produkcja — zostało:", self.production_turns_left)
 
         if self.production_turns_left <= 0:
-            from unit import Unit
-
-            cost = 10  # tymczasowo
+            cost = 10  # możesz potem podpiąć UNIT_COST
 
             if self.gold >= cost:
                 self.gold -= cost
@@ -160,12 +178,13 @@ class Castle:
 
                 print("Wyprodukowano:", self.production_unit_type)
 
-                # restart produkcji
+                # restart produkcji (fabryka)
                 self.production_turns_left = PRODUCTION_TIME[self.production_unit_type]
 
             else:
                 print("Brak złota — produkcja zatrzymana")
                 self.production_enabled = False
+
     
     def start_healing_unit(self, unit):
         if "hospital" not in self.buildings:
@@ -227,7 +246,8 @@ class Castle:
         self.update_level()
 
         print("Zbudowano:", building_name)
-       
+        return True
+
     def update_level(self):
         required = {"hospital", "garrison", "workshop", "forge"}
 
@@ -325,6 +345,26 @@ class Castle:
         self.training[unit] = 2
         print("Szkolenie rozpoczęte")
 
+    def start_training_selected(self, units):
+        for unit in units:
+            self.start_training(unit)
+
+    def start_training_group(self, units):
+        if "school" not in self.buildings:
+            print("Brak szkoły")
+            return
+
+        trained = 0
+
+        for unit in units:
+            if unit in self.garrison and unit.experience < 12:
+                if unit not in self.training:
+                    self.training[unit] = 2
+                self.training[unit] = 2
+                trained += 1
+
+        print("Rozpoczęto szkolenie:", trained)
+
     def process_training(self):
         finished = []
 
@@ -338,6 +378,9 @@ class Castle:
                 
         for unit in finished:
             del self.training[unit]
+
+            print("DEBUG training size:", len(self.training))
+
 
     def next_turn(self):
         self.update_happiness()

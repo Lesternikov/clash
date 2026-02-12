@@ -229,55 +229,6 @@ class Unit:
             return self.type == "highlander"
         return tile == "."
 
-    # -----------------------
-    # PRODUCTION
-    # -----------------------
-
-    def start_production(self, unit_type, production_time=3):
-        self.production_unit_type = unit_type
-        self.production_turns_left = production_time
-        self.production_enabled = True
-
-    def stop_production(self):
-        self.production_enabled = False
-
-    def process_production(self):
-        if not self.production_enabled:
-            return
-
-        if self.production_unit_type is None:
-            return
-
-        self.production_turns_left -= 1
-
-        if self.production_turns_left <= 0:
-            cost = 10
-
-            if self.gold < cost:
-                print("Brak złota — produkcja zatrzymana")
-                self.production_enabled = False
-                return
-
-            if len(self.garrison) >= self.garrison_limit:
-                print("Garnizon pełny")
-                return
-
-            self.gold -= cost
-
-            unit = Unit(
-                self.production_unit_type,
-                self.x,
-                self.y,
-                self.owner
-            )
-
-            self.garrison.append(unit)
-
-            print("Wyprodukowano:", self.production_unit_type)
-
-            self.production_turns_left = 3
-
-
 class GoldTransport:
     def __init__(self, x, y, owner, gold):
         self.x = x

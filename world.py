@@ -28,15 +28,12 @@ class World:
         self.recruit_button = pygame.Rect(40, 380, 160, 40)
         self.selected_unit_type = None
         self.menu_button = pygame.Rect(650, 40, 140, 40)
-
-        self.menu_open = False
-        self.build_open = False
-
         self.menu_rects = {}
         self.build_rects = {}
         self.next_turn_button = pygame.Rect(460, 10, 160, 40)
-
-
+        self.menu_open = False
+        self.build_open = False
+        
     def load(self, map_file, fac_file):
         self.map = load_map(map_file)
         self.objects = load_fac_objects(fac_file)
@@ -48,11 +45,6 @@ class World:
             
             c = Castle(x // 5, y // 10, owner)
             c.gold = 20000
-            c.buildings.add("hospital")
-            c.buildings.add("school")
-            c.buildings.add("garrison")
-            c.buildings.add("forge")
-            c.buildings.add("workshop")
             self.castles.append(c)
 
     # jednostki startowe przy zamkach graczy
@@ -362,19 +354,21 @@ class World:
             if self.menu_open:
                 for name, rect in self.build_rects.items():
                     if rect.collidepoint(mx, my):
-                        self.selected_castle.buildings.add(name)
-                        print("Zbudowano:", name)
+                        
+                        if self.selected_castle.build(name):
+                            self.menu_open = False
+                            self.build_open = False
                         return
 
-       
-            
-
+                    
     # ================= GARRISON =================
         elif self.screen == "garrison":
             if self.back_button.collidepoint(mx, my):
+                self.selected_units.clear()   # ← czyści multi-select
                 self.selected_garrison_unit = None
                 self.screen = "castle"
                 return
+
 
             self.handle_garrison_click(mx, my)
 
@@ -392,10 +386,14 @@ class World:
                         if self.heal_button.collidepoint(mx, my):
                             self.selected_castle.start_healing_unit(unit)
 
+                     # SZKOLENIE
                     if "school" in self.selected_castle.buildings:
                         if self.train_button.collidepoint(mx, my):
-                            unit.gain_training_exp()
-                            print("Szkolenie wykonane")   
+                            if self.selected_units:
+                                count = len(self.selected_units)
+                                self.selected_castle.start_training_group(self.selected_units)
+                                self.selected_units.clear()
+                                print("Przeszkolono", count, "jednostek")
         #produkcja wojska
         elif self.screen == "recruitment":
 
@@ -413,50 +411,25 @@ class World:
                 if hasattr(self, "start_prod_button"):
                     if self.start_prod_button.collidepoint(mx, my):
                         unit_types = ["lekka_piechota", "archer", "knight"]
-                        
-                        production_time = {
-                            "pospolite_ruszenie":1,
-                            "lekka_piechota": 2,
-                            "pikinier":2,
-                            "halberdier":3,
-                            "highlander":3,
-                            "light_cavalry":3,
-                            "heavy_cavalry":4,
-                            "elephant":4,
-                            "archer":2,
-                            "crossbowman":4,
-                            "musketeer":4,
-                            "worm":3,
-                            "scorpion":3,
-                            "mag":5,
-                            "pegasus":3,
-                            "eagle":3,
-                            "ghost":3,
-                            "bones":4,
-                            "trol":4,
-                            "smok":5,
-                            "heavy_infantry":4,
-                            "leśnik":3,
-                            "budowniczy":3,
-                            "armata":4,
-                            "ważka":2,
-                            "płaszczka":5,
-                            "rycerstwo":4,
-                            "dragon":4,
-                            "cyklop":3,
-                            "katapulta":4,
-                        }
 
                         utype = unit_types[self.selected_unit_type]
-                        turns = production_time[self.selected_unit_type]
 
-                        self.selected_castle.start_production(utype, turns)
+                        self.selected_castle.start_production(utype)
                         print("Produkcja:", utype)         
 
     def handle_garrison_click(self, mx, my):
         index = self.click_on_garrison(mx, my)
         if index is not None:
-            self.selected_garrison_unit = index
+            unit = self.selected_castle.garrison[index]
+
+            if unit in self.selected_units:
+                self.selected_units.remove(unit)
+            else:
+                if len(self.selected_units) < 10:
+                    self.selected_units.append(unit)
+                else:
+                    print("Można zaznaczyć max 10 jednostek")
+
             unit = self.selected_castle.garrison[index]
             print("Wybrano jednostkę:", unit.type)
 
@@ -523,7 +496,11 @@ class World:
 
                 rect = pygame.Rect(x, y, slot, slot)
 
-                if self.selected_garrison_unit == index:
+                unit = None
+                if index < len(self.selected_castle.garrison):
+                    unit = self.selected_castle.garrison[index]
+
+                if unit in self.selected_units:
                     pygame.draw.rect(screen, (255, 255, 0), rect, 3)
                 else:
                     pygame.draw.rect(screen, (200, 200, 200), rect, 2)
@@ -550,30 +527,36 @@ class World:
         font = pygame.font.SysFont(None, 24)
         screen.blit(font.render("BACK", True, (255,255,255)), (55,50))
 
-    # INFO o jednostce
-        if self.selected_garrison_unit is not None:
-            if self.selected_garrison_unit < len(self.selected_castle.garrison):
-                unit = self.selected_castle.garrison[self.selected_garrison_unit]
+        # INFO o zaznaczonych jednostkach
+        info_y = 120
 
-                screen.blit(font.render(f"Type: {unit.type}", True, (255,255,255)), (40,120))
-                screen.blit(font.render(f"HP: {unit.hp}", True, (255,255,255)), (40,150))
-                screen.blit(font.render(f"EXP: {unit.experience}", True, (255,255,255)), (40,180))
+        for unit in self.selected_units:
+            screen.blit(
+                font.render(f"{unit.type} EXP: {unit.experience}", True, (255,255,255)),
+                (40, info_y)
+            )
+            info_y += 25
+
+
         # HEAL BUTTON (hospital)
         if self.selected_castle and "hospital" in self.selected_castle.buildings:
             pygame.draw.rect(screen, (80, 160, 80), self.heal_button)
             screen.blit(font.render("HEAL", True, (255,255,255)), (50,270))
 
-    # TRAIN BUTTON (school)
+        # TRAIN BUTTON
         if self.selected_castle and "school" in self.selected_castle.buildings:
-            pygame.draw.rect(screen, (160, 160, 80), self.train_button)
-            screen.blit(font.render("TRAIN", True, (255,255,255)), (50,330))
+            if self.train_button.collidepoint(mx, my):
+                if self.selected_units:
+                    self.selected_castle.start_training_group(self.selected_units)
+                    print("Szkolenie wystartowało:", len(self.selected_units))
+                else:
+                    print("Brak zaznaczonych jednostek")
    
     # przycisk produkcji wojska
         if "garrison" in self.selected_castle.buildings:
             pygame.draw.rect(screen, (240, 120, 20), self.recruit_button)
             screen.blit(font.render("RECRUIT", True, (255,255,255)), (50,390))
-            print(self.selected_castle.buildings)
-
+           
     def draw_map(self, screen):
         tile = 32
         font = pygame.font.SysFont(None, 18)
@@ -725,7 +708,7 @@ class World:
             return
 
         castle.gold -= cost
-        castle.start_production(utype, production_time=3)
+        castle.start_production(utype)
 
         print("Rozpoczęto produkcję:", utype)
 
@@ -808,3 +791,4 @@ class World:
             self.build_rects[b] = rect
 
         return None
+    
