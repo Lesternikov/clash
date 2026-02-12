@@ -45,6 +45,7 @@ PRODUCTION_TIME = {
     "cyklop":3,
     "katapulta":4,
 }
+
 class Castle:
     def __init__(self, x, y, owner=None):
         self.x = x
@@ -120,7 +121,7 @@ class Castle:
 
         self.gold -= cost
         
-        unit = Unit("light_infantry", self.x, self.y, self.owner)
+        unit = Unit("lekka_piechota", self.x, self.y, self.owner)
         self.garrison.append(unit)
 
         print("Wyprodukowano jednostkę")
@@ -349,7 +350,10 @@ class Castle:
         for unit in units:
             self.start_training(unit)
 
+
     def start_training_group(self, units):
+        print("DEBUG: start_training_group wywołane")
+
         if "school" not in self.buildings:
             print("Brak szkoły")
             return
@@ -409,5 +413,28 @@ class Castle:
 
         self.production_enabled = False
         self.production_turns_left = 0
+    
+    def update_production(self, world):
+        if not self.production_enabled:
+            return
 
-        return True
+        self.production_turns_left -= 1
+        print("Produkcja — zostało tur:", self.production_turns_left)
+
+        if self.production_turns_left <= 0:
+            unit = Unit(
+                self.production_unit_type,
+                self.x,
+                self.y,
+                self.owner
+            )
+
+            if not world.spawn_unit_near_castle(unit, self):
+                print("Brak miejsca — jednostka w garnizonie")
+                self.garrison.append(unit)
+
+            self.production_enabled = False
+            self.production_unit_type = None
+            print("Wyprodukowano jednostkę")
+
+        return True 
