@@ -458,7 +458,7 @@ class World:
                 if self.start_prod_button.collidepoint(mx, my):
                     self.start_recruitment(self.selected_unit_type)
                     return
-                utype = UNIT_TYPES[self.selected_unit_type]
+                utype = [self.selected_unit_type]
 
                 self.selected_castle.start_production(utype)
                 print("Produkcja:", utype)  
