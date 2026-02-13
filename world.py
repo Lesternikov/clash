@@ -35,11 +35,36 @@ class World:
         self.menu_open = False
         self.build_open = False
 
-
-
         self.unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
             "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
             "dragon","cyklop","katapulta",]
+
+        self.peasant_button = pygame.Rect(0, 0, 180, 45)
+        self.send_peasants_amount = 0
+        self.send_gold_amount = 0
+        # PEASANTS + -
+        self.peasants_plus_button = pygame.Rect(0, 0, 40, 40)
+        self.peasants_minus_button = pygame.Rect(0, 0, 40, 40)
+       # TAX + -
+        self.tax_plus_button = pygame.Rect(0, 0, 40, 40)
+        self.tax_minus_button = pygame.Rect(0, 0, 40, 40)
+
+        # CASTLE SCROLL
+        self.castle_up_button = pygame.Rect(0, 0, 40, 40)
+        self.castle_down_button = pygame.Rect(0, 0, 40, 40)
+
+        # GOLD + -
+        self.gold_plus_button = pygame.Rect(0, 0, 40, 40)
+        self.gold_minus_button = pygame.Rect(0, 0, 40, 40)
+       
+        # SEND
+        self.send_button = pygame.Rect(0, 0, 160, 45)
+        
+        # BACK
+        self.back_button = pygame.Rect(0, 0, 120, 40)
+        self.castle_list_offset = 0
+        self.castle_scroll_up = pygame.Rect(0,0,40,40)
+        self.castle_scroll_down = pygame.Rect(0,0,40,40)
         
     def load(self, map_file, fac_file):
         self.map = load_map(map_file)
@@ -90,6 +115,9 @@ class World:
 
         self.selected_unit = None
         self.selected_castle = None
+        for castle in self.castles:
+            castle.collect_taxes()
+
 
     def move_unit(self, unit, dx, dy):
         if unit.move_points <= 0:
@@ -354,9 +382,8 @@ class World:
                 self.screen = "garrison"
                 return
 
-            # MENU button
-            if self.menu_button.collidepoint(mx, my):
-                self.menu_open = not self.menu_open
+            if self.peasant_button.collidepoint(mx, my):
+                self.screen = "peasants"
                 return
 
             # klik w budynki
@@ -426,13 +453,74 @@ class World:
             if index is not None:
                 self.selected_unit_type = index
                 return
-
+            
             if hasattr(self, "start_prod_button"):
                 if self.start_prod_button.collidepoint(mx, my):
                     self.start_recruitment(self.selected_unit_type)
                     return
-            
+                utype = UNIT_TYPES[self.selected_unit_type]
 
+                self.selected_castle.start_production(utype)
+                print("Produkcja:", utype)  
+                      
+        elif self.screen == "peasants":
+            print("peasants screen click")
+
+            if self.back_button.collidepoint(mx, my):
+                self.screen = "castle"
+                return
+
+            castle = self.selected_castle
+
+            # ================= SEND AMOUNT =================
+
+            if self.peasants_plus_button.collidepoint(mx, my):
+                if self.send_peasants_amount + 10 <= castle.peasants:
+                    self.send_peasants_amount += 10
+
+            if self.peasants_minus_button.collidepoint(mx, my):
+                self.send_peasants_amount = max(0, self.send_peasants_amount - 10)
+
+            if self.gold_plus_button.collidepoint(mx, my):
+                if self.send_gold_amount + 10 <= castle.gold:
+                    self.send_gold_amount += 10
+
+            if self.gold_minus_button.collidepoint(mx, my):
+                self.send_gold_amount = max(0, self.send_gold_amount - 10)
+
+            # ================= TAX =================
+
+            if self.tax_plus_button.collidepoint(mx, my):
+                castle.tax_rate = min(4.0, castle.tax_rate + 0.1)
+
+            if self.tax_minus_button.collidepoint(mx, my):
+                castle.tax_rate = max(0.0, castle.tax_rate - 0.1)
+
+            # ================= SCROLL =================
+
+            owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
+            max_offset = max(0, len(owned) - 3)
+
+            if self.castle_scroll_up.collidepoint(mx, my):
+                self.castle_list_offset = max(0, self.castle_list_offset - 1)
+
+            if self.castle_scroll_down.collidepoint(mx, my):
+                self.castle_list_offset = min(max_offset, self.castle_list_offset + 1)
+
+            # ================= SEND =================
+
+            if self.send_button.collidepoint(mx, my):
+
+                if self.send_peasants_amount <= castle.peasants and \
+                self.send_gold_amount <= castle.gold:
+
+                    castle.peasants -= self.send_peasants_amount
+                    castle.gold -= self.send_gold_amount
+
+                    print("Resources sent!")
+
+                    self.send_peasants_amount = 0
+                    self.send_gold_amount = 0
 
     def handle_garrison_click(self, mx, my):
         if self.selected_castle:
@@ -474,6 +562,9 @@ class World:
 
         elif self.screen == "recruitment":
             self.draw_recruitment(screen)
+        
+        elif self.screen == "peasants":
+            self.draw_peasants(screen)
 
     def draw_garrison(self, screen):
         if not self.selected_castle:
@@ -594,6 +685,12 @@ class World:
                     (self.next_turn_button.x + 10, self.next_turn_button.y + 10))
     
     def draw_castle(self, screen):
+        screen_width = screen.get_width()
+        screen_height = screen.get_height()
+
+        self.peasant_button.x = screen_width - 200
+        self.peasant_button.y = screen_height - 70
+
         font = pygame.font.SysFont(None, 28)
 
         title = font.render("CASTLE", True, (255, 255, 255))
@@ -617,15 +714,49 @@ class World:
         pygame.draw.rect(screen, (120, 80, 80), self.back_button)
         screen.blit(font.render("BACK", True, (255,255,255)), (50,210))
 
-        # --- MENU BUTTON (po prawej stronie) ---
+        pygame.draw.rect(screen, (100, 140, 60), self.peasant_button)
+
+        text = font.render("PEASANTS", True, (255,255,255))
+        screen.blit(
+            text,
+            (
+                self.peasant_button.x + 20,
+                self.peasant_button.y + 10
+    )
+)
+        mx, my = pygame.mouse.get_pos()
+
+        # MENU BUTTON
         pygame.draw.rect(screen, (80, 80, 80), self.menu_button)
         screen.blit(font.render("MENU", True, (255,255,255)),
                     (self.menu_button.x + 25, self.menu_button.y + 10))
 
-        mx, my = pygame.mouse.get_pos()
-            #otwarte menu
+        # jeśli najedziemy na przycisk — otwórz menu
+        if self.menu_button.collidepoint(mx, my):
+            self.menu_open = True
+
+        # NAJPIERW rysujemy menu (tworzy recty!)
         if self.menu_open:
             self.draw_castle_menu(screen, mx, my)
+
+        # DOPIERO TERAZ sprawdzamy czy zamknąć
+        mouse_over_ui = False
+
+        if self.menu_button.collidepoint(mx, my):
+            mouse_over_ui = True
+
+        for rect in self.menu_rects.values():
+            if rect.collidepoint(mx, my):
+                mouse_over_ui = True
+
+        for rect in self.build_rects.values():
+            if rect.collidepoint(mx, my):
+                mouse_over_ui = True
+
+        if not mouse_over_ui:
+            self.menu_open = False
+            self.build_open = False
+
 
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
@@ -669,6 +800,109 @@ class World:
                 f"Tury: {self.selected_castle.production_turns_left}",
                 True,
                 (255,255,255)), (40, 290))
+            
+    def draw_peasants(self, screen):
+        font = pygame.font.SysFont(None, 24)
+
+        castle = self.selected_castle
+        if not castle:
+            return
+
+        w = screen.get_width()
+        h = screen.get_height()
+
+        happiness_factor = 0.5 + (castle.happiness / 100) * 0.5
+        tax_income = int(castle.peasants * 0.1 * castle.tax_rate * happiness_factor)
+
+
+        # =====================================================
+        # TOP HUD
+        # =====================================================
+
+        screen.blit(font.render(f"Peasants: {castle.peasants}", True, (255,255,255)), (w//2 - 60, 20))
+        screen.blit(font.render(f"Happiness: {castle.happiness}%", True, (200,255,200)), (w//2 - 70, 45))
+        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)), (w - 120, 20))
+
+        # =====================================================
+        # TAX PANEL (LEFT)
+        # =====================================================
+
+        screen.blit(font.render("TAX", True, (255,255,255)), (60, h//2 - 80))
+        screen.blit(font.render(f"{castle.tax_rate:.1f}", True, (255,255,255)), (70, h//2 - 20))
+        screen.blit(font.render(f"+{tax_income}/turn", True, (255,255,0)), (40, h//2 + 10))
+
+        self.tax_minus_button.topleft = (20, h//2 - 40)
+        self.tax_plus_button.topleft = (140, h//2 - 40)
+
+        pygame.draw.rect(screen, (120,120,120), self.tax_minus_button)
+        pygame.draw.rect(screen, (120,120,120), self.tax_plus_button)
+
+        screen.blit(font.render("-", True, (0,0,0)), self.tax_minus_button.move(12,5))
+        screen.blit(font.render("+", True, (0,0,0)), self.tax_plus_button.move(12,5))
+
+        # =====================================================
+        # CASTLE LIST (CENTER)
+        # =====================================================
+
+        panel_rect = pygame.Rect(w//2 - 150, h//2 - 60, 300, 120)
+        pygame.draw.rect(screen, (70,50,40), panel_rect)
+
+        owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
+
+        visible = owned[self.castle_list_offset:self.castle_list_offset+3]
+
+        for i, c in enumerate(visible):
+            txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
+            screen.blit(font.render(txt, True, (255,255,255)),
+                        (w//2 - 130, h//2 - 40 + i*30))
+
+        self.castle_up_button.topleft = (w//2 + 160, h//2 - 60)
+        self.castle_down_button.topleft = (w//2 + 160, h//2)
+
+        pygame.draw.rect(screen,(120,120,120),self.castle_up_button)
+        pygame.draw.rect(screen,(120,120,120),self.castle_down_button)
+
+        screen.blit(font.render("^",True,(255,255,255)),self.castle_up_button.move(12,5))
+        screen.blit(font.render("v",True,(255,255,255)),self.castle_down_button.move(12,5))
+
+        # =====================================================
+        # SEND PANEL (RIGHT)
+        # =====================================================
+
+        self.peasants_minus_button.topleft = (w - 180, h//2 - 40)
+        self.peasants_plus_button.topleft = (w - 140, h//2 - 40)
+
+        self.gold_minus_button.topleft = (w - 180, h//2 + 10)
+        self.gold_plus_button.topleft = (w - 140, h//2 + 10)
+
+        self.send_button.center = (w - 120, h//2 + 80)
+
+        pygame.draw.rect(screen, (120,120,120), self.peasants_minus_button)
+        pygame.draw.rect(screen, (120,120,120), self.peasants_plus_button)
+        pygame.draw.rect(screen, (120,120,120), self.gold_minus_button)
+        pygame.draw.rect(screen, (120,120,120), self.gold_plus_button)
+        pygame.draw.rect(screen, (80,140,80), self.send_button)
+
+        screen.blit(font.render("-", True, (0,0,0)), self.peasants_minus_button.move(12,5))
+        screen.blit(font.render("+", True, (0,0,0)), self.peasants_plus_button.move(12,5))
+        screen.blit(font.render("-", True, (0,0,0)), self.gold_minus_button.move(12,5))
+        screen.blit(font.render("+", True, (0,0,0)), self.gold_plus_button.move(12,5))
+
+        screen.blit(font.render("SEND", True, (255,255,255)), self.send_button.move(30,10))
+
+        screen.blit(font.render(f"P: {self.send_peasants_amount}", True, (255,255,255)),
+                    (w-120, h//2 - 60))
+        screen.blit(font.render(f"G: {self.send_gold_amount}", True, (255,255,0)),
+                    (w-120, h//2 - 15))
+
+        # =====================================================
+        # BACK BUTTON
+        # =====================================================
+
+        self.back_button.bottomleft = (20, h - 20)
+        pygame.draw.rect(screen,(140,80,80),self.back_button)
+        screen.blit(font.render("BACK",True,(255,255,255)),self.back_button.move(20,8))
+
 
     def draw(self, screen):
         self.draw_pygame(screen)
@@ -803,6 +1037,6 @@ class World:
                         (sub_x+10, sub_y+10+i*40))
 
             self.build_rects[b] = rect
-
+    
         return None
     

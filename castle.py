@@ -127,21 +127,10 @@ class Castle:
         print("Wyprodukowano jednostkę")
         return unit
     
-    def start_production(self, unit_type):
-        if self.production_enabled:
-            print("Produkcja już trwa")
-            return
-
-        if unit_type not in PRODUCTION_TIME:
-            print("Nieznany typ jednostki:", unit_type)
-            return
-
-        self.production_enabled = True
+    def start_production(self, unit_type, production_time):
         self.production_unit_type = unit_type
-        self.production_turns_left = PRODUCTION_TIME[unit_type]
-
-        print("Start produkcji:", unit_type)
-
+        self.production_turns_left = production_time
+        self.production_enabled = True
 
     def stop_production(self):
         self.production_enabled = False
