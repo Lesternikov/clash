@@ -18,7 +18,7 @@ class World:
         self.screen = "map"
         self.selected_castle = None
         self.selected_garrison_unit = None
-        self.turn = 0
+        self.turn = 1
         self.current_player = 0
         self.selected_unit = None
         self.garrison_button = pygame.Rect(40, 140, 160, 40)
@@ -682,8 +682,10 @@ class World:
         pygame.draw.rect(screen, (80, 120, 200), self.next_turn_button)
 
         font = pygame.font.SysFont(None, 24)
-        screen.blit(font.render("NEXT TURN", True, (255,255,255)),
+        text = f"NEXT TURN ({self.turn})"
+        screen.blit(font.render(text, True, (255,255,255)),
                     (self.next_turn_button.x + 10, self.next_turn_button.y + 10))
+
     
     def draw_castle(self, screen):
         screen_width = screen.get_width()
