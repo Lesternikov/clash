@@ -6,6 +6,7 @@ import pygame
 
 
 class World:
+
     def __init__(self):
         self.map = None
         self.objects = None
@@ -33,6 +34,11 @@ class World:
         self.next_turn_button = pygame.Rect(460, 10, 160, 40)
         self.menu_open = False
         self.build_open = False
+
+        self.unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
+            "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
+            "dragon","cyklop","katapulta",]
+
         self.peasant_button = pygame.Rect(0, 0, 180, 45)
         self.send_peasants_amount = 0
         self.send_gold_amount = 0
@@ -93,6 +99,9 @@ class World:
             unit.owner.units.append(unit)
 
     def next_turn(self):
+
+        print("CASTLES:", [type(c) for c in self.castles])
+
         if not self.players:
             return
 
@@ -100,8 +109,9 @@ class World:
         self.current_player = (self.current_player + 1) % len(self.players)
         self.reset_units()
 
-        for c in self.castles:
-            c.next_turn()
+        for castle in self.castles:
+            castle.next_turn()
+            castle.update_production(self)
 
         self.selected_unit = None
         self.selected_castle = None
@@ -275,7 +285,7 @@ class World:
             print("Nie wybrano zamku")
             return
         
-        if len(self.selected_castle.garrison) >= 5:
+        if len(self.selected_castle.garrison) >= 12:
             print("Zamek jest pełny")
             return
 
@@ -328,8 +338,6 @@ class World:
             print("DEBUG: rozpoczęto szkolenie")
 
         self.selected_units.clear()
-
-    # przyciski na klawiaturze i myszka 
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -391,38 +399,50 @@ class World:
                     
     # ================= GARRISON =================
         elif self.screen == "garrison":
+
+
+
             if self.back_button.collidepoint(mx, my):
-                self.selected_units.clear()   # ← czyści multi-select
-                self.selected_garrison_unit = None
+                self.selected_units.clear()
                 self.screen = "castle"
                 return
-
-
+            
+            if self.recruit_button.collidepoint(mx, my):
+                self.screen = "recruitment"
+                return
+            
             self.handle_garrison_click(mx, my)
+            print("klik:", mx, my)
 
-            if self.selected_castle and "garrison" in self.selected_castle.buildings:
-                if self.recruit_button.collidepoint(mx, my):
-                    self.screen = "recruitment"
+
+            if self.back_button.collidepoint(mx, my):
+                self.screen = "garrison"
+                return
+        
+
+            if hasattr(self, "start_prod_button"):
+                if self.start_prod_button.collidepoint(mx, my):
+                    self.start_recruitment(self.selected_unit_type)
                     return
 
-            if self.selected_castle and self.selected_garrison_unit is not None:
-                if self.selected_garrison_unit < len(self.selected_castle.garrison):
 
-                    unit = self.selected_castle.garrison[self.selected_garrison_unit]
+            # HEAL
+            if self.selected_castle and "hospital" in self.selected_castle.buildings:
+                if self.heal_button.collidepoint(mx, my):
+                    for unit in self.selected_units:
+                        self.selected_castle.start_healing_unit(unit)
 
-                    if "hospital" in self.selected_castle.buildings:
-                        if self.heal_button.collidepoint(mx, my):
-                            self.selected_castle.start_healing_unit(unit)
-
-                     # SZKOLENIE
-                    if "school" in self.selected_castle.buildings:
-                        if self.train_button.collidepoint(mx, my):
-                            if self.selected_units:
-                                count = len(self.selected_units)
-                                self.selected_castle.start_training_group(self.selected_units)
-                                self.selected_units.clear()
-                                print("Przeszkolono", count, "jednostek")
-        #produkcja wojska
+            # TRAIN
+            if self.selected_castle and "school" in self.selected_castle.buildings:
+                if self.train_button.collidepoint(mx, my):
+                    if self.selected_units:
+                        count = len(self.selected_units)
+                        self.selected_castle.start_training_group(self.selected_units)
+                        self.selected_units.clear()
+                        print("Przeszkolono", count, "jednostek")
+                    else:
+                        print("Brak zaznaczonych jednostek")
+            
         elif self.screen == "recruitment":
 
             if self.back_button.collidepoint(mx, my):
@@ -433,17 +453,16 @@ class World:
             if index is not None:
                 self.selected_unit_type = index
                 return
+            
+            if hasattr(self, "start_prod_button"):
+                if self.start_prod_button.collidepoint(mx, my):
+                    self.start_recruitment(self.selected_unit_type)
+                    return
+                utype = UNIT_TYPES[self.selected_unit_type]
 
-            # START PRODUCTION BUTTON
-            if self.selected_unit_type is not None:
-                if hasattr(self, "start_prod_button"):
-                    if self.start_prod_button.collidepoint(mx, my):
-                        unit_types = ["lekka_piechota", "archer", "knight"]
-
-                        utype = unit_types[self.selected_unit_type]
-
-                        self.selected_castle.start_production(utype)
-                        print("Produkcja:", utype)    
+                self.selected_castle.start_production(utype)
+                print("Produkcja:", utype)  
+                      
         elif self.screen == "peasants":
             print("peasants screen click")
 
@@ -503,49 +522,32 @@ class World:
                     self.send_peasants_amount = 0
                     self.send_gold_amount = 0
 
-
     def handle_garrison_click(self, mx, my):
+        if self.selected_castle:
+            print("Garrison size:", len(self.selected_castle.garrison))
+
         index = self.click_on_garrison(mx, my)
-        if index is not None:
-            unit = self.selected_castle.garrison[index]
-
-            if unit in self.selected_units:
-                self.selected_units.remove(unit)
-            else:
-                if len(self.selected_units) < 10:
-                    self.selected_units.append(unit)
-                else:
-                    print("Można zaznaczyć max 10 jednostek")
-
-            unit = self.selected_castle.garrison[index]
-            print("Wybrano jednostkę:", unit.type)
-
-        start_x = 500
-        start_y = 120
-        slot = 64
-
-        cols = 2
-        rows = 6
-
-        if not (start_x <= mx < start_x + cols * slot):
-            return None
-        if not (start_y <= my < start_y + rows * slot):
-            return None
-
-        col = (mx - start_x) // slot
-        row = (my - start_y) // slot
-
-        index = row * cols + col
-
-        if index < len(self.selected_castle.garrison):
-            return index
-        if self.back_button.collidepoint(mx, my):
-            self.selected_garrison_unit = None
-            self.screen = "castle"
+        if index is None:
+            return
+        
+        if not self.selected_castle:
             return
 
-        return None
-    
+        if index >= len(self.selected_castle.garrison):
+            return
+
+        unit = self.selected_castle.garrison[index]
+
+        if unit in self.selected_units:
+            self.selected_units.remove(unit)
+            print("Odznaczono:", unit.type)
+        else:
+            if len(self.selected_units) < 10:
+                self.selected_units.append(unit)
+                print("Zaznaczono:", unit.type)
+            else:
+                print("Można zaznaczyć max 10 jednostek")
+
     def draw_pygame(self, screen):
         screen.fill((30, 30, 30))
 
@@ -633,14 +635,11 @@ class World:
             pygame.draw.rect(screen, (80, 160, 80), self.heal_button)
             screen.blit(font.render("HEAL", True, (255,255,255)), (50,270))
 
-        # TRAIN BUTTON
+       # TRAIN BUTTON
         if self.selected_castle and "school" in self.selected_castle.buildings:
-            if self.train_button.collidepoint(mx, my):
-                if self.selected_units:
-                    self.selected_castle.start_training_group(self.selected_units)
-                    print("Szkolenie wystartowało:", len(self.selected_units))
-                else:
-                    print("Brak zaznaczonych jednostek")
+            pygame.draw.rect(screen, (160, 160, 80), self.train_button)
+            screen.blit(font.render("TRAIN", True, (255,255,255)), (50,330))
+
    
     # przycisk produkcji wojska
         if "garrison" in self.selected_castle.buildings:
@@ -764,11 +763,13 @@ class World:
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
 
-        unit_types = ["arches"]
+        unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
+            "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
+            "dragon","cyklop","katapulta",]
 
         start_x = 400
         start_y = 120
-        slot = 64
+        slot = 50
 
         for i, utype in enumerate(unit_types):
             rect = pygame.Rect(start_x, start_y + i * slot, 200, 50)
@@ -924,29 +925,45 @@ class World:
     def click_on_recruitment(self, mx, my):
         start_x = 400
         start_y = 120
-        slot = 64
+        slot = 50
 
-        for i in range(3):
+        unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
+            "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
+            "dragon","cyklop","katapulta",
+        ]
+
+        for i in range(len(unit_types)):
             rect = pygame.Rect(start_x, start_y + i * slot, 200, 50)
             if rect.collidepoint(mx, my):
                 return i
-    def start_recruitment(self):
-        unit_types = ["lekka_piechota", "archer", "knight"]
+        return None
+    def start_recruitment(self, index):
+        unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
+            "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
+            "dragon","cyklop","katapulta",]
+        
+        if index is None:
+            return
 
-        utype = unit_types[self.selected_unit_type]
+        if index is None:
+            return
+        
+        utype = unit_types[index]
         cost = 50
-
         castle = self.selected_castle
 
         if castle.gold < cost:
             print("Za mało złota")
             return
 
+        if castle.gold < cost:
+            print("Za mało złota")
+            return
+        
         castle.gold -= cost
         castle.start_production(utype)
 
         print("Rozpoczęto produkcję:", utype)
-
         self.screen = "garrison"
     def click_on_garrison(self, mx, my):
         start_x = 500
@@ -964,9 +981,7 @@ class World:
         col = (mx - start_x) // slot
         row = (my - start_y) // slot
 
-        index = row * cols + col
-        return index
-
+        return int(row * cols + col)
 
     def draw_castle_menu(self, screen, mx, my):
         font = pygame.font.SysFont(None, 24)
