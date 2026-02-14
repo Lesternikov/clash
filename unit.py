@@ -1,79 +1,45 @@
 UNIT_STATS = {
-    "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,},
-    "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense": 50},
-    "pikinier": {"hp": 60, "moves": 7, "attack": 80, "defense": 60},
-    "highlander": {"hp": 100, "moves": 6, "attack": 80, "defense": 60},
-    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,},
+    "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1 },
+    "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2 },
+    "pikinier": {"hp": 60, "moves": 7, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2 },
+    "highlander": {"hp": 100, "moves": 6, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost": 8,"production_time":3 },
+    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3 },
 
-    "light_cavalry": {"hp": 80, "moves": 10, "attack": 90, "defense": 40},
+    "light_cavalry": {"hp": 80, "moves": 10, "attack": 90, "defense": 40,"exp":0,"morale":10,"fatigue":0,"patent_cost":100,"production_cost": 3,"production_time":3 },
 
-    "archer": {"hp": 8, "moves": 8, "attack": 20, "defense": 0, "range": 3, "tags": ["ranged"]},
-    "leśnik":{"hp":100,"moves":7,"attack":90,"defense":60,"range": 4, "tags": ["ranged"]},
+    "archer": {"hp": 8, "moves": 8, "attack": 20, "defense": 0, "range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":60,"production_cost":10 ,"production_time":2 },
+    "leśnik":{"hp":100,"moves":7,"attack":90,"defense":60,"range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":100 ,"production_cost":10 ,"production_time":3 },
 
-    "ważka":{"hp":80,"moves":6,"attack":60,"defense":70,},
+    "wazka":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":380 ,"production_cost":5 ,"production_time":2 },
 
-    "heavy_infantry": {"hp": 120, "moves": 8, "attack": 50, "defense": 70},
-    "halberdier": {"hp": 70, "moves": 5, "attack": 90, "defense": 100},
-    "rycerstwo":{"hp":80,"moves":6,"attack":60,"defense":70,},
+    "heavy_infantry": {"hp": 120, "moves": 8, "attack": 50, "defense": 70,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":10 ,"production_time":2 },
+    "halberdier": {"hp": 70, "moves": 5, "attack": 90, "defense": 100,"exp":0,"morale":10,"fatigue":0,"patent_cost":50 ,"production_cost":10 ,"production_time":3 },
+    "rycerstwo":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":8 ,"production_time":4 },
+    "crossbowman": {"hp": 20, "moves": 6, "attack": 40, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":240 ,"production_cost":12 ,"production_time":4 },
+    "dragon":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":5 ,"production_time":4 },
+    "katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 5, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":300 ,"production_cost":18 ,"production_time":4 },
+    "armata":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 5, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":400 ,"production_cost": 20,"production_time":5 },
+    "scorpion":{"hp":100,"moves":8,"attack":80,"defense":80,"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost": 10,"production_time":3 },
+    "elephant": {"hp": 100, "moves": 3, "attack": 100, "defense":0,"exp":0,"morale":6,"fatigue":0,"patent_cost":300 ,"production_cost":10 ,"production_time":4 },
+    "eagle":{"hp":100, "moves":11, "attack":90, "defense":30,"exp":0,"morale":6,"fatigue":0,"patent_cost":300 ,"production_cost":5 ,"production_time":3 },
+
+    "trol":{"hp":90,"moves":4,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":270 ,"production_cost": 10,"production_time":4 },
+    "heavy_cavalry": {"hp": 160, "moves": 3, "attack": 120, "defense": 90,"exp":0,"morale":6,"fatigue":0,"patent_cost":200 ,"production_cost":10 ,"production_time":4 },
+    "worm":{"hp":60,"moves":5,"attack":55,"defense":10,"exp":0,"morale":6,"fatigue":0,"patent_cost":250 ,"production_cost":10 ,"production_time":3 },
+
+    "cyklop":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost": 10,"production_time":3 },
     
-    "crossbowman": {"hp": 20, "moves": 6, "attack": 40, "defense": 30, "range": 4, "tags": ["ranged"]},
+    "pegasus":{"hp":120, "moves":10, "attack":80, "defense":20,"exp":0,"morale":6,"fatigue":0,"patent_cost":350 ,"production_cost":8 ,"production_time":3 },
+    "płaszczka":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":16 ,"production_time":5 },
 
-    "dragon":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
-    "katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 5, "tags": ["ranged"]},
-    "armata":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 5, "tags": ["ranged"]},
-    "scorpion":{"hp":100,"moves":8,"attack":80,"defense":80,},
-    "elephant": {"hp": 100, "moves": 3, "attack": 100, "defense": 0},
-    "eagle":{"hp":100, "moves":11, "attack":90, "defense":30},
-
-    "trol":{"hp":90,"moves":4,"attack":60,"defense":70,},
-    "heavy_cavalry": {"hp": 160, "moves": 3, "attack": 120, "defense": 90},
-    "worm":{"hp":60,"moves":5,"attack":55,"defense":10},
-
-    "cyklop":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"]},
-    
-    "pegasus":{"hp":120, "moves":10, "attack":80, "defense":20},
-    "płaszczka":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 4, "tags": ["ranged"]},
-
-    "musketeer": {"hp": 25, "moves": 5, "attack": 50, "defense": 30, "range": 4, "tags": ["ranged"]},
-    "gohst":{"hp":100,"moves":4,"attack":80,"defense":60,},
-    "bones":{"hp":90,"moves":6,"attack":60,"defense":70,},
-    "mag":{"hp":140,"moves":10,"attack":100,"defense":100, "range": 6, "tags": ["ranged"]},
-    "smok":{"hp":150,"moves":14,"attack":100,"defense":100,},
+    "musketeer": {"hp": 25, "moves": 5, "attack": 50, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost":14 ,"production_time":4 },
+    "gohst":{"hp":100,"moves":4,"attack":80,"defense":60,"exp":0,"morale":6,"fatigue":0,"patent_cost":380 ,"production_cost":8 ,"production_time":3 },
+    "bones":{"hp":90,"moves":6,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost":15 ,"production_time":4 },
+    "mag":{"hp":140,"moves":10,"attack":100,"defense":100, "range": 6, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":20 ,"production_time":5 },
+    "smok":{"hp":150,"moves":14,"attack":100,"defense":100,"exp":0,"morale":6,"fatigue":0,"patent_cost":550 ,"production_cost":20 ,"production_time":5 },
 }
 
 class Unit:
-    UNIT_COSTS = {
-        "pospolite_ruszenie":0,
-        "lekka_piechota": 10,
-        "pikinier": 30,
-        "halberdier": 50,
-        "highlander": 80,
-        "light_cavalry": 100,
-        "heavy_cavalry": 200,
-        "elephant": 300,
-        "archer": 60,
-        "crossbowman": 240,
-        "musketeer": 290,
-        "worm":250,
-        "scorpion":290,
-        "mag":500,
-        "pegasus":350,
-        "eagle":300,
-        "ghost":380,
-        "bones":280,
-        "trol":130,
-        "smok":550,
-        "heavy_infantry": 30,
-        "leśnik":100,
-        "budowniczy":80,
-        "armata":400,
-        "ważka":380,
-        "płaszczka":400,
-        "rycerstwo":150,
-        "dragon":150,
-        "cyklop":280,
-        "katapulta":300,
-    }
     def __init__(self, unit_type, x, y, owner):
         self.type = unit_type
         self.x = x

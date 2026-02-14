@@ -3,8 +3,7 @@ import random
 from unit import PeasantGroup
 from unit import GoldTransport
 # castle.py
-import pygame
-from unit import Unit
+from unit import UNIT_STATS, Unit
 
 BUILDINGS = {
     "hospital": {"cost": 200},
@@ -12,39 +11,6 @@ BUILDINGS = {
     "workshop": {"cost": 220},
     "forge": {"cost": 190},
     "school": {"cost": 400},}
-
-PRODUCTION_TIME = {
-    "pospolite_ruszenie":1,
-    "lekka_piechota": 2,
-    "pikinier":2,
-    "halberdier":3,
-    "highlander":3,
-    "light_cavalry":3,
-    "heavy_cavalry":4,
-    "elephant":4,
-    "archer":2,
-    "crossbowman":4,
-    "musketeer":4,
-    "worm":3,
-    "scorpion":3,
-    "mag":5,
-    "pegasus":3,
-    "eagle":3,
-    "ghost":3,
-    "bones":4,
-    "trol":4,
-    "smok":5,
-    "heavy_infantry":4,
-    "leśnik":3,
-    "budowniczy":3,
-    "armata":4,
-    "ważka":2,
-    "płaszczka":5,
-    "rycerstwo":4,
-    "dragon":4,
-    "cyklop":3,
-    "katapulta":4,
-}
 
 class Castle:
     def __init__(self, x, y, owner=None):
@@ -65,9 +31,13 @@ class Castle:
         self.production_turns_left = 0
         self.production_enabled = False
         self.training = {}        
-        self.production_queue = None
-        self.production_time_left = 0
+       
         self.garrison_limit = 12
+        self.available_units = ["Militia", "Archer", "Knight", "Pikeman"]
+        self.production_unit = None
+        self.patents = []          # wykupione patenty
+        self.max_patents = 12
+        self.patents = set()
 
     def collect_taxes(self):        
         if self.plague_active:
@@ -104,36 +74,77 @@ class Castle:
     def __repr__(self):
         return f"Castle({self.x},{self.y})"
     
-    def recruit(self, player):
+    def recruit(self, player, unit_type):
         if self.owner != player:
             print("To nie jest twój zamek")
-            return None
+            return False
 
-        cost = 100
+        return self.start_production(unit_type)
 
+    
+    def start_production(self, unit_type):
+
+        if self.production_enabled:
+            print("Produkcja już trwa")
+            return False
+
+        # 🔒 każda jednostka wymaga patentu
+        if unit_type not in self.patents:
+            print("Najpierw kup patent:", unit_type)
+            return False
+
+        stats = UNIT_STATS[unit_type]
+        cost = stats["production_cost"]
+        production_time = stats["production_time"]
+
+        # sprawdź złoto
         if self.gold < cost:
             print("Za mało złota")
-            return None
-
-        if len(self.garrison) >= 12:
-            print("Garnizon pełny")
-            return None
+            return False
 
         self.gold -= cost
-        
-        unit = Unit("lekka_piechota", self.x, self.y, self.owner)
-        self.garrison.append(unit)
-
-        print("Wyprodukowano jednostkę")
-        return unit
-    
-    def start_production(self, unit_type, production_time):
         self.production_unit_type = unit_type
         self.production_turns_left = production_time
         self.production_enabled = True
 
+        print("Start produkcji:", unit_type)
+        return True
+
+    def buy_patent(self, unit_type):
+
+        if unit_type in self.patents:
+            print("Patent już kupiony")
+            return False
+
+        stats = UNIT_STATS[unit_type]
+        cost = stats["patent_cost"]
+
+        if self.gold < cost:
+            print("Za mało złota")
+            return False
+
+        self.gold -= cost
+        self.patents.add(unit_type)
+
+        print("Kupiono patent:", unit_type)
+        return True
+    
+    def remove_patent(self, unit_type):
+
+        if unit_type in self.patents:
+            self.patents.remove(unit_type)
+            print("Usunięto patent:", unit_type)
+            return True
+
+        print("Patent nie istnieje")
+        return False
+    
+
     def stop_production(self):
         self.production_enabled = False
+        self.production_unit_type = None
+        self.production_turns_left = 0
+
 
     def process_production(self):
         if not self.production_enabled:
@@ -142,7 +153,6 @@ class Castle:
         if self.production_unit_type is None:
             return
 
-        # zatrzymaj gdy garnizon pełny
         if len(self.garrison) >= self.garrison_limit:
             print("Garnizon pełny — produkcja zatrzymana")
             self.production_enabled = False
@@ -152,30 +162,31 @@ class Castle:
         print("Produkcja — zostało:", self.production_turns_left)
 
         if self.production_turns_left <= 0:
-            cost = 10  # możesz potem podpiąć UNIT_COST
+            stats = UNIT_STATS[self.production_unit_type]
+            cost = stats["production_cost"]
 
-            if self.gold >= cost:
-                self.gold -= cost
-
-                unit = Unit(
-                    self.production_unit_type,
-                    self.x,
-                    self.y,
-                    self.owner
-                )
-
-                self.garrison.append(unit)
-
-                print("Wyprodukowano:", self.production_unit_type)
-
-                # restart produkcji (fabryka)
-                self.production_turns_left = PRODUCTION_TIME[self.production_unit_type]
-
-            else:
+            if self.gold < cost:
                 print("Brak złota — produkcja zatrzymana")
                 self.production_enabled = False
+                return
 
-    
+            self.gold -= cost
+
+            unit = Unit(
+                self.production_unit_type,
+                self.x,
+                self.y,
+                self.owner
+            )
+
+            self.garrison.append(unit)
+
+            print("Wyprodukowano:", self.production_unit_type)
+
+            # restart cyklu produkcji
+            self.production_turns_left = stats["production_time"]
+
+
     def start_healing_unit(self, unit):
         if "hospital" not in self.buildings:
             print("Brak szpitala")
@@ -426,4 +437,33 @@ class Castle:
             self.production_unit_type = None
             print("Wyprodukowano jednostkę")
 
-        return True 
+    def buy_patent(self, unit_type):
+        stats = UNIT_STATS[unit_type]
+
+        patent_cost = stats.get("patent_cost", 100)
+
+        if unit_type in self.patents:
+            print("Patent już kupiony")
+            return False
+
+        if self.gold < patent_cost:
+            print("Za mało złota na patent")
+            return False
+
+        self.gold -= patent_cost
+        self.patents.add(unit_type)
+
+        print("Kupiono patent:", unit_type)
+        return True
+
+    
+    def remove_patent(self, unit_type):
+        if unit_type in self.patents:
+            self.patents.remove(unit_type)
+            return True
+        return False
+    def add_patent(self, patent):
+        self.patents.add(patent)
+        print("Nowy patent:", patent)
+
+        return True
