@@ -8,7 +8,7 @@ from unit import Unit
 
 BUILDINGS = {
     "hospital": {"cost": 200},
-    "garrison": {"cost": 200},
+    "Koszary": {"cost": 200},
     "workshop": {"cost": 220},
     "forge": {"cost": 190},
     "school": {"cost": 400},}
@@ -239,7 +239,7 @@ class Castle:
         return True
 
     def update_level(self):
-        required = {"hospital", "garrison", "workshop", "forge"}
+        required = {"hospital", "Koszary", "workshop", "forge"}
 
         if required.issubset(self.buildings):
             if self.level < 2:
