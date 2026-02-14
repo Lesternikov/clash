@@ -14,8 +14,8 @@ clock = pygame.time.Clock()
 # world
 world = World()
 
-p1 = Player("Gracz 1", "red")
-p2 = Player("Gracz 2", "blue")
+p1 = Player(1, "Gracz 1", "red")
+p2 = Player(2, "Gracz 2", "blue")
 
 world.add_player(p1)
 world.add_player(p2)
