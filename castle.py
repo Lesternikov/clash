@@ -13,6 +13,7 @@ BUILDINGS = {
     "school": {"cost": 400},}
 
 class Castle:
+
     def __init__(self, x, y, owner=None):
         self.x = x
         self.y = y
