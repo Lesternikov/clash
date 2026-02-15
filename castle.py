@@ -27,6 +27,9 @@ class Castle:
         self.happiness = 50.0     # 0–100
         self.buildings = set()
         self.level = 1
+        #burzenie zamku
+        self.destroyed = False
+
                 # PRODUKCJA
         self.production_unit_type = None
         self.production_turns_left = 0
@@ -466,5 +469,11 @@ class Castle:
     def add_patent(self, patent):
         self.patents.add(patent)
         print("Nowy patent:", patent)
+
+    def demolish(self):
+        self.destroyed = True
+        self.owner = None
+        self.garrison.clear()
+
 
         return True

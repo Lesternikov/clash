@@ -41,11 +41,11 @@ class World:
         self.koszary_button = None
         self.garrison_button = pygame.Rect(40, 140, 160, 40)
         self.exit_castle_button = pygame.Rect(40, 200, 160, 40)
-        self.heal_button = pygame.Rect(460, 600, 100, 40)
-        self.train_button = pygame.Rect(680, 600, 100, 40)
-        self.recruit_button = pygame.Rect(260, 600, 100, 40)
+        self.heal_button = pygame.Rect(40, 260, 160, 40)
+        self.train_button = pygame.Rect(40, 320, 160, 40)
+        self.recruit_button = pygame.Rect(40, 380, 160, 40)
         self.selected_unit_type = None
-        self.menu_button = pygame.Rect(860, 40, 140, 40)
+        self.menu_button = pygame.Rect(650, 40, 140, 40)
         self.menu_rects = {}
         self.build_rects = {}
         self.next_turn_button = pygame.Rect(460, 10, 160, 40)
@@ -54,11 +54,12 @@ class World:
         self.victories = 0
         self.defeats = 0
         self.court_button = pygame.Rect(40, 140, 160, 40)
-        self.forge_button = None
         self.exit_button = pygame.Rect(20, 20, 120, 50)
         self.prison_slots = [PrisonSlot(), PrisonSlot(), PrisonSlot()]
         self.unit_scroll = 0
-        self.unit_types = [UNIT_STATS]
+        self.unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
+            "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
+            "dragon","cyklop","katapulta",]
         self.selected_recruit_units =None
         self.peasant_button = pygame.Rect(0, 0, 180, 45)
         self.send_peasants_amount = 0
@@ -81,9 +82,8 @@ class World:
         # SEND
         self.send_button = pygame.Rect(0, 0, 160, 45)
         
-        # BACK działanie
-        self.back_button = pygame.Rect(90, 600, 100, 40)
-        
+        # BACK
+        self.back_button = pygame.Rect(0, 0, 120, 40)
         self.castle_list_offset = 0
         self.castle_scroll_up = pygame.Rect(0,0,40,40)
         self.castle_scroll_down = pygame.Rect(0,0,40,40)
@@ -95,9 +95,6 @@ class World:
         self.patent_rects = []
         self.scroll_up_button = pygame.Rect(380, 80, 40, 60)
         self.scroll_down_button = pygame.Rect(380, 150, 40, 60)
-
-        # niszczenie zamku
-        self.demolish_confirm = False
 
     def load(self, map_file, fac_file):
         self.map = load_map(map_file)
@@ -132,6 +129,7 @@ class World:
             unit.owner.units.append(unit)
 
     def next_turn(self):
+
         print("CASTLES:", [type(c) for c in self.castles])
 
         if not self.players:
@@ -142,17 +140,13 @@ class World:
         self.reset_units()
 
         for castle in self.castles:
-            if castle.destroyed:
-                continue
             castle.next_turn()
             castle.update_production(self)
 
         self.selected_unit = None
         self.selected_castle = None
-
         for castle in self.castles:
-            if not castle.destroyed:
-                castle.collect_taxes()
+            castle.collect_taxes()
 
 
     def move_unit(self, unit, dx, dy):
@@ -238,11 +232,6 @@ class World:
 
         for castle in self.castles:
             if castle.x == nx and castle.y == ny:
-
-                if castle.destroyed:
-                    print("Ruiny zamku — nie można wejść")
-                    return
-
                 print("Jednostka weszła do zamku")
 
                 castle.under_attack()
@@ -423,48 +412,14 @@ class World:
                     if self.exit_button.collidepoint(mx, my):
                         self.screen = "map"
 
-                if self.screen == "forge":
-                    if self.back_button.collidepoint(mx, my):
-                        self.screen = "castle"
-                        return
-
-
         return None
 
     def handle_mouse_click(self, mx, my):
-
-        # ================= DEMOLISH CONFIRM =================
-        if self.demolish_confirm:
-            if self.demolish_yes.collidepoint(mx, my):
-                if self.selected_castle:
-                    castle = self.selected_castle
-
-                    castle.destroyed = True
-
-                    # usunięcie z listy gracza
-                    if castle.owner and castle in castle.owner.castles:
-                        castle.owner.castles.remove(castle)
-
-                    # wyrzucenie gracza z zamku
-                    self.selected_castle = None
-                    self.screen = "map"
-
-                self.demolish_confirm = False
-                return
-
-            if self.demolish_no.collidepoint(mx, my):
-                self.demolish_confirm = False
-                return
-
         print("CLICK:", self.screen, mx, my)
 
-        # ================= UI SCREENS =================
+        # UI screens
         if self.screen == "court":
             self.handle_court_click(mx, my)
-            return
-
-        if self.forge_button and self.forge_button.collidepoint(mx, my):
-            self.screen = "forge"
             return
 
         if self.screen == "peasants":
@@ -479,22 +434,16 @@ class World:
             self.handle_garrison_click(mx, my)
             return
 
-        # ================= CASTLE =================
+        # map / castle logic
         if self.screen == "castle":
-
-            if self.demolish_button.collidepoint(mx, my):
-                self.demolish_confirm = True
-                return
-
             self.handle_castle_click(mx, my)
             return
 
-        # ================= MAP =================
         if self.screen == "map":
-        
             self.handle_map_click(mx, my)
             return
 
+   
     def handle_garrison_click(self, mx, my):
 
         castle = self.selected_castle
@@ -523,7 +472,7 @@ class World:
                     castle.start_healing_unit(unit)
                 return
 
-        # ================= TRAIN ================= 
+        # ================= TRAIN =================
         if "school" in castle.buildings:
             if self.train_button.collidepoint(mx, my):
                 if self.selected_units:
@@ -556,11 +505,9 @@ class World:
         else:
             if len(self.selected_units) < 10:
                 self.selected_units.append(unit)
-
-
-            if self.demolish_no.collidepoint(mx, my):
-                self.demolish_confirm = False
-                return
+                print("Zaznaczono:", unit.type)
+            else:
+                print("Można zaznaczyć max 10 jednostek")
 
 
     def calculate_army_power(self, player):
@@ -593,18 +540,16 @@ class World:
         elif self.screen == "court":
             self.draw_court(screen)
             return
-        elif self.screen == "forge":
-            self.draw_forge(screen)
-            return
     def draw_garrison(self, screen):
         if not self.selected_castle:
             return
 
-        start_x = 100
+        start_x = 500
         start_y = 120
+        slot = 64
 
-        cols = 6
-        rows = 2
+        cols = 2
+        rows = 6
 
         font = pygame.font.SysFont(None, 20)
 
@@ -612,25 +557,25 @@ class World:
             for col in range(cols):
                 index = row * cols + col   # ← BRAKOWAŁO TEGO
 
-                x = start_x + col * 130
-                y = start_y + row * 210
+                x = start_x + col * slot
+                y = start_y + row * slot
 
-                rect = pygame.Rect(x, y, 100, 180)
+                rect = pygame.Rect(x, y, slot, slot)
 
                 unit = None
                 if index < len(self.selected_castle.garrison):
                     unit = self.selected_castle.garrison[index]
 
                 if unit in self.selected_units:
-                    pygame.draw.rect(screen, (255, 255, 0), rect, 4)
+                    pygame.draw.rect(screen, (255, 255, 0), rect, 3)
                 else:
-                    pygame.draw.rect(screen, (200, 200, 200), rect, 4)
+                    pygame.draw.rect(screen, (200, 200, 200), rect, 2)
 
                 if index < len(self.selected_castle.garrison):
                     unit = self.selected_castle.garrison[index]
 
                     # tło jednostki
-                    pygame.draw.rect(screen, (80, 120, 200), (x+20, y+20, 60, 60))
+                    pygame.draw.rect(screen, (80, 120, 200), (x+4, y+4, 56, 56))
 
                     # prosty "X"
                     pygame.draw.line(screen, (255,255,255), (x+8, y+8), (x+56, y+56), 2)
@@ -641,12 +586,12 @@ class World:
                     screen.blit(text, (x + 6, y + 42))
 
 
-    # BACK button kwadrat
-        self.back_button = pygame.Rect(70, 600, 100, 40)
+    # BACK button
+        self.back_button = pygame.Rect(40, 40, 120, 40)
         pygame.draw.rect(screen, (120, 80, 80), self.back_button)
 
         font = pygame.font.SysFont(None, 24)
-        screen.blit(font.render("BACK", True, (255,255,255)), (80,610))
+        screen.blit(font.render("BACK", True, (255,255,255)), (55,50))
 
         # INFO o zaznaczonych jednostkach
         info_y = 120
@@ -662,18 +607,18 @@ class World:
         # HEAL BUTTON (hospital)
         if self.selected_castle and "hospital" in self.selected_castle.buildings:
             pygame.draw.rect(screen, (80, 160, 80), self.heal_button)
-            screen.blit(font.render("HEAL", True, (255,255,255)), (490,610))
+            screen.blit(font.render("HEAL", True, (255,255,255)), (50,270))
 
        # TRAIN BUTTON
         if self.selected_castle and "school" in self.selected_castle.buildings:
             pygame.draw.rect(screen, (160, 160, 80), self.train_button)
-            screen.blit(font.render("TRAIN", True, (255,255,255)), (700,610))
+            screen.blit(font.render("TRAIN", True, (255,255,255)), (50,330))
 
    
     # przycisk produkcji wojska
         if "Koszary" in self.selected_castle.buildings:
             pygame.draw.rect(screen, (240, 120, 20), self.recruit_button)
-            screen.blit(font.render("RECRUIT", True, (255,255,255)), (270,610))
+            screen.blit(font.render("RECRUIT", True, (255,255,255)), (50,390))
            
     def draw_map(self, screen):
         tile = 32
@@ -689,17 +634,12 @@ class World:
     # zamki
         for c in self.castles:
             rect = pygame.Rect(c.x * tile, c.y * tile, tile, tile)
-            if c.destroyed:
-                pygame.draw.rect(screen, (200, 0, 0), rect)
-            else:
-                pygame.draw.rect(screen, (150, 150, 255), rect)
+            pygame.draw.rect(screen, (150, 150, 255), rect)
 
     # jednostki
-        for player in self.players:
-            for u in player.units:
-                rect = pygame.Rect(u.x * tile + 8, u.y * tile + 8, 16, 16)
-                pygame.draw.rect(screen, (255, 255, 0), rect)
-
+        for u in self.units:
+            rect = pygame.Rect(u.x * tile + 8, u.y * tile + 8, 16, 16)
+            pygame.draw.rect(screen, (255, 255, 0), rect)
 
     # selected unit
         if self.selected_unit:
@@ -723,8 +663,6 @@ class World:
     def draw_castle(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()
-
-        screen.fill((60, 50, 40))  
 
         self.peasant_button.x = screen_width - 200
         self.peasant_button.y = screen_height - 70
@@ -751,15 +689,6 @@ class World:
         pygame.draw.rect(screen, (80, 80, 160), self.garrison_button)
         screen.blit(font.render("Garrison", True, (255,255,255)),
                     (self.garrison_button.x + 10, self.garrison_button.y + 10))
-
-        # KUŹNIA — tylko jeśli forge zbudowany
-        if self.selected_castle and "forge" in self.selected_castle.buildings:
-            self.forge_button = pygame.Rect(40, 170, 160, 40)
-            pygame.draw.rect(screen, (100, 100, 100), self.forge_button)
-            screen.blit(font.render("KUŹNIA", True, (255,255,255)),
-                        (self.forge_button.x + 20, self.forge_button.y + 10))
-        else:
-            self.forge_button = None
 
     # --- BUTTON: BACK ---
         self.back_button = pygame.Rect(40, 200, 160, 40)
@@ -809,50 +738,23 @@ class World:
             self.menu_open = False
             self.build_open = False
 
-        if "demolish" in self.menu_rects:
-            if self.menu_rects["demolish"].collidepoint(mx, my):
-                self.demolish_confirm = True
-                return
-
     # --- BUTTON: COURT ---
         self.court_button = pygame.Rect(420, 100, 160, 40)
-        pygame.draw.rect(screen, (20, 80, 80), self.court_button)
+        pygame.draw.rect(screen, (220, 80, 80), self.court_button)
         screen.blit(font.render("DWÓR", True, (255,225,255)), (470,110))
-
-        if self.demolish_confirm:
-
-            rect = pygame.Rect(350, 250, 300, 150)
-            font = pygame.font.SysFont(None, 28)
-            screen.blit(font.render("Wyburzyć zamek?", True, (255,255,255)),
-                        (rect.x + 50, rect.y + 30))
-
-            self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 90, 80, 40)
-            self.demolish_no = pygame.Rect(rect.x + 180, rect.y + 90, 80, 40)
-
-            pygame.draw.rect(screen, (120,180,120), self.demolish_yes)
-            pygame.draw.rect(screen, (180,120,120), self.demolish_no)
-
-            screen.blit(font.render("TAK", True, (0,0,0)),
-                        (self.demolish_yes.x + 20, self.demolish_yes.y + 10))
-            screen.blit(font.render("NIE", True, (0,0,0)),
-                        (self.demolish_no.x + 20, self.demolish_no.y + 10))
-
-            self.forge_button = pygame.Rect(420, 150, 160, 40)
-            pygame.draw.rect(screen, (90, 90, 90), self.forge_button)
-            draw_text(screen, "Kuznia", 455, 160)
 
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
+
         castle = self.selected_castle
         if not castle:
             return
         unit_types = self.recruitment_unit_types
-
         w = screen.get_width()
         h = screen.get_height()
 
         # =====================================================
-        # LEWE PRZYCISKI (piramida)
+        # LEFT BUTTONS
         # =====================================================
 
         self.info_button = pygame.Rect(120, 590, 100, 30)
@@ -868,24 +770,29 @@ class World:
         screen.blit(font.render("KUP PATENT", True, (255,255,255)), (170,635))
 
         # =====================================================
-        # PANEL PRAWY — PATENTY (12)
+        # PATENTS PANEL
         # =====================================================
 
         patents_panel = pygame.Rect(w-310, 40, 250, 320)
         pygame.draw.rect(screen, (70,50,40), patents_panel)
 
+        self.patent_rects = []
+
         for i in range(12):
             x = w-300 + (i % 4)*60
             y = 30 + (i // 4)*90
-            rect = pygame.Rect(x, y + 50, 50, 80,)
+            rect = pygame.Rect(x, y + 50, 50, 80)
+            self.patent_rects.append(rect)
+
             pygame.draw.rect(screen, (120,120,120), rect, 3)
 
             if i < len(castle.patents):
                 screen.blit(font.render("U", True, (255,255,0)), (x+18, y+80))
 
         # =====================================================
-        # PRODUKCJA INFO
+        # PRODUCTION INFO
         # =====================================================
+
         if castle.production_enabled:
             text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
             color = (0,255,0)
@@ -896,7 +803,7 @@ class World:
         screen.blit(font.render(text, True, color), (x - 150, y + 300))
 
         # =====================================================
-        # PRAWE PRZYCISKI
+        # RIGHT BUTTONS
         # =====================================================
 
         self.remove_patent_button = pygame.Rect(w-230, 590, 100, 30)
@@ -917,7 +824,7 @@ class World:
 
         screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)),
                     (w//2 - 30, 640))
-
+        
         # =====================================================
         # LISTA PATENTÓW
         # =====================================================
@@ -931,15 +838,18 @@ class World:
             screen.blit(font.render(f"MOV: {stats['moves']}", True, (255,255,255)), (320,400))
             screen.blit(font.render(f"ZME: {stats['fatigue']}", True, (255,255,255)), (460,300))
             screen.blit(font.render(f"EXP: {stats['exp']}", True, (255,255,255)), (460,400))
+
+
+
             screen.blit(font.render(f"Patent: {stats['patent_cost']}", True,(255,255,0)), (40,500))
             screen.blit(font.render(f"Prod: {stats['production_cost']}", True,(255,255,0)), (200,500))
             screen.blit(font.render(f"Tury: {stats['production_time']}", True,(255,255,0)), (360,500))
 
 
             self.unit_list_rects.clear()
-
-        #Rysowanie listy
-        font = pygame.font.SysFont(None, 24)
+        # =====================================================
+        # UNIT LIST
+        # =====================================================
 
         self.unit_list_rects.clear()
 
@@ -962,28 +872,30 @@ class World:
 
             global_index = self.recruitment_scroll + i
 
-            # tło zawsze takie samo
             pygame.draw.rect(screen, (30, 30, 30), rect)
 
-            # kolor tekstu zależy od zaznaczenia
-            text_color = (180, 180, 180)
+            text_color = (180,180,180)
             if self.selected_unit_type == global_index:
-                text_color = (255, 255, 255)
-
+                text_color = (255,255,255)
+                
             stats = UNIT_STATS[unit_type]
             text = f"{unit_type}"
 
-            screen.blit(font.render(text, True, text_color),
+            screen.blit(font.render(unit_type, True, text_color),
                         (rect.x + 10, rect.y + 8))
 
-            #przyciski przewijania wojska
-            pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
-            screen.blit(font.render("▲", True, (255,255,255)),
-                        (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
+        # =====================================================
+        # SCROLL BUTTONS
+        # =====================================================
 
-            pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
-            screen.blit(font.render("▼", True, (255,255,255)),
-                        (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
+        pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
+        screen.blit(font.render("▲", True, (255,255,255)),
+                    (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
+
+        pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
+        screen.blit(font.render("▼", True, (255,255,255)),
+                    (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
+
                                                                 
     def draw_peasants(self, screen):
         font = pygame.font.SysFont(None, 24)
@@ -1034,13 +946,6 @@ class World:
         owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
 
         visible = owned[self.castle_list_offset:self.castle_list_offset+3]
-
-        owned = [
-            c for c in self.castles
-            if c.owner == self.players[self.current_player] and not c.destroyed
-        ]
-
-
 
         for i, c in enumerate(visible):
             txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
@@ -1134,7 +1039,7 @@ class World:
         x = 200 
         y = 100
         for p in self.players:
-            pygame.draw.rect(screen, p.color, (x, y, 120, 30))
+            pygame.draw.rect(screen, p.color, (x, 10, 120, 30))
             draw_text(screen,p.name, x + 10, y + 10)
             x += 140
         self.back_button = pygame.Rect(20, 10, 100, 40)
@@ -1143,15 +1048,16 @@ class World:
     def draw_queen_panel(self, screen):
         w = screen.get_width()
 
-        rect = pygame.Rect(w//2 - 290, 370, 600, 180)
+        rect = pygame.Rect(w//2 - 200, 200, 400, 120)
         pygame.draw.rect(screen, (210,200,160), rect)
 
-        draw_text(screen, "Nie ma królowej", rect.x + 250, rect.y + 20)
+        draw_text(screen, "KRÓLOWA", rect.x + 150, rect.y + 10)
+        draw_text(screen, "Brak królowej", rect.x + 130, rect.y + 50)
 
     def draw_court_stats(self, screen):
         screen_w = screen.get_width()
         section_width = screen_w // 3
-        top_y = 190
+        top_y = 70
 
         font_title = pygame.font.SysFont(None, 28)
         font = pygame.font.SysFont(None, 22)
@@ -1159,11 +1065,11 @@ class World:
         titles = ["SIŁA ARMII", "ZŁOTO", "BILANS"]
 
         for i in range(3):
-            x =120 + i * section_width
+            x = i * section_width
 
             # Tytuł sekcji
             title_surface = font_title.render(titles[i], True, (255,255,255))
-            screen.blit(title_surface, (x - 100, top_y + 100))
+            screen.blit(title_surface, (x + 20, top_y))
 
             # Linie graczy
             for index in range(5):
@@ -1193,7 +1099,7 @@ class World:
     def draw_prison_sections(self, screen):
         font = pygame.font.SysFont(None, 24)
 
-        start_y = 600
+        start_y = 380
         section_w = 250
         gap = 40
         start_x = 60
@@ -1231,19 +1137,6 @@ class World:
         else:
             self.draw_pygame(screen)
 
-            #demolowanie zamku
-        if self.demolish_confirm:
-            rect = pygame.Rect(350, 260, 300, 140)
-            pygame.draw.rect(screen, (30,30,30), rect)
-
-            draw_text(screen, "Wyburzyć zamek?", rect.x + 60, rect.y + 20)
-
-            self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 70, 80, 40)
-            self.demolish_no = pygame.Rect(rect.x + 180, rect.y + 70, 80, 40)
-
-            draw_button(screen, "TAK", self.demolish_yes.x, self.demolish_yes.y, 80, 40)
-            draw_button(screen, "NIE", self.demolish_no.x, self.demolish_no.y, 80, 40)
-
 
     def select_castle(self, x, y):
         for c in self.castles:
@@ -1253,8 +1146,6 @@ class World:
                 return
 
         self.selected_castle = None
-        return
-
 
     def create_unit(self, unit_type, x, y, owner):
         u = Unit(unit_type, x, y, owner)
@@ -1394,13 +1285,7 @@ class World:
 
             if pygame.Rect(50, y+40, 200, 20).collidepoint(mx, my):
                 self.bribe_general(slot)
-
     def handle_map_click(self, mx, my):
-
-        if self.next_turn_button.collidepoint(mx, my):
-            self.next_turn()
-            return
-
         tile_x = mx // 32
         tile_y = my // 32
 
@@ -1409,7 +1294,7 @@ class World:
         if tile_x < 0 or tile_x >= len(self.map[0]):
             return
 
-        # ================= JEDNOSTKI =================
+        # jednostki
         for player in self.players:
             for unit in player.units:
                 if unit.x == tile_x and unit.y == tile_y:
@@ -1418,18 +1303,12 @@ class World:
                     print("Selected unit:", unit.type)
                     return
 
-        # ================= ZAMKI =================
+        # zamki
         for castle in self.castles:
             if castle.x == tile_x and castle.y == tile_y:
-
-                # BLOKADA RUIN
-                if castle.destroyed:
-                    print("To są ruiny zamku")
-                    return
-
                 self.selected_castle = castle
                 self.selected_unit = None
-                self.screen = "castle"
+                self.screen = "castle"   # <<< TO BYŁO POTRZEBNE
                 print("Selected castle")
                 return
 
@@ -1437,27 +1316,18 @@ class World:
         self.selected_castle = None
 
     def handle_castle_click(self, mx, my):
-
         if not self.selected_castle:
             return
 
-        # BACK
         if self.back_button.collidepoint(mx, my):
             self.screen = "map"
             self.selected_castle = None
             return
 
-        # GARRISON
         if self.garrison_button and self.garrison_button.collidepoint(mx, my):
             self.screen = "garrison"
             return
 
-        # FORGE
-        if self.forge_button and self.forge_button.collidepoint(mx, my):
-            self.screen = "forge"
-            return
-
-        # RECRUITMENT
         if (
             "Koszary" in self.selected_castle.buildings
             and self.koszary_button
@@ -1466,17 +1336,14 @@ class World:
             self.screen = "recruitment"
             return
 
-        # PEASANTS
         if self.peasant_button.collidepoint(mx, my):
             self.screen = "peasants"
             return
 
-        # COURT
         if self.court_button.collidepoint(mx, my):
             self.screen = "court"
             return
 
-        # BUILD MENU
         if self.menu_open:
             for name, rect in self.build_rects.items():
                 if rect.collidepoint(mx, my):
@@ -1484,7 +1351,6 @@ class World:
                         self.menu_open = False
                         self.build_open = False
                     return
-
 
     def handle_recruitment_click(self, mx, my):
         castle = self.selected_castle
@@ -1525,7 +1391,12 @@ class World:
             castle.stop_production()
             print("Production stopped")
             return
-
+        # Kliknięcie slotów patentów
+        for i, rect in enumerate(self.patent_rects):
+            if rect.collidepoint(mx, my):
+                if i < len(castle.patents):
+                    self.selected_patent = castle.patents[i]
+                return
         # SCROLL UP
         if self.scroll_up_button.collidepoint(mx, my):
             if self.recruitment_scroll > 0:
@@ -1542,121 +1413,22 @@ class World:
         if not self.selected_castle:
             return
 
-        print("peasants screen click")
-
-        castle = self.selected_castle
-
         # BACK
-        if self.back_button.collidepoint(mx, my):
+        if self.back_button and self.back_button.collidepoint(mx, my):
             self.screen = "castle"
             return
 
-        # ================= SEND AMOUNT =================
+        # przykład przycisku podatków (jeśli istnieje)
+        if hasattr(self, "tax_button"):
+            if self.tax_button.collidepoint(mx, my):
+                self.selected_castle.collect_taxes()
+                print("Zebrano podatki")
 
-        if self.peasants_plus_button.collidepoint(mx, my):
-            if self.send_peasants_amount + 10 <= castle.peasants:
-                self.send_peasants_amount += 10
-            return
-
-        if self.peasants_minus_button.collidepoint(mx, my):
-            self.send_peasants_amount = max(0, self.send_peasants_amount - 10)
-            return
-
-        if self.gold_plus_button.collidepoint(mx, my):
-            if self.send_gold_amount + 10 <= castle.gold:
-                self.send_gold_amount += 10
-            return
-
-        if self.gold_minus_button.collidepoint(mx, my):
-            self.send_gold_amount = max(0, self.send_gold_amount - 10)
-            return
-
-        # ================= TAX =================
-
-        if self.tax_plus_button.collidepoint(mx, my):
-            castle.tax_rate = min(4.0, castle.tax_rate + 0.1)
-            return
-
-        if self.tax_minus_button.collidepoint(mx, my):
-            castle.tax_rate = max(0.0, castle.tax_rate - 0.1)
-            return
-
-        # ================= SCROLL =================
-
-        owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
-        max_offset = max(0, len(owned) - 3)
-
-        if self.castle_up_button.collidepoint(mx, my):
-            self.castle_list_offset = max(0, self.castle_list_offset - 1)
-            return
-
-        if self.castle_down_button.collidepoint(mx, my):
-            self.castle_list_offset = min(max_offset, self.castle_list_offset + 1)
-            return
-
-        # ================= SEND =================
-
-        if self.send_button.collidepoint(mx, my):
-            if self.send_peasants_amount <= castle.peasants and \
-            self.send_gold_amount <= castle.gold:
-
-                castle.peasants -= self.send_peasants_amount
-                castle.gold -= self.send_gold_amount
-
-                print("Resources sent!")
-
-                self.send_peasants_amount = 0
-                self.send_gold_amount = 0
-
-    def demolish_castle(self, castle):
-        print("Burzenie zamku")
-
-        castle.destroyed = True
-        castle.owner = None
-        castle.garrison.clear()
-
-        self.selected_castle = None
-
-    def draw_forge(self, screen):
-        screen.fill((40, 70, 70))  # tło "kamień"
-
-        font_title = pygame.font.SysFont(None, 48)
-        font_text = pygame.font.SysFont(None, 24)
-
-        # PANEL
-        panel = pygame.Rect(120, 80, 760, 420)
-        pygame.draw.rect(screen, (120, 90, 60), panel)
-        pygame.draw.rect(screen, (200, 170, 90), panel, 6)
-
-        # TYTUŁ
-        title = font_title.render("Kuźnia", True, (255, 220, 120))
-        screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y - 40))
-
-        # TEKSt
-        text_lines = [
-        "Dzień i noc słychać rytmiczne uderzenia żelaznych młotów –",
-        "to ławrowni kowale w pocie czoła pokuwają bojowe rumaki.",
-        "Dzięki ich wysiłkom będziesz mógł rozpocząć produkcję",
-        "oddziałów konnych, bardzo przydatnych w bojowych zmaganiach.",
-        "",
-        "Jednocześnie łowisarze z górskich krain wytapiają tu stal",
-        "na pancerze i wytwarzają broń palną. Daje Ci to możliwość",
-        "produkowania w koszarach artylerii oraz ciężko opancerzonych",
-        "oddziałów."
-        ]
-
-        y = panel.y + 30
-        for line in text_lines:
-            txt = font_text.render(line, True, (255, 255, 255))
-            screen.blit(txt, (panel.x + 30, y))
-            y += 28
-
-        # BACK BUTTON
-        self.back_button = pygame.Rect(40, 520, 120, 50)
-        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
-        screen.blit(font_text.render("BACK", True, (255,255,255)), (60, 535))
-
+        # przykład zwiększania szczęścia (opcjonalne)
+        if hasattr(self, "festival_button"):
+            if self.festival_button.collidepoint(mx, my):
+                self.selected_castle.happiness = min(100, self.selected_castle.happiness + 5)
+                print("Festival → happiness:", self.selected_castle.happiness)
 
         return None
-    
     
