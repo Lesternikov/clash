@@ -57,9 +57,7 @@ class World:
         self.exit_button = pygame.Rect(20, 20, 120, 50)
         self.prison_slots = [PrisonSlot(), PrisonSlot(), PrisonSlot()]
         self.unit_scroll = 0
-        self.unit_types = [ "pospolite_ruszenie","lekka_piechota","pikinier","halberdier","highlander","light_cavalry","heavy_cavalry","elephant","archer","crossbowman",
-            "musketeer","worm","scorpion","mag","pegasus","eagle","ghost","bones","trol","smok","heavy_infantry","leśnik","budowniczy","armata","ważka","płaszczka","rycerstwo",
-            "dragon","cyklop","katapulta",]
+        self.unit_types = [UNIT_STATS]
         self.selected_recruit_units =None
         self.peasant_button = pygame.Rect(0, 0, 180, 45)
         self.send_peasants_amount = 0
@@ -417,273 +415,14 @@ class World:
 
     def handle_mouse_click(self, mx, my):
         print("CLICK:", self.screen, mx, my)
-<<<<<<< HEAD
 
         # UI screens
-=======
-        tile_x = mx // 32
-        tile_y = my // 32
-        # --- COURT screen ---
->>>>>>> a9a7e6a7d027276556977e29e617b09ceadf22ca
         if self.screen == "court":
             self.handle_court_click(mx, my)
             return
 
-<<<<<<< HEAD
         if self.screen == "peasants":
             self.handle_peasants_click(mx, my)
-=======
-        # --- RECRUITMENT screen ---
-        if self.screen == "recruitment":
-            idx = self.click_on_recruitment(mx, my)
-            print("CLICK: recruitment", mx, my)
-
-            if idx is not None:
-                print("selected index", idx)
-                self.selected_recruitment_index = idx
-
-            return 
-
-        # 1️⃣ sprawdź zamek
-        for castle in self.castles:
-            if castle.x == tile_x and castle.y == tile_y:
-                self.selected_castle = castle
-                self.screen = "castle"
-                print("Wejście do zamku")
-                return
-
-        # 2️⃣ sprawdź jednostkę
-        unit = self.get_unit_at(mx, my)
-        if unit:
-            self.selected_unit = unit
-            print("Wybrano jednostkę")
-        else:
-            print("Brak jednostki na tym polu")
-
-    # ================= MAP =================
-        if self.screen == "map":
-            if self.next_turn_button.collidepoint(mx, my):
-                self.next_turn()
-                return
-    
-            self.select_castle(tile_x, tile_y)
-            self.select_unit(tile_x, tile_y)
-
-            if self.selected_castle:
-                self.screen = "castle"
-
-    # ================= CASTLE =================
-        elif self.screen == "castle":
-
-            if self.back_button.collidepoint(mx, my):
-                self.screen = "map"
-                self.selected_castle = None
-                return
-
-            if self.screen == "castle":
-
-                if self.garrison_button and self.garrison_button.collidepoint(mx, my):
-                    self.screen = "garrison"
-                    return
-
-                if (
-                    self.selected_castle
-                    and "Koszary" in self.selected_castle.buildings
-                    and self.koszary_button
-                    and self.koszary_button.collidepoint(mx, my)
-                ):
-                    self.screen = "garrison"
-                    return
-
-            if self.peasant_button.collidepoint(mx, my):
-                self.screen = "peasants"
-                return
-
-            if self.court_button.collidepoint(mx, my):
-                self.screen = "court"
-                return
-
-            for castle in self.castles:
-                if castle.x == tile_x and castle.y == tile_y:
-                    print("Znaleziono zamek:", castle.x, castle.y)
-                    self.selected_castle = castle
-                    self.screen = "castle"
-                    return
-
-
-            # klik w budynki
-            if self.menu_open:
-                for name, rect in self.build_rects.items():
-                    if rect.collidepoint(mx, my):
-                        
-                        if self.selected_castle.build(name):
-                            self.menu_open = False
-                            self.build_open = False
-                        return
-
-                    
-    # ================= GARRISON =================
-        elif self.screen == "garrison":
-
-            if self.back_button.collidepoint(mx, my):
-                self.selected_units.clear()
-                self.screen = "castle"
-                return
-
-            if (
-                self.selected_castle
-                and "Koszary" in self.selected_castle.buildings
-                and self.recruit_button
-                and self.recruit_button.collidepoint(mx, my)
-            ):
-                self.screen = "recruitment"
-                return
-
-            if hasattr(self, "start_prod_button"):
-                if self.start_prod_button.collidepoint(mx, my):
-                    self.start_recruitment(self.selected_unit_type)
-                    return
-
-
-            # HEAL
-            if self.selected_castle and "hospital" in self.selected_castle.buildings:
-                if self.heal_button.collidepoint(mx, my):
-                    for unit in self.selected_units:
-                        self.selected_castle.start_healing_unit(unit)
-
-            # TRAIN
-            if self.selected_castle and "school" in self.selected_castle.buildings:
-                if self.train_button.collidepoint(mx, my):
-                    if self.selected_units:
-                        count = len(self.selected_units)
-                        self.selected_castle.start_training_group(self.selected_units)
-                        self.selected_units.clear()
-                        print("Przeszkolono", count, "jednostek")
-                    else:
-                        print("Brak zaznaczonych jednostek")
-            
-        elif self.screen == "recruitment":
-
-            castle = self.selected_castle
-            if not castle:
-                return
-
-            if self.back_button.collidepoint(mx, my):
-                self.screen = "garrison"
-                return
-
-            # Kliknięcie listy jednostek
-            index = self.click_on_recruitment(mx, my)
-            if index is not None:
-                print("selected index", index)
-                self.selected_unit_type = index
-                return
-
-            # Kup patent
-            if self.buy_patent_button.collidepoint(mx, my):
-                if self.selected_unit_type is not None:
-                    unit_type = self.recruitment_unit_types[self.selected_unit_type]
-                    castle.buy_patent(unit_type)
-                return
-
-            # Start produkcji
-            if self.start_prod_button.collidepoint(mx, my):
-                if self.selected_unit_type is not None:
-                    unit_type = self.recruitment_unit_types[self.selected_unit_type]
-                    castle.start_production(unit_type)
-                return
-
-            # Stop produkcji
-            if self.stop_prod_button.collidepoint(mx, my):
-                castle.stop_production()
-                return
-
-            # Kliknięcie slotów patentów
-            for i, rect in enumerate(self.patent_rects):
-                if rect.collidepoint(mx, my):
-                    if i < len(castle.patents):
-                        self.selected_patent = castle.patents[i]
-                    return
-            # przyciski przewijania jednostek
-                        # SCROLL UP
-            if self.scroll_up_button.collidepoint(mx, my):
-                if self.recruitment_scroll > 0:
-                    self.recruitment_scroll -= 1
-                return
-
-                         # SCROLL DOWN
-            if self.scroll_down_button.collidepoint(mx, my):
-                if self.recruitment_scroll < len(self.recruitment_unit_types) - self.visible_recruitment_count:
-                    self.recruitment_scroll += 1
-                return
-
-
-        elif self.screen == "peasants":
-            print("peasants screen click")
-
-            if self.back_button.collidepoint(mx, my):
-                self.screen = "castle"
-                return
-
-            castle = self.selected_castle
-
-        elif self.screen == "court":
-            if self.back_button.collidepoint(mx, my):
-                self.screen = "castle"
-                return
-
-            castle = self.selected_castle
-
-            # ================= SEND AMOUNT =================
-
-            if self.peasants_plus_button.collidepoint(mx, my):
-                if self.send_peasants_amount + 10 <= castle.peasants:
-                    self.send_peasants_amount += 10
-
-            if self.peasants_minus_button.collidepoint(mx, my):
-                self.send_peasants_amount = max(0, self.send_peasants_amount - 10)
-
-            if self.gold_plus_button.collidepoint(mx, my):
-                if self.send_gold_amount + 10 <= castle.gold:
-                    self.send_gold_amount += 10
-
-            if self.gold_minus_button.collidepoint(mx, my):
-                self.send_gold_amount = max(0, self.send_gold_amount - 10)
-
-            # ================= TAX =================
-
-            if self.tax_plus_button.collidepoint(mx, my):
-                castle.tax_rate = min(4.0, castle.tax_rate + 0.1)
-
-            if self.tax_minus_button.collidepoint(mx, my):
-                castle.tax_rate = max(0.0, castle.tax_rate - 0.1)
-
-            # ================= SCROLL =================
-
-            owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
-            max_offset = max(0, len(owned) - 3)
-
-            if self.castle_scroll_up.collidepoint(mx, my):
-                self.castle_list_offset = max(0, self.castle_list_offset - 1)
-
-            if self.castle_scroll_down.collidepoint(mx, my):
-                self.castle_list_offset = min(max_offset, self.castle_list_offset + 1)
-
-            # ================= SEND =================
-
-            if self.send_button.collidepoint(mx, my):
-
-                if self.send_peasants_amount <= castle.peasants and \
-                self.send_gold_amount <= castle.gold:
-
-                    castle.peasants -= self.send_peasants_amount
-                    castle.gold -= self.send_gold_amount
-
-                    print("Resources sent!")
-
-                    self.send_peasants_amount = 0
-                    self.send_gold_amount = 0
->>>>>>> a9a7e6a7d027276556977e29e617b09ceadf22ca
             return
 
         if self.screen == "recruitment":
@@ -814,7 +553,7 @@ class World:
 
         for row in range(rows):
             for col in range(cols):
-                index = row * cols + col
+                index = row * cols + col   # ← BRAKOWAŁO TEGO
 
                 x = start_x + col * 130
                 y = start_y + row * 210
@@ -896,9 +635,11 @@ class World:
             pygame.draw.rect(screen, (150, 150, 255), rect)
 
     # jednostki
-        for u in self.units:
-            rect = pygame.Rect(u.x * tile + 8, u.y * tile + 8, 16, 16)
-            pygame.draw.rect(screen, (255, 255, 0), rect)
+        for player in self.players:
+            for u in player.units:
+                rect = pygame.Rect(u.x * tile + 8, u.y * tile + 8, 16, 16)
+                pygame.draw.rect(screen, (255, 255, 0), rect)
+
 
     # selected unit
         if self.selected_unit:
@@ -1534,7 +1275,14 @@ class World:
 
             if pygame.Rect(50, y+40, 200, 20).collidepoint(mx, my):
                 self.bribe_general(slot)
+
     def handle_map_click(self, mx, my):
+        
+        if self.screen == "map":
+            if self.next_turn_button.collidepoint(mx, my):
+                self.next_turn()
+                return
+            
         tile_x = mx // 32
         tile_y = my // 32
 
@@ -1557,7 +1305,7 @@ class World:
             if castle.x == tile_x and castle.y == tile_y:
                 self.selected_castle = castle
                 self.selected_unit = None
-                self.screen = "castle"   # <<< TO BYŁO POTRZEBNE
+                self.screen = "castle"   # TO BYŁO POTRZEBNE
                 print("Selected castle")
                 return
 
@@ -1724,4 +1472,44 @@ class World:
                 self.send_gold_amount = 0
 
         return None
+    
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+
+    konieckoniec
+    koniec
+
+
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    koniec
+    konieckoniec
+    koniec
+
+    koniec
+    konieckoniec
     
