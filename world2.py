@@ -745,17 +745,16 @@ class World:
 
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
+
         castle = self.selected_castle
         if not castle:
             return
         unit_types = self.recruitment_unit_types
-
-
         w = screen.get_width()
         h = screen.get_height()
 
         # =====================================================
-        # LEWE PRZYCISKI (piramida)
+        # LEFT BUTTONS
         # =====================================================
 
         self.info_button = pygame.Rect(120, 590, 100, 30)
@@ -771,24 +770,29 @@ class World:
         screen.blit(font.render("KUP PATENT", True, (255,255,255)), (170,635))
 
         # =====================================================
-        # PANEL PRAWY — PATENTY (12)
+        # PATENTS PANEL
         # =====================================================
 
         patents_panel = pygame.Rect(w-310, 40, 250, 320)
         pygame.draw.rect(screen, (70,50,40), patents_panel)
 
+        self.patent_rects = []
+
         for i in range(12):
             x = w-300 + (i % 4)*60
             y = 30 + (i // 4)*90
-            rect = pygame.Rect(x, y + 50, 50, 80,)
+            rect = pygame.Rect(x, y + 50, 50, 80)
+            self.patent_rects.append(rect)
+
             pygame.draw.rect(screen, (120,120,120), rect, 3)
 
             if i < len(castle.patents):
                 screen.blit(font.render("U", True, (255,255,0)), (x+18, y+80))
 
         # =====================================================
-        # PRODUKCJA INFO
+        # PRODUCTION INFO
         # =====================================================
+
         if castle.production_enabled:
             text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
             color = (0,255,0)
@@ -799,7 +803,7 @@ class World:
         screen.blit(font.render(text, True, color), (x - 150, y + 300))
 
         # =====================================================
-        # PRAWE PRZYCISKI
+        # RIGHT BUTTONS
         # =====================================================
 
         self.remove_patent_button = pygame.Rect(w-230, 590, 100, 30)
@@ -820,7 +824,7 @@ class World:
 
         screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)),
                     (w//2 - 30, 640))
-
+        
         # =====================================================
         # LISTA PATENTÓW
         # =====================================================
@@ -834,15 +838,18 @@ class World:
             screen.blit(font.render(f"MOV: {stats['moves']}", True, (255,255,255)), (320,400))
             screen.blit(font.render(f"ZME: {stats['fatigue']}", True, (255,255,255)), (460,300))
             screen.blit(font.render(f"EXP: {stats['exp']}", True, (255,255,255)), (460,400))
+
+
+
             screen.blit(font.render(f"Patent: {stats['patent_cost']}", True,(255,255,0)), (40,500))
             screen.blit(font.render(f"Prod: {stats['production_cost']}", True,(255,255,0)), (200,500))
             screen.blit(font.render(f"Tury: {stats['production_time']}", True,(255,255,0)), (360,500))
 
 
             self.unit_list_rects.clear()
-
-        #Rysowanie listy
-        font = pygame.font.SysFont(None, 24)
+        # =====================================================
+        # UNIT LIST
+        # =====================================================
 
         self.unit_list_rects.clear()
 
@@ -865,28 +872,30 @@ class World:
 
             global_index = self.recruitment_scroll + i
 
-            # tło zawsze takie samo
             pygame.draw.rect(screen, (30, 30, 30), rect)
 
-            # kolor tekstu zależy od zaznaczenia
-            text_color = (180, 180, 180)
+            text_color = (180,180,180)
             if self.selected_unit_type == global_index:
-                text_color = (255, 255, 255)
-
+                text_color = (255,255,255)
+                
             stats = UNIT_STATS[unit_type]
             text = f"{unit_type}"
 
-            screen.blit(font.render(text, True, text_color),
+            screen.blit(font.render(unit_type, True, text_color),
                         (rect.x + 10, rect.y + 8))
 
-            #przyciski przewijania wojska
-            pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
-            screen.blit(font.render("▲", True, (255,255,255)),
-                        (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
+        # =====================================================
+        # SCROLL BUTTONS
+        # =====================================================
 
-            pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
-            screen.blit(font.render("▼", True, (255,255,255)),
-                        (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
+        pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
+        screen.blit(font.render("▲", True, (255,255,255)),
+                    (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
+
+        pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
+        screen.blit(font.render("▼", True, (255,255,255)),
+                    (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
+
                                                                 
     def draw_peasants(self, screen):
         font = pygame.font.SysFont(None, 24)
@@ -1382,7 +1391,12 @@ class World:
             castle.stop_production()
             print("Production stopped")
             return
-
+        # Kliknięcie slotów patentów
+        for i, rect in enumerate(self.patent_rects):
+            if rect.collidepoint(mx, my):
+                if i < len(castle.patents):
+                    self.selected_patent = castle.patents[i]
+                return
         # SCROLL UP
         if self.scroll_up_button.collidepoint(mx, my):
             if self.recruitment_scroll > 0:
@@ -1399,71 +1413,22 @@ class World:
         if not self.selected_castle:
             return
 
-        print("peasants screen click")
-
-        castle = self.selected_castle
-
         # BACK
-        if self.back_button.collidepoint(mx, my):
+        if self.back_button and self.back_button.collidepoint(mx, my):
             self.screen = "castle"
             return
 
-        # ================= SEND AMOUNT =================
+        # przykład przycisku podatków (jeśli istnieje)
+        if hasattr(self, "tax_button"):
+            if self.tax_button.collidepoint(mx, my):
+                self.selected_castle.collect_taxes()
+                print("Zebrano podatki")
 
-        if self.peasants_plus_button.collidepoint(mx, my):
-            if self.send_peasants_amount + 10 <= castle.peasants:
-                self.send_peasants_amount += 10
-            return
-
-        if self.peasants_minus_button.collidepoint(mx, my):
-            self.send_peasants_amount = max(0, self.send_peasants_amount - 10)
-            return
-
-        if self.gold_plus_button.collidepoint(mx, my):
-            if self.send_gold_amount + 10 <= castle.gold:
-                self.send_gold_amount += 10
-            return
-
-        if self.gold_minus_button.collidepoint(mx, my):
-            self.send_gold_amount = max(0, self.send_gold_amount - 10)
-            return
-
-        # ================= TAX =================
-
-        if self.tax_plus_button.collidepoint(mx, my):
-            castle.tax_rate = min(4.0, castle.tax_rate + 0.1)
-            return
-
-        if self.tax_minus_button.collidepoint(mx, my):
-            castle.tax_rate = max(0.0, castle.tax_rate - 0.1)
-            return
-
-        # ================= SCROLL =================
-
-        owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
-        max_offset = max(0, len(owned) - 3)
-
-        if self.castle_up_button.collidepoint(mx, my):
-            self.castle_list_offset = max(0, self.castle_list_offset - 1)
-            return
-
-        if self.castle_down_button.collidepoint(mx, my):
-            self.castle_list_offset = min(max_offset, self.castle_list_offset + 1)
-            return
-
-        # ================= SEND =================
-
-        if self.send_button.collidepoint(mx, my):
-            if self.send_peasants_amount <= castle.peasants and \
-            self.send_gold_amount <= castle.gold:
-
-                castle.peasants -= self.send_peasants_amount
-                castle.gold -= self.send_gold_amount
-
-                print("Resources sent!")
-
-                self.send_peasants_amount = 0
-                self.send_gold_amount = 0
+        # przykład zwiększania szczęścia (opcjonalne)
+        if hasattr(self, "festival_button"):
+            if self.festival_button.collidepoint(mx, my):
+                self.selected_castle.happiness = min(100, self.selected_castle.happiness + 5)
+                print("Festival → happiness:", self.selected_castle.happiness)
 
         return None
     
