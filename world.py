@@ -943,10 +943,6 @@ class World:
             return
         unit_types = self.recruitment_unit_types
 
-        screen.blit(font.render(f"Peasants: {castle.peasants}", True, (255,255,255)), (w//2 - 60, 20))
-        screen.blit(font.render(f"Happiness: {castle.happiness}%", True, (200,255,200)), (w//2 - 70, 45))
-        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)), (w - 120, 20))
-
         w = screen.get_width()
         h = screen.get_height()
 
@@ -993,10 +989,6 @@ class World:
             color = (200,200,200)
 
         screen.blit(font.render(text, True, color), (x - 150, y + 300))
-
-        screen.blit(font.render("TAX", True, (255,255,255)), (60, h//2 - 80))
-        screen.blit(font.render(f"{castle.tax_rate:.1f}", True, (255,255,255)), (70, h//2 - 20))
-        screen.blit(font.render(f"+{tax_income}/turn", True, (255,255,0)), (40, h//2 + 10))
 
         # =====================================================
         # PRAWE PRZYCISKI
