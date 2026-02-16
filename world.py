@@ -41,6 +41,7 @@ class World:
         self.koszary_button = None
         self.garrison_button = pygame.Rect(40, 140, 160, 40)
         self.exit_castle_button = pygame.Rect(40, 200, 160, 40)
+        #koszary przyciski
         self.heal_button = pygame.Rect(460, 600, 100, 40)
         self.train_button = pygame.Rect(680, 600, 100, 40)
         self.recruit_button = pygame.Rect(260, 600, 100, 40)
@@ -48,13 +49,15 @@ class World:
         self.menu_button = pygame.Rect(860, 40, 140, 40)
         self.menu_rects = {}
         self.build_rects = {}
+        self.build_clicked = {}
         self.next_turn_button = pygame.Rect(460, 10, 160, 40)
         self.menu_open = False
         self.build_open = False
+        #dwór
         self.victories = 0
         self.defeats = 0
         self.court_button = pygame.Rect(40, 140, 160, 40)
-        self.forge_button = None
+
         self.exit_button = pygame.Rect(20, 20, 120, 50)
         self.prison_slots = [PrisonSlot(), PrisonSlot(), PrisonSlot()]
         self.unit_scroll = 0
@@ -95,7 +98,10 @@ class World:
         self.patent_rects = []
         self.scroll_up_button = pygame.Rect(380, 80, 40, 60)
         self.scroll_down_button = pygame.Rect(380, 150, 40, 60)
-
+        self.forge_button = None
+        self.workshop_button = None
+        self.hospital_button = None
+        self.school_button = None
         # niszczenie zamku
         self.demolish_confirm = False
 
@@ -423,7 +429,7 @@ class World:
                     if self.exit_button.collidepoint(mx, my):
                         self.screen = "map"
 
-                if self.screen == "forge":
+                if self.screen in ["forge","workshop","hospital","school"]:
                     if self.back_button.collidepoint(mx, my):
                         self.screen = "castle"
                         return
@@ -463,9 +469,23 @@ class World:
             self.handle_court_click(mx, my)
             return
 
+        #FORGE
         if self.forge_button and self.forge_button.collidepoint(mx, my):
             self.screen = "forge"
             return
+
+        if self.workshop_button and self.workshop_button.collidepoint(mx, my):
+            self.screen = "workshop"
+            return
+
+        if self.hospital_button and self.hospital_button.collidepoint(mx, my):
+            self.screen = "hospital"
+            return
+
+        if self.school_button and self.school_button.collidepoint(mx, my):
+            self.screen = "school"
+            return
+
 
         if self.screen == "peasants":
             self.handle_peasants_click(mx, my)
@@ -595,6 +615,15 @@ class World:
             return
         elif self.screen == "forge":
             self.draw_forge(screen)
+            return
+        elif self.screen == "workshop":
+            self.draw_workshop(screen)
+            return
+        elif self.screen == "hospital":
+            self.draw_hospital(screen)
+            return
+        elif self.screen == "school":
+            self.draw_school(screen)
             return
     def draw_garrison(self, screen):
         if not self.selected_castle:
@@ -747,24 +776,52 @@ class World:
             screen.blit(gold, (40, 80))
 
         # GARNIZON — zawsze
-        self.garrison_button = pygame.Rect(40, 120, 160, 40)
+        self.garrison_button = pygame.Rect(80, 630, 160, 40)
         pygame.draw.rect(screen, (80, 80, 160), self.garrison_button)
         screen.blit(font.render("Garrison", True, (255,255,255)),
                     (self.garrison_button.x + 10, self.garrison_button.y + 10))
 
         # KUŹNIA — tylko jeśli forge zbudowany
         if self.selected_castle and "forge" in self.selected_castle.buildings:
-            self.forge_button = pygame.Rect(40, 170, 160, 40)
+            self.forge_button = pygame.Rect(750, 500, 160, 40)
             pygame.draw.rect(screen, (100, 100, 100), self.forge_button)
             screen.blit(font.render("KUŹNIA", True, (255,255,255)),
                         (self.forge_button.x + 20, self.forge_button.y + 10))
         else:
             self.forge_button = None
 
+        # WARSZTAT — tylko jeśli workshop zbudowany
+        if self.selected_castle and "workshop" in self.selected_castle.buildings:
+            self.workshop_button = pygame.Rect(290, 480, 160, 40)
+            pygame.draw.rect(screen, (90, 90, 140), self.workshop_button)
+            screen.blit(font.render("WARSZTAT", True, (255,255,255)),
+                        (self.workshop_button.x + 15, self.workshop_button.y + 10))
+        else:
+            self.workshop_button = None
+
+        # SZPITAL — tylko jeśli hospital zbudowany
+        if self.selected_castle and "hospital" in self.selected_castle.buildings:
+            self.hospital_button = pygame.Rect(110, 350, 160, 40)
+            pygame.draw.rect(screen, (200, 60, 60), self.hospital_button)
+            screen.blit(font.render("SZPITAL", True, (255,255,255)),
+                        (self.hospital_button.x + 15, self.hospital_button.y + 10))
+        else:
+            self.hospital_button = None
+
+        #SZKOŁA — tylko jeśli school zbudowany
+        if self.selected_castle and "school" in self.selected_castle.buildings:
+            self.school_button = pygame.Rect(830, 250, 160, 40)
+            pygame.draw.rect(screen, (90, 90, 240), self.school_button)
+            screen.blit(font.render("SZKOŁA", True, (255,255,255)),
+                        (self.school_button.x + 15, self.school_button.y + 10))
+        else:
+            self.school_button = None
+
+
     # --- BUTTON: BACK ---
-        self.back_button = pygame.Rect(40, 200, 160, 40)
+        self.back_button = pygame.Rect(40, 700, 160, 40)
         pygame.draw.rect(screen, (120, 80, 80), self.back_button)
-        screen.blit(font.render("BACK", True, (255,255,255)), (50,210))
+        screen.blit(font.render("BACK", True, (255,255,255)), (50,710))
 
         pygame.draw.rect(screen, (100, 140, 60), self.peasant_button)
 
@@ -837,9 +894,21 @@ class World:
             screen.blit(font.render("NIE", True, (0,0,0)),
                         (self.demolish_no.x + 20, self.demolish_no.y + 10))
 
+            self.workshop_button = pygame.Rect(340, 480, 160, 40)
+            pygame.draw.rect(screen, (90, 90, 90), self.forge_button)
+            draw_text(screen, "warsztat", 455, 160)
+
             self.forge_button = pygame.Rect(420, 150, 160, 40)
             pygame.draw.rect(screen, (90, 90, 90), self.forge_button)
             draw_text(screen, "Kuznia", 455, 160)
+
+            self.hospital_button = pygame.Rect(420, 150, 160, 40)
+            pygame.draw.rect(screen, (150, 90, 90), self.hospital_button)
+            draw_text(screen, "Szpital", 455, 160)
+
+            self.school_button = pygame.Rect(400, 150, 160, 40)
+            pygame.draw.rect(screen, (150, 90, 90), self.school_button)
+            draw_text(screen, "Szkoła", 455, 160)
 
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
@@ -1327,7 +1396,7 @@ class World:
 
         for i, opt in enumerate(options):
             rect = pygame.Rect(menu_x, menu_y + i*40, 160, 40)
-            pygame.draw.rect(screen, (60, 60, 60), rect)
+            pygame.draw.rect(screen, (100, 100, 100), rect)
             screen.blit(font.render(opt, True, (255,255,255)),
                         (menu_x+10, menu_y+10+i*40))
 
@@ -1368,8 +1437,9 @@ class World:
         for i, b in enumerate(buildings):
             rect = pygame.Rect(sub_x, sub_y + i*40, 160, 40)
             pygame.draw.rect(screen, (80, 80, 120), rect)
-            screen.blit(font.render(b, True, (255,255,255)),
-                        (sub_x+10, sub_y+10+i*40))
+            color = (255, 255, 255) if not self.build_clicked.get(b, False) else (100, 100, 100)
+            screen.blit(font.render(b, True, color),
+                    (sub_x + 10, sub_y + 10 + i*40))
 
             self.build_rects[b] = rect
     
@@ -1481,6 +1551,7 @@ class World:
             for name, rect in self.build_rects.items():
                 if rect.collidepoint(mx, my):
                     if self.selected_castle.build(name):
+                        self.build_clicked[name] = True
                         self.menu_open = False
                         self.build_open = False
                     return
@@ -1656,6 +1727,106 @@ class World:
         pygame.draw.rect(screen, (120, 80, 80), self.back_button)
         screen.blit(font_text.render("BACK", True, (255,255,255)), (60, 535))
 
+    def draw_workshop(self, screen):
+        screen.fill((60, 60, 80))
+
+        font_title = pygame.font.SysFont(None, 48)
+        font_text = pygame.font.SysFont(None, 24)
+
+        panel = pygame.Rect(120, 80, 760, 420)
+        pygame.draw.rect(screen, (100, 100, 130), panel)
+        pygame.draw.rect(screen, (180, 180, 220), panel, 6)
+
+        title = font_title.render("Warsztat", True, (220, 220, 255))
+        screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y - 40))
+
+        lines = [
+            "Pracują tu znakomici rzemieślnicy ze starego kraju.",
+            "Dzięki ich kunsztowi staniesz się posiadaczem łuków, kusz,",
+            "oszczepów oraz strzał niespotykanych wcześniej w tej części",
+            "kontynentu. Daje Ci to możliwość rozpoczęcia produkcji",
+            "oddziałów rażących wroga na dystans a także rozmaitych",
+            "machin.",
+        ]
+
+        y = panel.y + 30
+        for line in lines:
+            txt = font_text.render(line, True, (255, 255, 255))
+            screen.blit(txt, (panel.x + 30, y))
+            y += 28
+
+        # BACK BUTTON
+        self.back_button = pygame.Rect(40, 520, 120, 50)
+        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
+        screen.blit(font_text.render("BACK", True, (255,255,255)), (60, 535))
+        
+    def draw_hospital(self, screen):
+        screen.fill((60, 60, 80))
+
+        font_title = pygame.font.SysFont(None, 48)
+        font_text = pygame.font.SysFont(None, 24)
+
+        panel = pygame.Rect(120, 80, 760, 420)
+        pygame.draw.rect(screen, (100, 100, 130), panel)
+        pygame.draw.rect(screen, (180, 180, 220), panel, 6)
+
+        title = font_title.render("Szpital", True, (220, 220, 255))
+        screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y - 40))
+
+        lines = [
+            "Zapach rozcieranych ziół da się odczuć we wszystkich zakamarkach Twojego dziedzinca.",
+            "Powstające tu specyfiki i mikstury robione są według bardzo starych receptur,",
+            "znanych tylko niektórym kapłanom.",
+            "Owe lekarstwa pomogą odzyskać Twoim rycerzom pełnię sił, gojąc w szybkim tempie", 
+            "nawet najcięższe rany.",
+            "Ponadto troskliwi kapłani roztoczyli swą opiekę nad mieszkańcami dworskiej wsi.",
+            "Przez to szalejące plagi i zarazy rzadko zagoszczą w Twych progach i będą mniej dotkliwe.",
+        ]
+
+        y = panel.y + 30
+        for line in lines:
+            txt = font_text.render(line, True, (255, 255, 255))
+            screen.blit(txt, (panel.x + 30, y))
+            y += 28
+
+        # BACK BUTTON
+        self.back_button = pygame.Rect(40, 520, 120, 50)
+        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
+        screen.blit(font_text.render("BACK", True, (255,255,255)), (60, 535))
+
+    def draw_school(self, screen):
+        screen.fill((60, 60, 80))
+
+        font_title = pygame.font.SysFont(None, 48)
+        font_text = pygame.font.SysFont(None, 24)
+
+        panel = pygame.Rect(120, 80, 760, 420)
+        pygame.draw.rect(screen, (100, 100, 130), panel)
+        pygame.draw.rect(screen, (180, 180, 220), panel, 6)
+
+        title = font_title.render("Szkoła", True, (220, 220, 255))
+        screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y - 40))
+
+        lines = [
+            "Zapach rozcieranych ziół da się odczuć we wszystkich zakamarkach Twojego dziedzinca.",
+            "Powstające tu specyfiki i mikstury robione są według bardzo starych receptur,",
+            "znanych tylko niektórym kapłanom.",
+            "Owe lekarstwa pomogą odzyskać Twoim rycerzom pełnię sił, gojąc w szybkim tempie", 
+            "nawet najcięższe rany.",
+            "Ponadto troskliwi kapłani roztoczyli swą opiekę nad mieszkańcami dworskiej wsi.",
+            "Przez to szalejące plagi i zarazy rzadko zagoszczą w Twych progach i będą mniej dotkliwe.",
+        ]
+
+        y = panel.y + 30
+        for line in lines:
+            txt = font_text.render(line, True, (255, 255, 255))
+            screen.blit(txt, (panel.x + 30, y))
+            y += 28
+
+        # BACK BUTTON
+        self.back_button = pygame.Rect(40, 520, 120, 50)
+        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
+        screen.blit(font_text.render("BACK", True, (255,255,255)), (60, 535))
 
         return None
     
