@@ -42,7 +42,7 @@ class World:
         self.garrison_button = pygame.Rect(40, 140, 160, 40)
         self.exit_castle_button = pygame.Rect(40, 200, 160, 40)
         self.heal_button = pygame.Rect(460, 600, 100, 40)
-        self.train_button = pygame.Rect(680, 600, 100, 40)
+        self.train_button = pygame.Rect(660, 600, 100, 40)
         self.recruit_button = pygame.Rect(260, 600, 100, 40)
         self.selected_unit_type = None
         self.menu_button = pygame.Rect(860, 40, 140, 40)
@@ -57,7 +57,6 @@ class World:
         self.exit_button = pygame.Rect(20, 20, 120, 50)
         self.prison_slots = [PrisonSlot(), PrisonSlot(), PrisonSlot()]
         self.unit_scroll = 0
-        self.unit_types = [UNIT_STATS]
         self.selected_recruit_units =None
         self.peasant_button = pygame.Rect(0, 0, 180, 45)
         self.send_peasants_amount = 0
@@ -68,21 +67,17 @@ class World:
        # TAX + -
         self.tax_plus_button = pygame.Rect(0, 0, 40, 40)
         self.tax_minus_button = pygame.Rect(0, 0, 40, 40)
-
         # CASTLE SCROLL
         self.castle_up_button = pygame.Rect(0, 0, 40, 40)
         self.castle_down_button = pygame.Rect(0, 0, 40, 40)
-
         # GOLD + -
         self.gold_plus_button = pygame.Rect(0, 0, 40, 40)
         self.gold_minus_button = pygame.Rect(0, 0, 40, 40)
-       
         # SEND
         self.send_button = pygame.Rect(0, 0, 160, 45)
-        
         # BACK działanie
         self.back_button = pygame.Rect(90, 600, 100, 40)
-        
+        self.selected_patent_index = None
         self.castle_list_offset = 0
         self.castle_scroll_up = pygame.Rect(0,0,40,40)
         self.castle_scroll_down = pygame.Rect(0,0,40,40)
@@ -94,6 +89,8 @@ class World:
         self.patent_rects = []
         self.scroll_up_button = pygame.Rect(380, 80, 40, 60)
         self.scroll_down_button = pygame.Rect(380, 150, 40, 60)
+        self.button_send_army = pygame.Rect(860, 600, 100, 40)
+        
 
     def load(self, map_file, fac_file):
         self.map = load_map(map_file)
@@ -118,6 +115,11 @@ class World:
         print("DEBUG units:", len(self.units))
         map_width = len(self.map[0]) * 32
         self.next_turn_button = pygame.Rect(map_width + 20, 10, 170, 40)
+        print("PLAYERS:", len(self.players))
+        print("CASTLES:", len(self.castles))
+
+        for c in self.castles:
+            print("castle owner:", c.owner)
 
     def add_player(self, player):
         self.players.append(player)
@@ -140,13 +142,9 @@ class World:
 
         for castle in self.castles:
             castle.next_turn()
-            castle.update_production(self)
 
         self.selected_unit = None
         self.selected_castle = None
-        for castle in self.castles:
-            castle.collect_taxes()
-
 
     def move_unit(self, unit, dx, dy):
         if unit.move_points <= 0:
@@ -456,11 +454,8 @@ class World:
             return
 
         # ================= RECRUITMENT =================
-        if (
-            "Koszary" in castle.buildings
-            and self.recruit_button
-            and self.recruit_button.collidepoint(mx, my)
-        ):
+        if ("Koszary" in castle.buildings
+            and self.recruit_button.collidepoint(mx, my)):
             self.screen = "recruitment"
             return
 
@@ -474,6 +469,7 @@ class World:
         # ================= TRAIN =================
         if "school" in castle.buildings:
             if self.train_button.collidepoint(mx, my):
+                print("trenuj")
                 if self.selected_units:
                     castle.start_training_group(self.selected_units)
                     self.selected_units.clear()
@@ -481,6 +477,11 @@ class World:
                 else:
                     print("Brak zaznaczonych jednostek")
                 return
+        #=================wyślij wojsko======================
+        
+        if self.button_send_army.collidepoint(mx, my):
+            self.release_selected_units()
+            return
 
         # =====================================================
         # TWOJA ORYGINALNA LOGIKA SELEKCJI JEDNOSTEK
@@ -549,46 +550,45 @@ class World:
         cols = 6
         rows = 2
 
+        slot_w = 100
+        slot_h = 180
+
+        offset_x = 130
+        offset_y = 210
+
         font = pygame.font.SysFont(None, 20)
 
         for row in range(rows):
             for col in range(cols):
-                index = row * cols + col   # ← BRAKOWAŁO TEGO
+                index = row * cols + col
 
-                x = start_x + col * 130
-                y = start_y + row * 210
+                x = start_x + col * offset_x
+                y = start_y + row * offset_y
 
-                rect = pygame.Rect(x, y, 100, 180)
+                rect = pygame.Rect(x, y, slot_w, slot_h)
 
                 unit = None
                 if index < len(self.selected_castle.garrison):
                     unit = self.selected_castle.garrison[index]
 
+                # ramka
                 if unit in self.selected_units:
                     pygame.draw.rect(screen, (255, 255, 0), rect, 4)
                 else:
                     pygame.draw.rect(screen, (200, 200, 200), rect, 4)
 
-                if index < len(self.selected_castle.garrison):
-                    unit = self.selected_castle.garrison[index]
-
-                    # tło jednostki
+                if unit:
                     pygame.draw.rect(screen, (80, 120, 200), (x+20, y+20, 60, 60))
 
-                    # prosty "X"
                     pygame.draw.line(screen, (255,255,255), (x+8, y+8), (x+56, y+56), 2)
                     pygame.draw.line(screen, (255,255,255), (x+56, y+8), (x+8, y+56), 2)
 
-                    # nazwa
                     text = font.render(unit.type[:3], True, (255,255,255))
                     screen.blit(text, (x + 6, y + 42))
 
-
-    # BACK button kwadrat
+        # BACK
         self.back_button = pygame.Rect(70, 600, 100, 40)
         pygame.draw.rect(screen, (120, 80, 80), self.back_button)
-
-        font = pygame.font.SysFont(None, 24)
         screen.blit(font.render("BACK", True, (255,255,255)), (80,610))
 
         # INFO o zaznaczonych jednostkach
@@ -600,7 +600,10 @@ class World:
                 (40, info_y)
             )
             info_y += 25
-
+        # przycisk produkcji wojska
+        if "Koszary" in self.selected_castle.buildings:
+            pygame.draw.rect(screen, (240, 120, 20), self.recruit_button)
+            screen.blit(font.render("RECRUIT", True, (255,255,255)), (270,610))
 
         # HEAL BUTTON (hospital)
         if self.selected_castle and "hospital" in self.selected_castle.buildings:
@@ -612,12 +615,11 @@ class World:
             pygame.draw.rect(screen, (160, 160, 80), self.train_button)
             screen.blit(font.render("TRAIN", True, (255,255,255)), (700,610))
 
-   
-    # przycisk produkcji wojska
-        if "Koszary" in self.selected_castle.buildings:
-            pygame.draw.rect(screen, (240, 120, 20), self.recruit_button)
-            screen.blit(font.render("RECRUIT", True, (255,255,255)), (270,610))
-           
+        #send button
+        pygame.draw.rect(screen, (160,120,60), self.button_send_army)
+        screen.blit(font.render("RELEASE", True, (255,255,255)), (890,610))
+
+
     def draw_map(self, screen):
         tile = 32
         font = pygame.font.SysFont(None, 18)
@@ -635,9 +637,20 @@ class World:
             pygame.draw.rect(screen, (150, 150, 255), rect)
 
     # jednostki
-        for u in self.units:
-            rect = pygame.Rect(u.x * tile + 8, u.y * tile + 8, 16, 16)
+        tile_units = {}
+
+        for player in self.players:
+            for u in player.units:
+                key = (u.x, u.y)
+                tile_units[key] = tile_units.get(key, 0) + 1
+
+        for (x, y), count in tile_units.items():
+            rect = pygame.Rect(x * tile + 8, y * tile + 8, 16, 16)
             pygame.draw.rect(screen, (255, 255, 0), rect)
+
+            if count > 1:
+                screen.blit(font.render(str(count), True, (0,0,0)),
+                            (x * tile + 10, y * tile + 6))
 
     # selected unit
         if self.selected_unit:
@@ -741,21 +754,20 @@ class World:
         pygame.draw.rect(screen, (220, 80, 80), self.court_button)
         screen.blit(font.render("DWÓR", True, (255,225,255)), (470,110))
 
+    # =======================
+    # DRAW RECRUITMENT
+    # =======================
     def draw_recruitment(self, screen):
         font = pygame.font.SysFont(None, 24)
         castle = self.selected_castle
         if not castle:
             return
+
         unit_types = self.recruitment_unit_types
-
-
         w = screen.get_width()
         h = screen.get_height()
 
-        # =====================================================
-        # LEWE PRZYCISKI (piramida)
-        # =====================================================
-
+        # ---- LEWE PRZYCISKI ----
         self.info_button = pygame.Rect(120, 590, 100, 30)
         self.back_button = pygame.Rect(40, 630, 100, 30)
         self.buy_patent_button = pygame.Rect(160, 630, 140, 30)
@@ -768,38 +780,35 @@ class World:
         screen.blit(font.render("BACK", True, (255,255,255)), (65,635))
         screen.blit(font.render("KUP PATENT", True, (255,255,255)), (170,635))
 
-        # =====================================================
-        # PANEL PRAWY — PATENTY (12)
-        # =====================================================
-
+        # ---- PANEL PATENTÓW ----
         patents_panel = pygame.Rect(w-310, 40, 250, 320)
         pygame.draw.rect(screen, (70,50,40), patents_panel)
 
+        self.patent_rects = []
         for i in range(12):
             x = w-300 + (i % 4)*60
             y = 30 + (i // 4)*90
-            rect = pygame.Rect(x, y + 50, 50, 80,)
-            pygame.draw.rect(screen, (120,120,120), rect, 3)
+            rect = pygame.Rect(x, y + 50, 50, 80)
+            self.patent_rects.append(rect)
 
-            if i < len(castle.patents):
+            if i == self.selected_patent_index:
+                pygame.draw.rect(screen, (255,255,0), rect, 3)
+            else:
+                pygame.draw.rect(screen, (120,120,120), rect, 3)
+
+            if i < len(castle.patents) and castle.patents[i] is not None:
                 screen.blit(font.render("U", True, (255,255,0)), (x+18, y+80))
 
-        # =====================================================
-        # PRODUKCJA INFO
-        # =====================================================
+        # ---- PRODUKCJA INFO ----
         if castle.production_enabled:
             text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
             color = (0,255,0)
         else:
             text = "Produkcja nieaktywna"
             color = (200,200,200)
-
         screen.blit(font.render(text, True, color), (x - 150, y + 300))
 
-        # =====================================================
-        # PRAWE PRZYCISKI
-        # =====================================================
-
+        # ---- PRAWE PRZYCISKI ----
         self.remove_patent_button = pygame.Rect(w-230, 590, 100, 30)
         self.start_prod_button = pygame.Rect(w-300, 630, 120, 30)
         self.stop_prod_button = pygame.Rect(w-160, 630, 120, 30)
@@ -812,80 +821,71 @@ class World:
         screen.blit(font.render("START", True, (255,255,255)), (w-270,635))
         screen.blit(font.render("STOP", True, (255,255,255)), (w-130,635))
 
-        # =====================================================
-        # GOLD INFO
-        # =====================================================
+        # ---- GOLD INFO ----
+        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)), (w//2 - 30, 640))
 
-        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)),
-                    (w//2 - 30, 640))
+        # ---- INFO O WYBRANEJ JEDNOSTCE / PATENCIE ----
+        stats = None
+        unit_name = None
 
-        # =====================================================
-        # LISTA PATENTÓW
-        # =====================================================
         if self.selected_unit_type is not None:
             unit_name = unit_types[self.selected_unit_type]
             stats = UNIT_STATS[unit_name]
+        elif self.selected_patent_index is not None:
+            p = castle.patents[self.selected_patent_index]
+            if p is not None:
+                if isinstance(p, dict):
+                    unit_name = p["unit_type"]
+                    stats = p["stats"]
+                else:
+                    unit_name = p
+                    stats = UNIT_STATS[unit_name]
+                    castle.patents[self.selected_patent_index] = {"unit_type": unit_name, "stats": stats}
 
+        if stats is not None:
+            screen.blit(font.render(f"Jednostka: {unit_name}", True, (255,255,255)), (180,250))
             screen.blit(font.render(f"ATK: {stats['attack']}", True, (255,255,255)), (180,300))
-            screen.blit(font.render(f"DEF: {stats['defense']}", True, (255,255,255)), (180,400))
+            screen.blit(font.render(f"DEF: {stats['defense']}", True, (255,255,255)), (180,350))
             screen.blit(font.render(f"MOR:{stats['morale']}", True, (255,255,255)), (320,300))
-            screen.blit(font.render(f"MOV: {stats['moves']}", True, (255,255,255)), (320,400))
+            screen.blit(font.render(f"MOV: {stats['moves']}", True, (255,255,255)), (320,350))
             screen.blit(font.render(f"ZME: {stats['fatigue']}", True, (255,255,255)), (460,300))
-            screen.blit(font.render(f"EXP: {stats['exp']}", True, (255,255,255)), (460,400))
+            screen.blit(font.render(f"EXP: {stats['exp']}", True, (255,255,255)), (460,350))
             screen.blit(font.render(f"Patent: {stats['patent_cost']}", True,(255,255,0)), (40,500))
             screen.blit(font.render(f"Prod: {stats['production_cost']}", True,(255,255,0)), (200,500))
             screen.blit(font.render(f"Tury: {stats['production_time']}", True,(255,255,0)), (360,500))
 
-
-            self.unit_list_rects.clear()
-
-        #Rysowanie listy
-        font = pygame.font.SysFont(None, 24)
-
+        # ---- LISTA JEDNOSTEK ----
         self.unit_list_rects.clear()
-
         start_x = 30
         start_y = 80
         box_w = 220
         box_h = 30
         gap = 2
 
-        visible_units = self.recruitment_unit_types[
+        visible_units = unit_types[
             self.recruitment_scroll:
             self.recruitment_scroll + self.visible_recruitment_count
         ]
 
         for i, unit_type in enumerate(visible_units):
             y = start_y + i * (box_h + gap)
-
             rect = pygame.Rect(start_x, y, box_w, box_h)
             self.unit_list_rects.append(rect)
-
             global_index = self.recruitment_scroll + i
 
-            # tło zawsze takie samo
             pygame.draw.rect(screen, (30, 30, 30), rect)
-
-            # kolor tekstu zależy od zaznaczenia
-            text_color = (180, 180, 180)
+            text_color = (180,180,180)
             if self.selected_unit_type == global_index:
-                text_color = (255, 255, 255)
+                text_color = (255,255,255)
 
-            stats = UNIT_STATS[unit_type]
-            text = f"{unit_type}"
+            screen.blit(font.render(unit_type, True, text_color), (rect.x + 10, rect.y + 8))
 
-            screen.blit(font.render(text, True, text_color),
-                        (rect.x + 10, rect.y + 8))
+        # ---- SCROLL BUTTONS ----
+        pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
+        screen.blit(font.render("▲", True, (255,255,255)), (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
+        pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
+        screen.blit(font.render("▼", True, (255,255,255)), (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
 
-            #przyciski przewijania wojska
-            pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
-            screen.blit(font.render("▲", True, (255,255,255)),
-                        (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
-
-            pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
-            screen.blit(font.render("▼", True, (255,255,255)),
-                        (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
-                                                                
     def draw_peasants(self, screen):
         font = pygame.font.SysFont(None, 24)
 
@@ -1172,22 +1172,31 @@ class World:
         print("Rozpoczęto produkcję:", utype)
         self.screen = "garrison"
     def click_on_garrison(self, mx, my):
-        start_x = 500
+        start_x = 100
         start_y = 120
-        slot = 64
 
-        cols = 2
-        rows = 6
+        cols = 6
+        rows = 2
 
-        if not (start_x <= mx < start_x + cols * slot):
-            return None
-        if not (start_y <= my < start_y + rows * slot):
-            return None
+        slot_w = 100
+        slot_h = 180
 
-        col = (mx - start_x) // slot
-        row = (my - start_y) // slot
+        offset_x = 130
+        offset_y = 210
 
-        return int(row * cols + col)
+        for row in range(rows):
+            for col in range(cols):
+                index = row * cols + col
+
+                x = start_x + col * offset_x
+                y = start_y + row * offset_y
+
+                rect = pygame.Rect(x, y, slot_w, slot_h)
+
+                if rect.collidepoint(mx, my):
+                    return index
+
+        return None
     
     def get_unit_at(self, x, y):
         for unit in self.units:
@@ -1273,7 +1282,14 @@ class World:
 
             if pygame.Rect(50, y+40, 200, 20).collidepoint(mx, my):
                 self.bribe_general(slot)
+
     def handle_map_click(self, mx, my):
+        
+        if self.screen == "map":
+            if self.next_turn_button.collidepoint(mx, my):
+                self.next_turn()
+                return
+            
         tile_x = mx // 32
         tile_y = my // 32
 
@@ -1339,26 +1355,56 @@ class World:
                         self.menu_open = False
                         self.build_open = False
                     return
-
+    # =======================
+    # HANDLE CLICKS
+    # =======================
     def handle_recruitment_click(self, mx, my):
         castle = self.selected_castle
         if not castle:
             return
 
+        # ---------------------------
+        # KLIK NA PATENT
+        # ---------------------------
+        if hasattr(self, "patent_rects"):
+            for i, rect in enumerate(self.patent_rects):
+                if rect.collidepoint(mx, my):
+                    p = castle.patents[i]
+                    if p is not None:
+                        # obsługa starego i nowego formatu
+                        if isinstance(p, dict):
+                            unit_name = p["unit_type"]
+                        else:
+                            unit_name = p
+                            # konwersja do dict w locie
+                            castle.patents[i] = {"unit_type": unit_name, "stats": UNIT_STATS[unit_name]}
+
+                        self.selected_patent_index = i
+                        self.selected_unit_type = None
+                        print("Selected patent:", unit_name)
+                    return
+
+        # ---------------------------
         # BACK
+        # ---------------------------
         if self.back_button.collidepoint(mx, my):
             self.screen = "garrison"
             return
 
-        # lista jednostek
+        # ---------------------------
+        # LISTA JEDNOSTEK
+        # ---------------------------
         index = self.click_on_recruitment(mx, my)
         if index is not None:
             if index < len(self.recruitment_unit_types):
                 self.selected_unit_type = index
+                self.selected_patent_index = None  # odznacz patent
                 print("Selected unit type:", self.recruitment_unit_types[index])
             return
 
+        # ---------------------------
         # BUY PATENT
+        # ---------------------------
         if self.buy_patent_button.collidepoint(mx, my):
             if self.selected_unit_type is not None:
                 unit_type = self.recruitment_unit_types[self.selected_unit_type]
@@ -1366,32 +1412,93 @@ class World:
                 print("Patent bought:", unit_type)
             return
 
-        # START PRODUCTION
-        if self.start_prod_button.collidepoint(mx, my):
-            if self.selected_unit_type is not None:
-                unit_type = self.recruitment_unit_types[self.selected_unit_type]
-                castle.start_production(unit_type)
-                print("Production started:", unit_type)
+        # ---------------------------
+        # REMOVE PATENT
+        # ---------------------------
+        if self.remove_patent_button.collidepoint(mx, my):
+            idx = self.selected_patent_index
+            if idx is not None and castle.patents[idx] is not None:
+                p = castle.patents[idx]
+                if isinstance(p, dict):
+                    removed = p["unit_type"]
+                else:
+                    removed = p
+                castle.patents[idx] = None
+                if castle.production_unit_type == removed:
+                    castle.stop_production()
+                self.selected_patent_index = None
+                print("Usunięto patent:", removed)
             return
 
+        # ---------------------------
+        # START PRODUCTION
+        # ---------------------------
+        if self.start_prod_button.collidepoint(mx, my):
+            idx = self.selected_patent_index
+            if idx is not None and castle.patents[idx] is not None:
+                p = castle.patents[idx]
+                if isinstance(p, dict):
+                    unit_type = p["unit_type"]
+                else:
+                    unit_type = p
+                    castle.patents[idx] = {"unit_type": unit_type, "stats": UNIT_STATS[unit_type]}
+                castle.start_production(unit_type)
+                print("Production started:", unit_type)
+            else:
+                print("Wybierz patent do produkcji")
+            return
+
+        # ---------------------------
         # STOP PRODUCTION
+        # ---------------------------
         if self.stop_prod_button.collidepoint(mx, my):
             castle.stop_production()
             print("Production stopped")
             return
 
-        # SCROLL UP
+        # ---------------------------
+        # SCROLL UP/DOWN
+        # ---------------------------
         if self.scroll_up_button.collidepoint(mx, my):
             if self.recruitment_scroll > 0:
                 self.recruitment_scroll -= 1
             return
-
-        # SCROLL DOWN
         if self.scroll_down_button.collidepoint(mx, my):
             if self.recruitment_scroll < len(self.recruitment_unit_types) - self.visible_recruitment_count:
                 self.recruitment_scroll += 1
             return
 
+        # ---------------------------
+        # INFO BUTTON
+        # ---------------------------
+        if self.info_button.collidepoint(mx, my):
+            castle = self.selected_castle
+            unit_info = None
+
+            # jeśli zaznaczono patent
+            if self.selected_patent_index is not None:
+                p = castle.patents[self.selected_patent_index]
+                if p is not None:
+                    if isinstance(p, dict):
+                        unit_name = p["unit_type"]
+                    else:
+                        unit_name = p
+                    unit_info = UNIT_STATS[unit_name].get("description", "Brak opisu")
+
+            # jeśli zaznaczono jednostkę z listy
+            elif self.selected_unit_type is not None:
+                unit_name = self.recruitment_unit_types[self.selected_unit_type]
+                unit_info = UNIT_STATS[unit_name].get("description", "Brak opisu")
+
+            if unit_info:
+                self.screen = "unit_info"
+                self.unit_info_text = unit_info
+            if self.screen == "unit_info":
+                # każde kliknięcie wraca do rekrutacji
+                self.screen = "recruitment"
+
+            return
+   
     def handle_peasants_click(self, mx, my):
         if not self.selected_castle:
             return
@@ -1461,6 +1568,65 @@ class World:
 
                 self.send_peasants_amount = 0
                 self.send_gold_amount = 0
+
+    def release_selected_units(self):
+        castle = self.selected_castle
+        if not castle:
+            return
+        if castle.owner is None:
+            print("Castle has no owner!")
+            return
+
+        if not self.selected_units:
+            print("Brak zaznaczonych jednostek")
+            return
+
+        player = castle.owner
+
+        directions = [
+        (0, 1), (-1, 1), (1, 1),     # dół
+        (-1, 0),         (1, 0),     # boki
+        (0,-1), (-1,-1), (1,-1),     # góra
+]
+
+        occupied = {(u.x, u.y) for p in self.players for u in p.units}
+
+        spawn_pos = None
+        for dx, dy in directions:
+            nx = castle.x + dx
+            ny = castle.y + dy
+            if (nx, ny) not in occupied:
+                spawn_pos = (nx, ny)
+                break
+
+        if not spawn_pos:
+            print("Brak miejsca wokół zamku")
+            return
+
+        nx, ny = spawn_pos
+
+        army = Unit("army", nx, ny, player)
+        army.garrison = []
+
+        for u in list(self.selected_units):
+            castle.garrison.remove(u)
+            army.garrison.append(u)
+
+        player.units.append(army)
+
+        self.selected_units.clear()
+        print("Wypuszczono armię")
+        return False
+    
+    def draw_unit_info(self, screen):
+        font = pygame.font.SysFont(None, 28)
+        w = screen.get_width()
+        h = screen.get_height()
+        screen.fill((30,30,30))
+
+        lines = self.unit_info_text.split("\n")
+        for i, line in enumerate(lines):
+            screen.blit(font.render(line, True, (255,255,255)), (50, 50 + i*30))
 
         return None
     

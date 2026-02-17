@@ -1,5 +1,7 @@
 UNIT_STATS = {
-    "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1 },
+    "   ":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":0},
+    " ":{"hp":50,"moves":54,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":0},
+    "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"CHŁOPI\nZazwyczaj uprawiają rolę"},
     "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2 },
     "pikinier": {"hp": 60, "moves": 7, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2 },
     "highlander": {"hp": 100, "moves": 6, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost": 8,"production_time":3 },
@@ -37,7 +39,9 @@ UNIT_STATS = {
     "bones":{"hp":90,"moves":6,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost":15 ,"production_time":4 },
     "mag":{"hp":140,"moves":10,"attack":100,"defense":100, "range": 6, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":20 ,"production_time":5 },
     "smok":{"hp":150,"moves":14,"attack":100,"defense":100,"exp":0,"morale":6,"fatigue":0,"patent_cost":550 ,"production_cost":20 ,"production_time":5 },
-}
+    "    ":{"hp":50,"moves":52,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":0},
+    "      ":{"hp":50,"moves":5,"attack":13,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":0},
+    }
 
 class Unit:
     def __init__(self, unit_type, x, y, owner):

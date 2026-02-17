@@ -25,7 +25,7 @@ class Castle:
         self.peasants = 100
         self.tax_rate = 1.0        # 0.0–4.0
         self.happiness = 50.0     # 0–100
-        self.buildings = set()
+        self.buildings = ["Koszary"]
         self.level = 1
         #burzenie zamku
         self.destroyed = False
@@ -37,11 +37,11 @@ class Castle:
         self.training = {}        
        
         self.garrison_limit = 12
-        self.available_units = ["Militia", "Archer", "Knight", "Pikeman"]
         self.production_unit = None
-        self.patents = []          # wykupione patenty
         self.max_patents = 12
-        self.patents = set()
+        self.patents = [None] * self.max_patents       # wykupione patenty
+        
+        
 
     def collect_taxes(self):        
         if self.plague_active:
@@ -88,35 +88,26 @@ class Castle:
     
     def start_production(self, unit_type):
 
-        if self.production_enabled:
-            print("Produkcja już trwa")
-            return False
-
-        # 🔒 każda jednostka wymaga patentu
-        if unit_type not in self.patents:
+        if not any(p is not None and p["unit_type"] == unit_type for p in self.patents):
             print("Najpierw kup patent:", unit_type)
             return False
 
         stats = UNIT_STATS[unit_type]
         cost = stats["production_cost"]
-        production_time = stats["production_time"]
 
-        # sprawdź złoto
         if self.gold < cost:
             print("Za mało złota")
             return False
 
-        self.gold -= cost
         self.production_unit_type = unit_type
-        self.production_turns_left = production_time
+        self.production_turns_left = stats["production_time"]
         self.production_enabled = True
 
-        print("Start produkcji:", unit_type)
+        print("Produkcja ustawiona na:", unit_type)
         return True
 
     def buy_patent(self, unit_type):
-
-        if unit_type in self.patents:
+        if any(p is not None and p["unit_type"] == unit_type for p in self.patents):
             print("Patent już kupiony")
             return False
 
@@ -127,22 +118,34 @@ class Castle:
             print("Za mało złota")
             return False
 
-        self.gold -= cost
-        self.patents.add(unit_type)
+        for i in range(self.max_patents):
+            if self.patents[i] is None:
+                self.patents[i] = {
+                    "unit_type": unit_type,
+                    "stats": UNIT_STATS[unit_type]
+                }
 
-        print("Kupiono patent:", unit_type)
-        return True
+                self.gold -= cost
+                print("Kupiono patent:", unit_type)
+                return True
+
+        print("Brak miejsca na patenty")
+        return False
     
     def remove_patent(self, unit_type):
+        for i in range(len(self.patents)):
+            if self.patents[i] is not None and self.patents[i]["unit_type"] == unit_type:
+                if self.production_unit_type == unit_type:
+                    self.stop_production()
 
-        if unit_type in self.patents:
-            self.patents.remove(unit_type)
-            print("Usunięto patent:", unit_type)
-            return True
+                self.patents[i] = None
+                print("Usunięto patent:", unit_type)
+                return True
 
         print("Patent nie istnieje")
         return False
-    
+
+
 
     def stop_production(self):
         self.production_enabled = False
@@ -426,49 +429,18 @@ class Castle:
         print("Produkcja — zostało tur:", self.production_turns_left)
 
         if self.production_turns_left <= 0:
-            unit = Unit(
-                self.production_unit_type,
-                self.x,
-                self.y,
-                self.owner
-            )
+                unit = Unit(
+                    self.production_unit_type,
+                    self.x,
+                    self.y,
+                    self.owner
+                )
 
-            if not world.spawn_unit_near_castle(unit, self):
-                print("Brak miejsca — jednostka w garnizonie")
                 self.garrison.append(unit)
+                print("Jednostka dodana do garnizonu")
 
-            self.production_enabled = False
-            self.production_unit_type = None
-            print("Wyprodukowano jednostkę")
-
-    def buy_patent(self, unit_type):
-        stats = UNIT_STATS[unit_type]
-
-        patent_cost = stats.get("patent_cost", 100)
-
-        if unit_type in self.patents:
-            print("Patent już kupiony")
-            return False
-
-        if self.gold < patent_cost:
-            print("Za mało złota na patent")
-            return False
-
-        self.gold -= patent_cost
-        self.patents.add(unit_type)
-
-        print("Kupiono patent:", unit_type)
-        return True
-
-    
-    def remove_patent(self, unit_type):
-        if unit_type in self.patents:
-            self.patents.remove(unit_type)
-            return True
-        return False
-    def add_patent(self, patent):
-        self.patents.add(patent)
-        print("Nowy patent:", patent)
+                self.production_enabled = False
+                self.production_unit_type = None
 
     def demolish(self):
         self.destroyed = True
