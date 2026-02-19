@@ -79,7 +79,7 @@ class World:
         self.gold_minus_button = pygame.Rect(0, 0, 40, 40)
         # SEND
         self.send_button = pygame.Rect(0, 0, 160, 45)
-        # BACK działanie
+        # BACK działa
         self.back_button = pygame.Rect(90, 600, 100, 40)
         self.selected_patent_index = None
         self.castle_list_offset = 0
@@ -100,7 +100,8 @@ class World:
         # niszczenie zamku
         self.demolish_confirm = False
         self.button_send_army = pygame.Rect(860, 600, 100, 40)
-        
+        self.demolish_button = None
+
 
     def load(self, map_file, fac_file):
         self.map = load_map(map_file)
@@ -439,6 +440,18 @@ class World:
         return None
 
     def handle_mouse_click(self, mx, my):
+        if self.demolish_confirm:
+
+            if self.demolish_yes.collidepoint(mx, my):
+                self.demolish_castle(self.selected_castle)
+                self.demolish_confirm = False
+                return
+
+            if self.demolish_no.collidepoint(mx, my):
+                self.demolish_confirm = False
+                return
+
+            return  # <- BLOKUJE resztę kliknięć
 
         # ================= DEMOLISH CONFIRM =================
         if self.demolish_confirm:
@@ -474,25 +487,6 @@ class World:
         if self.screen == "court":
             self.handle_court_click(mx, my)
             return
-
-        #FORGE
-        if self.forge_button and self.forge_button.collidepoint(mx, my):
-            self.screen = "forge"
-            return
-
-        if self.workshop_button and self.workshop_button.collidepoint(mx, my):
-            self.screen = "workshop"
-            return
-
-        if self.hospital_button and self.hospital_button.collidepoint(mx, my):
-            self.screen = "hospital"
-            return
-
-        if self.school_button and self.school_button.collidepoint(mx, my):
-            self.screen = "school"
-            return
-
-
         if self.screen == "peasants":
             self.handle_peasants_click(mx, my)
             return
@@ -503,12 +497,29 @@ class World:
 
         if self.screen == "garrison":
             self.handle_garrison_click(mx, my)
-            return
-
-        # ================= CASTLE =================
+            return 
+           
         if self.screen == "castle":
+        #FORGE
+            if self.forge_button and self.forge_button.collidepoint(mx, my):
+                self.screen = "forge"
+                return
 
-            if self.demolish_button.collidepoint(mx, my):
+            if self.workshop_button and self.workshop_button.collidepoint(mx, my):
+                self.screen = "workshop"
+                return
+
+            
+            if self.hospital_button and self.hospital_button.collidepoint(mx, my):
+                self.screen = "hospital"
+                return
+
+            if self.school_button and self.school_button.collidepoint(mx, my):
+                self.screen = "school"
+                return
+        
+            if self.demolish_button and self.demolish_button.collidepoint(mx, my):
+
                 self.demolish_confirm = True
                 return
 
@@ -520,9 +531,7 @@ class World:
         
             self.handle_map_click(mx, my)
             return
-        if self.screen == "unit_info":
-            self.screen = "recruitment"
-            return
+        
 
     def handle_garrison_click(self, mx, my):
 
@@ -780,6 +789,9 @@ class World:
 
     
     def draw_castle(self, screen):
+        if self.demolish_confirm:
+            return
+        
         screen_width = screen.get_width()
         screen_height = screen.get_height()
 
@@ -905,40 +917,6 @@ class World:
         self.court_button = pygame.Rect(420, 100, 160, 40)
         pygame.draw.rect(screen, (20, 80, 80), self.court_button)
         screen.blit(font.render("DWÓR", True, (255,225,255)), (470,110))
-
-        if self.demolish_confirm:
-
-            rect = pygame.Rect(350, 250, 300, 150)
-            font = pygame.font.SysFont(None, 28)
-            screen.blit(font.render("Wyburzyć zamek?", True, (255,255,255)),
-                        (rect.x + 50, rect.y + 30))
-
-            self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 90, 80, 40)
-            self.demolish_no = pygame.Rect(rect.x + 180, rect.y + 90, 80, 40)
-
-            pygame.draw.rect(screen, (120,180,120), self.demolish_yes)
-            pygame.draw.rect(screen, (180,120,120), self.demolish_no)
-
-            screen.blit(font.render("TAK", True, (0,0,0)),
-                        (self.demolish_yes.x + 20, self.demolish_yes.y + 10))
-            screen.blit(font.render("NIE", True, (0,0,0)),
-                        (self.demolish_no.x + 20, self.demolish_no.y + 10))
-
-            self.workshop_button = pygame.Rect(340, 480, 160, 40)
-            pygame.draw.rect(screen, (90, 90, 90), self.forge_button)
-            draw_text(screen, "warsztat", 455, 160)
-
-            self.forge_button = pygame.Rect(420, 150, 160, 40)
-            pygame.draw.rect(screen, (90, 90, 90), self.forge_button)
-            draw_text(screen, "Kuznia", 455, 160)
-
-            self.hospital_button = pygame.Rect(420, 150, 160, 40)
-            pygame.draw.rect(screen, (150, 90, 90), self.hospital_button)
-            draw_text(screen, "Szpital", 455, 160)
-
-            self.school_button = pygame.Rect(400, 150, 160, 40)
-            pygame.draw.rect(screen, (150, 90, 90), self.school_button)
-            draw_text(screen, "Szkoła", 455, 160)
 
     def castle_has_patent(self, castle, unit_name):
         for p in castle.patents:
@@ -1358,16 +1336,37 @@ class World:
 
             #demolowanie zamku
         if self.demolish_confirm:
-            rect = pygame.Rect(350, 260, 300, 140)
-            pygame.draw.rect(screen, (30,30,30), rect)
+            self.draw_demolish_confirm(screen)
+            pygame.draw.rect(screen, (0,255,0), (0,0,50,50))
 
-            draw_text(screen, "Wyburzyć zamek?", rect.x + 60, rect.y + 20)
+            
+    def draw_demolish_confirm(self, screen):
+   
+        # ===== PRZEZROCZYSTA WARSTWA =====
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
 
-            self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 70, 80, 40)
-            self.demolish_no = pygame.Rect(rect.x + 180, rect.y + 70, 80, 40)
+        overlay.fill((0, 0, 0, 120))  # 120 = lekko przyciemnione
+        screen.blit(overlay, (0, 0))
 
-            draw_button(screen, "TAK", self.demolish_yes.x, self.demolish_yes.y, 80, 40)
-            draw_button(screen, "NIE", self.demolish_no.x, self.demolish_no.y, 80, 40)
+        # ===== OKNO =====
+        rect = pygame.Rect(350, 260, 300, 140)
+        pygame.draw.rect(screen, (40, 40, 40), rect)
+        pygame.draw.rect(screen, (200, 200, 200), rect, 2)
+
+        font = pygame.font.SysFont(None, 28)
+        screen.blit(font.render("Wyburzyć zamek?", True, (255,255,255)),
+                    (rect.x + 60, rect.y + 20))
+
+        self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 70, 80, 40)
+        self.demolish_no = pygame.Rect(rect.x + 180, rect.y + 70, 80, 40)
+
+        pygame.draw.rect(screen, (120,180,120), self.demolish_yes)
+        pygame.draw.rect(screen, (180,120,120), self.demolish_no)
+
+        screen.blit(font.render("TAK", True, (0,0,0)),
+                    (self.demolish_yes.x + 20, self.demolish_yes.y + 10))
+        screen.blit(font.render("NIE", True, (0,0,0)),
+                    (self.demolish_no.x + 20, self.demolish_no.y + 10))
 
 
     def select_castle(self, x, y):

@@ -25,7 +25,7 @@ class Castle:
         self.peasants = 100
         self.tax_rate = 1.0        # 0.0–4.0
         self.happiness = 50.0     # 0–100
-        self.buildings = ["Koszary"]
+        self.buildings = set()
         self.level = 1
         #burzenie zamku
         self.destroyed = False
