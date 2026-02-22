@@ -72,8 +72,9 @@ class Castle:
         target.gold += gold
 
 
-    def position(self):
-        return (self.x, self.y)
+    def tile_position(self):
+        return (self.x // 32, self.y // 32)
+
 
     def __repr__(self):
         return f"Castle({self.x},{self.y})"
@@ -448,4 +449,5 @@ class Castle:
         self.garrison.clear()
 
 
+    
         return True
