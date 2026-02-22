@@ -513,21 +513,6 @@ class World:
 
                     self.handle_mouse_click(mx, my)
 
-<<<<<<< HEAD
-=======
-
-                # ===== ZAMEK =====
-                elif self.screen == "castle":
-                    if self.exit_button.collidepoint(mx, my):
-                        self.screen = "map"
-
-                if self.screen in ["forge","workshop","hospital","school"]:
-                    if self.back_button.collidepoint(mx, my):
-                        self.screen = "castle"
-                        return
-    
-
->>>>>>> 378ac6e68ddb6c7cd95ce16e536427924d2b38b2
         return None
 
     def handle_recruitment_scroll(self, event):
@@ -542,7 +527,7 @@ class World:
         elif event.button == 5: # Kręcimy w dół (lista ma jechać do góry)
             if self.recruitment_scroll < len(unit_types) - 3:
                 self.recruitment_scroll += 1
-
+        return
     def handle_mouse_click(self, mx, my):
         # A. NAJPIERW INTERFEJS (Stałe pozycje, nie liczymy kamery!)
         if self.next_turn_button.collidepoint(mx, my):
@@ -569,7 +554,6 @@ class World:
         if self.demolish_confirm:
 
             if self.demolish_yes.collidepoint(mx, my):
-<<<<<<< HEAD
                 castle = self.selected_castle
 
                 castle.destroyed = True
@@ -588,14 +572,6 @@ class World:
         if self.demolish_no.collidepoint(mx, my):
             self.demolish_confirm = False
             return
-=======
-
-                if self.selected_castle:
-
-                    castle = self.selected_castle
-
-
->>>>>>> 378ac6e68ddb6c7cd95ce16e536427924d2b38b2
 
         print("CLICK:", self.screen, mx, my)
 
