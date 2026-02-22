@@ -243,6 +243,11 @@ class World:
             return
 
         # ===== ZAMEK =====
+        print("UNIT IDZIE NA:", nx, ny)
+
+        for castle in self.castles:
+            print("ZAMEK TILE:", castle.tile_position())
+
         for castle in self.castles:
             if castle.tile_position() == (nx, ny):
 
