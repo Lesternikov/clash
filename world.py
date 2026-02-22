@@ -164,8 +164,8 @@ class World:
 
 
     def move_unit(self, unit, dx, dy):
+
         if unit.move_points <= 0:
-            print("Brak punktów ruchu")
             return
 
         nx = unit.x + dx
@@ -176,15 +176,37 @@ class World:
         if nx < 0 or nx >= len(self.map[0]):
             return
 
+        # ====== WALKA ======
+        for other in self.units:
+            if other.x == nx and other.y == ny:
+
+                if other.owner != unit.owner:
+                    print("ATAK!")
+
+                    # usuń wroga
+                    self.units.remove(other)
+                    other.owner.units.remove(other)
+
+                    # wejdź na jego pole
+                    unit.x = nx
+                    unit.y = ny
+                    unit.move_points -= 1
+                    return
+                else:
+                    print("Sojusznik blokuje pole")
+                    return
+
+        # ===== NORMALNY RUCH =====
         if self.map[ny][nx] != ".":
             return
 
         unit.x = nx
         unit.y = ny
         unit.move_points -= 1
-
     def reset_units(self):
         for u in self.units:
+            if u.x < 0:
+                continue
             u.move_points = 5
 
     def select_unit(self, x, y):
@@ -220,7 +242,39 @@ class World:
         if nx < 0 or nx >= len(self.map[0]):
             return
 
-    # blokada terenu
+        # ===== ZAMEK =====
+        for castle in self.castles:
+            if castle.tile_position() == (nx, ny):
+
+                if castle.destroyed:
+                    print("Ruiny zamku — nie można wejść")
+                    return
+
+
+                print("Jednostka weszła do zamku")
+
+                # === PRZEJĘCIE ===
+                if castle.owner != u.owner:
+                    castle.owner = u.owner
+                    castle.garrison.clear()
+                    print("Zamek został przejęty!")
+
+                # === WEJŚCIE DO GARNIZONU ===
+                castle.garrison.append(u)
+
+                if u in self.units:
+                    self.units.remove(u)
+
+                u.x = -1
+                u.y = -1
+
+                u.move_points -= 1
+                self.selected_unit = None
+                self.selected_units.clear()
+
+                return
+
+        # blokada terenu (ALE NIE ZAMEK)
         if self.map[ny][nx] != ".":
             print("Nie można wejść na to pole")
             return
@@ -245,7 +299,7 @@ class World:
         u.move_points -= 1
 
         for castle in self.castles:
-            if castle.x == nx and castle.y == ny:
+            if castle.tile_position() == (nx, ny):
 
                 if castle.destroyed:
                     print("Ruiny zamku — nie można wejść")
@@ -267,7 +321,7 @@ class World:
              
             for group in self.peasant_groups:
                 for castle in self.castles:
-                    if castle.position() == group.position():
+                    if castle.tyle_position() == group.position():
                         if castle.owner == group.owner:
                             castle.peasants += group.amount
                             self.peasant_groups.remove(group)
@@ -275,7 +329,7 @@ class World:
                             return
             for t in self.gold_transports:
                 for castle in self.castles:
-                    if castle.position() == t.position():
+                    if castle.tyle_position() == t.position():
                         if castle.owner == t.owner:
                             castle.gold += t.gold
                             self.gold_transports.remove(t)
@@ -435,7 +489,7 @@ class World:
                     if self.back_button.collidepoint(mx, my):
                         self.screen = "castle"
                         return
-
+    
 
         return None
 
@@ -455,26 +509,14 @@ class World:
 
         # ================= DEMOLISH CONFIRM =================
         if self.demolish_confirm:
+
             if self.demolish_yes.collidepoint(mx, my):
+
                 if self.selected_castle:
+
                     castle = self.selected_castle
 
-                    castle.destroyed = True
 
-                    # usunięcie z listy gracza
-                    if castle.owner and castle in castle.owner.castles:
-                        castle.owner.castles.remove(castle)
-
-                    # wyrzucenie gracza z zamku
-                    self.selected_castle = None
-                    self.screen = "map"
-
-                self.demolish_confirm = False
-                return
-
-            if self.demolish_no.collidepoint(mx, my):
-                self.demolish_confirm = False
-                return
 
         print("CLICK:", self.screen, mx, my)
 
@@ -602,11 +644,6 @@ class World:
         else:
             if len(self.selected_units) < 10:
                 self.selected_units.append(unit)
-
-
-            if self.demolish_no.collidepoint(mx, my):
-                self.demolish_confirm = False
-                return
 
 
     def calculate_army_power(self, player):
@@ -1202,8 +1239,8 @@ class World:
 
         font = pygame.font.SysFont(None, 24)
 
-        # ===== BACK BUTTON =====
-        self.back_button = pygame.Rect(20, 20, 120, 40)
+        # ===== BACK BUTTON ====
+        self.back_button = pygame.Rect(20, 120, 120, 40)
         pygame.draw.rect(screen, (140, 80, 80), self.back_button)
         screen.blit(font.render("BACK", True, (255,255,255)),
                     (self.back_button.x + 25, self.back_button.y + 10))
@@ -1218,17 +1255,32 @@ class World:
     def draw_court_players_header(self, screen):
         font = pygame.font.SysFont(None, 26)
 
-        start_x = 120
-        y = 20
-        slot_w = 140
-
+        start_x = 140
+        start_y = 20
+        slot_w = 240
+        slot_h = 90
+        
         for i in range(5):
-            rect = pygame.Rect(start_x + i*slot_w, y, 120, 30)
-            pygame.draw.rect(screen, (120,120,120), rect)
+            # Obliczanie rzędu i kolumny
+            row = i // 3
+            col = i % 3 
 
+            current_x = start_x + col * slot_w 
+            if row == 1:
+                current_x += slot_w // 2  # Przesunięcie dolnego rzędu o pół slotu dla lepszego wyglądu
+
+            current_y = start_y + row * slot_h
+            
+            rect = pygame.Rect(current_x, current_y, 200, 60)
+            
+            # Rysowanie tła slotu (szary dla pustych)
+            pygame.draw.rect(screen, (120, 120, 120), rect)
+
+            # Rysowanie danych gracza, jeśli istnieje
             if i < len(self.players):
                 p = self.players[i]
                 pygame.draw.rect(screen, p.color, rect)
+                # Zakładam, że draw_text to Twoja pomocnicza funkcja lub używasz font.render
                 draw_text(screen, p.name, rect.x + 10, rect.y + 5)
 
 
@@ -1545,29 +1597,45 @@ class World:
         if tile_x < 0 or tile_x >= len(self.map[0]):
             return
 
-        # ================= JEDNOSTKI =================
+        # ===============================
+        # 1. JEŚLI MAMY ZAZNACZONĄ JEDNOSTKĘ → PRÓBUJ RUCHU
+        # ===============================
+        if self.selected_unit:
+
+            u = self.selected_unit
+            dx = tile_x - u.x
+            dy = tile_y - u.y
+
+            # tylko pola OBOK (bez skosów)
+            if max(abs(dx), abs(dy)) == 1:
+                self.move_unit(u, dx, dy)
+                return
+
+        # ===============================
+        # 2. KLIKNIĘCIE W JEDNOSTKĘ → ZAZNACZ
+        # ===============================
         for player in self.players:
             for unit in player.units:
                 if unit.x == tile_x and unit.y == tile_y:
-                    self.selected_unit = unit
-                    self.selected_castle = None
-                    print("Selected unit:", unit.type)
+                    if unit.owner == self.players[self.current_player]:
+                        self.selected_unit = unit
+                        self.selected_castle = None
+                        print("Selected unit:", unit.type)
                     return
 
-        # ================= ZAMKI =================
+        # ===============================
+        # 3. KLIKNIĘCIE W ZAMEK
+        # ===============================
         for castle in self.castles:
             if castle.x == tile_x and castle.y == tile_y:
 
-                # BLOKADA RUIN
                 if castle.destroyed:
-                    print("To są ruiny zamku")
                     return
 
                 self.selected_castle = castle
-                self.selected_unit = None
                 self.screen = "castle"
-                print("Selected castle")
-                return
+                return 
+
 
         self.selected_unit = None
         self.selected_castle = None
@@ -1863,14 +1931,41 @@ class World:
                 self.send_gold_amount = 0
 
     def demolish_castle(self, castle):
-        print("Burzenie zamku")
 
+        if not castle:
+            return
+
+        # === WYRZUĆ WSZYSTKIE JEDNOSTKI Z POLA ZAMKU ===
+        for player in self.players:
+            for unit in player.units:
+
+                if unit.x == castle.x and unit.y == castle.y:
+
+                    for dx, dy in [(-1,0),(1,0),(0,-1),(0,1),(-1,-1),(1,-1),(-1,1),(1,1)]:
+                        nx = unit.x + dx
+                        ny = unit.y + dy
+
+                        if 0 <= nx < self.map_width and 0 <= ny < self.map_height:
+
+                            if not self.get_unit_at(nx, ny):
+                                unit.x = nx
+                                unit.y = ny
+                                break
+
+        # === ZBURZ ===
         castle.destroyed = True
-        castle.owner = None
+
+        if castle.owner and castle in castle.owner.castles:
+            castle.owner.castles.remove(castle)
+
         castle.garrison.clear()
+        castle.owner = None
 
+        # === WYJDŹ Z UI ===
         self.selected_castle = None
-
+        self.selected_unit = None
+        self.selected_units.clear()
+        self.screen = "map"
     def draw_forge(self, screen):
         screen.fill((40, 70, 70))  # tło "kamień"
 
