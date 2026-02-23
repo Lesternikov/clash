@@ -25,7 +25,7 @@ world.load("map.txt", "0.FAC")
 # Tworzymy jednostkę na polu (10, 10) - upewnij się, że to wolne pole (trawa ".")
 start_unit = Unit("pikinier", 10, 10, p1) 
 
-# Musimy dodać ją w TRZY miejsca, żeby wszystko działało:
+# Musimy dodać ją w TRZY miejsca, żeby wystko działało:
 world.units.append(start_unit)      # 1. Żeby świat ją widział
 p1.units.append(start_unit)         # 2. Żeby gracz ją posiadał
 # ----------------------
