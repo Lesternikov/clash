@@ -21,7 +21,6 @@ class PrisonSlot:
         self.turns_in_prison = 0
 
 class World:
-
     def __init__(self):
         pygame.font.init() # Inicjalizacja modułu czcionek
         self.font = pygame.font.SysFont("Arial", 24) # Stworzenie czcionki systemowej
@@ -192,8 +191,20 @@ class World:
             if c.owner:
                 self.add_unit(Unit("lekka_piechota", c.x, c.y + 1, c.owner))
 
+<<<<<<< HEAD
         print(f"Zbudowano zamków: {len(self.castles)}")
         print(f"Miejsc pod budowę: {len(self.castle_locations)}")
+=======
+        print("DEBUG castles:", len(self.castles))
+        print("DEBUG units:", len(self.units))
+        map_width = len(self.map[0]) * 32
+        self.next_turn_button = pygame.Rect(map_width + 20, 10, 170, 40)
+        print("PLAYERS:", len(self.players))
+        print("CASTLES:", len(self.castles))
+
+        for c in self.castles:
+            print("castle owner:", c.owner)
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
 
     def add_player(self, player):
         self.players.append(player)
@@ -324,13 +335,21 @@ class World:
             return
 
         # ===== ZAMEK =====
+        print("UNIT IDZIE NA:", nx, ny)
+
+        for castle in self.castles:
+            print("ZAMEK TILE:", castle.tile_position())
+
         for castle in self.castles:
             if castle.tile_position() == (nx, ny):
 
                 if castle.destroyed:
                     print("Ruiny zamku — nie można wejść")
                     return
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
                 print("Jednostka weszła do zamku")
 
                 # === PRZEJĘCIE ===
@@ -351,7 +370,6 @@ class World:
                 u.move_points -= 1
                 self.selected_unit = None
                 self.selected_units.clear()
-
                 return
 
         # blokada terenu (ALE NIE ZAMEK)
@@ -371,8 +389,13 @@ class World:
                 u.x = nx
                 u.y = ny
                 u.move_points -= 1
+<<<<<<< HEAD
                 return
             
+=======
+                return            
+
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
         u.x = nx
         u.y = ny
         u.move_points -= 1
@@ -600,6 +623,7 @@ class World:
 
         # 3. MENU ZAMKU
         if self.screen == "castle":
+<<<<<<< HEAD
             # Przyciski budynków - muszą być sprawdzane ZANIM sprawdzimy back_button
             if hasattr(self, 'forge_button') and self.forge_button and self.forge_button.collidepoint(mx, my):
                 self.screen = "forge"; return
@@ -613,6 +637,20 @@ class World:
             # Przycisk rekrutacji (często pomijany w logice Gemini)
             if hasattr(self, 'recruit_button') and self.recruit_button.collidepoint(mx, my):
                 self.screen = "recruitment"; return
+=======
+        #FORGE
+            if self.forge_button and self.forge_button.collidepoint(mx, my):
+                self.screen = "forge"
+                return
+
+            if self.workshop_button and self.workshop_button.collidepoint(mx, my):
+                self.screen = "workshop"
+                return
+
+            if self.hospital_button and self.hospital_button.collidepoint(mx, my):
+                self.screen = "hospital"
+                return
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
 
             if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
                 self.demolish_confirm = True; return
@@ -772,7 +810,11 @@ class World:
         elif self.screen == "school":
             self.draw_school(screen)
             return
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
     def draw_garrison(self, screen):
         if not self.selected_castle:
             return
@@ -915,6 +957,53 @@ class World:
                 txt = font.render(str(count), True, (0, 0, 0))
                 screen.blit(txt, (pos_x + 10, pos_y + 6))
 
+<<<<<<< HEAD
+=======
+        # 1. Definiujemy pozycję przycisku
+        # Umieśćmy go w prawym górnym rogu
+        self.next_turn_button = pygame.Rect(screen.get_width() - 180, 10, 170, 45)
+
+        # 2. Pobieramy aktualną pozycję myszy
+        mx, my = pygame.mouse.get_pos()
+
+        # 3. Sprawdzamy, czy myszka znajduje się nad przyciskiem
+        if self.next_turn_button.collidepoint(mx, my):
+            # Rysujemy przycisk tylko, gdy mysz jest nad nim
+            # Możesz dodać lekką przezroczystość, by wyglądało to nowocześniej
+            s = pygame.Surface((self.next_turn_button.width, self.next_turn_button.height), pygame.SRCALPHA)
+            s.fill((80, 120, 200, 200)) # Kolor z kanałem Alpha (200/255)
+            screen.blit(s, (self.next_turn_button.x, self.next_turn_button.y))
+            
+            # Ramka
+            pygame.draw.rect(screen, (255, 255, 255), self.next_turn_button, 2)
+            
+            # Tekst
+            font = pygame.font.SysFont(None, 24)
+            text = font.render(f"NEXT TURN ({self.turn})", True, (255, 255, 255))
+            screen.blit(text, (self.next_turn_button.x + 15, self.next_turn_button.y + 12))
+
+        # 6. MENU ZAMKU (Pojawia się na wierzchu mapy)
+        if self.screen == "castle":
+            self.draw_castle_menu(screen)
+
+        # 7. EKRAN DEMOLKI (Przezroczysta nakładka na samym końcu)
+        if self.demolish_confirm:
+            # Tworzymy półprzezroczyste tło na całe okno
+            s = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            s.fill((0, 0, 0, 180)) 
+            screen.blit(s, (0, 0))
+            
+            # Przycisk TAK (Czerwony)
+            self.demolish_yes = pygame.Rect(screen.get_width()//2 - 110, 300, 100, 50)
+            pygame.draw.rect(screen, (200, 0, 0), self.demolish_yes)
+            screen.blit(font.render("TAK", True, (255,255,255)), (self.demolish_yes.x + 30, self.demolish_yes.y + 15))
+            
+            # Przycisk NIE (Szary)
+            self.demolish_no = pygame.Rect(screen.get_width()//2 + 10, 300, 100, 50)
+            pygame.draw.rect(screen, (100, 100, 100), self.demolish_no)
+            screen.blit(font.render("NIE", True, (255,255,255)), (self.demolish_no.x + 35, self.demolish_no.y + 15))
+
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
     def draw_castle(self, screen):
         if self.demolish_confirm:
             return
@@ -1275,6 +1364,10 @@ class World:
             if c.owner == self.players[self.current_player] and not c.destroyed
         ]
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
         for i, c in enumerate(visible):
             txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
             screen.blit(font.render(txt, True, (255,255,255)),
@@ -1498,6 +1591,7 @@ class World:
         # 4. LOGIKA DWORU I CHŁOPÓW
         elif self.screen == "court":
             self.draw_court(screen)
+<<<<<<< HEAD
         
         elif self.screen == "peasants":
             self.draw_peasants(screen) # Dodaj to, jeśli masz taką metodę
@@ -1505,6 +1599,15 @@ class World:
         # 5. NOWE EKRANY BUDYNKÓW (Tego brakowało!)
         elif self.screen == "forge":
             self.draw_forge(screen)
+=======
+        else:
+            self.draw_pygame(screen)
+
+            #demolowanie zamku
+        if self.demolish_confirm:
+            self.draw_demolish_confirm(screen)
+            pygame.draw.rect(screen, (0,255,0), (0,0,50,50))
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
             
         elif self.screen == "workshop":
             self.draw_workshop(screen)
@@ -1552,6 +1655,7 @@ class World:
         color_yes = (100, 200, 100) if self.demolish_yes.collidepoint(mx, my) else (60, 130, 60)
         color_no = (200, 100, 100) if self.demolish_no.collidepoint(mx, my) else (130, 60, 60)
 
+<<<<<<< HEAD
         pygame.draw.rect(screen, color_yes, self.demolish_yes)
         pygame.draw.rect(screen, color_no, self.demolish_no)
         
@@ -1563,6 +1667,8 @@ class World:
         screen.blit(txt_yes, (self.demolish_yes.centerx - txt_yes.get_width() // 2, self.demolish_yes.centery - txt_yes.get_height() // 2))
         screen.blit(txt_no, (self.demolish_no.centerx - txt_no.get_width() // 2, self.demolish_no.centery - txt_no.get_height() // 2))
 
+=======
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
     def select_castle(self, x, y):
         for c in self.castles:
             if c.x == x and c.y == y:
@@ -1762,6 +1868,7 @@ class World:
                         self.selected_castle = None
                         return
 
+<<<<<<< HEAD
         # 3. RUCH JEDNOSTKI (Tylko jeśli nie kliknięto w zamek ani inną jednostkę)
         if self.selected_unit:
             u = self.selected_unit
@@ -1772,6 +1879,8 @@ class World:
                 return
 
         # Puste pole
+=======
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
         self.selected_unit = None
         self.selected_castle = None
 
@@ -1912,7 +2021,11 @@ class World:
                     self.selected_unit_type = clicked_unit_idx
                     self.selected_patent_index = None
                     return
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
         # Kliknięcie w patenty
         for i, rect in enumerate(self.patent_rects):
             if rect.collidepoint(mx, my):
@@ -2228,7 +2341,7 @@ class World:
     
     def draw_unit_info(self, screen):
         screen.fill((20,20,20))
-        
+        0
         # Jeśli tekst jest pusty, zainicjuj go bezpiecznym komunikatem
         if not hasattr(self, 'unit_info_text') or not self.unit_info_text:
             self.unit_info_text = "Brak informacji\nNie wybrano jednostki."
