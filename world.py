@@ -15,7 +15,6 @@ def draw_button(screen, text, x, y, w, h):
     pygame.draw.rect(screen, (0,0,0), (x, y, w, h), 2)
     draw_text(screen, text, x + 10, y + 5)
 
-
 class PrisonSlot:
     def __init__(self, general=None):
         self.general = general
@@ -24,6 +23,19 @@ class PrisonSlot:
 class World:
 
     def __init__(self):
+        pygame.font.init() # Inicjalizacja modułu czcionek
+        self.font = pygame.font.SysFont("Arial", 24) # Stworzenie czcionki systemowej
+        # 1. Najpierw tworzymy puste listy/atrybuty
+        self.map=[]
+        self.units = []
+        self.castles = []           # Lista dla zbudowanych zamków
+        self.castle_locations = []  # Lista dla pustych miejsc (fundamentów)
+        # 2. Potem ładujemy dane, które te listy wypełnią
+        self.map = self.load_map("map.txt")
+        self.load_castles_from_fac("0.FAC")
+        self.garrison = [] # Lista jednostek w środku
+        self.destroyed = False
+        self.owner = None # Możesz ustawić właściciela na podstawie danych z FAC
         self.map = None
         self.objects = None
         self.peasant_groups = []
@@ -50,14 +62,13 @@ class World:
         self.menu_rects = {}
         self.build_rects = {}
         self.build_clicked = {}
-        self.next_turn_button = pygame.Rect(460, 10, 160, 40)
+        self.next_turn_button = pygame.Rect(820, 20, 180, 40)
         self.menu_open = False
         self.build_open = False
         #dwór
         self.victories = 0
         self.defeats = 0
         self.court_button = pygame.Rect(40, 140, 160, 40)
-
         self.exit_button = pygame.Rect(20, 20, 120, 50)
         self.prison_slots = [PrisonSlot(), PrisonSlot(), PrisonSlot()]
         self.unit_scroll = 0
@@ -106,35 +117,83 @@ class World:
         self.demolish_no = pygame.Rect(0, 0, 0, 0)
         self.camera_x = 0
         self.camera_y = 0
+        # Definiujemy bazową pozycję panelu (np. dolny prawy róg)
+        panel_x = 730
+        panel_y = 620
+        self.action_buttons = []
+        # Tworzymy 6 przycisków w siatce 2x3
+        for row in range(2):
+            for col in range(3):
+                rect = pygame.Rect(panel_x + col * 65, panel_y + row * 55, 60, 50)
+                self.action_buttons.append(rect)
+        self.build_menu_open = False  # Flaga: czy menu budowania jest otwarte?
+            # Definiujemy 3 przyciski na górze
+        self.btn_system = pygame.Rect(10, 0, 100, 40)
+        self.btn_mapa = pygame.Rect(115, 0, 100, 40)
+        # Twój zwój z "koniec tury" - dopasuj X do szerokości ekranu
+        self.next_turn_button = pygame.Rect(700, 0, 200, 45) 
+        # Bardzo wąski pasek na samej górze - tylko on "wywołuje" menu
+        self.top_ui_trigger_area = pygame.Rect(0, 0, 1024, 10) 
+        # Obszar, który utrzymuje menu widoczne (cała wysokość przycisków)
+        # Dzięki temu menu nie zniknie, gdy będziesz chciał kliknąć przycisk
+        self.top_ui_full_area = pygame.Rect(0, 0, 1024, 55) 
+        self.show_top_ui = False
+        # Definicje opcji menu
+        self.menu_options = {
+            "System": ["Misja", "Poddanie się", "Zapisz grę", "Wczytaj grę", "Opcje", "Koniec"],
+            "Mapa": ["Wszystko", "Budynki", "Jednostki", "Nic"]
+        }
+        # Stan: które menu jest otwarte (None, "system" lub "mapa")
+        self.active_dropdown = None
+        # Wysokość pojedynczej opcji w menu
+        self.option_height = 35
+
+    def load_map(self, filename):
+            game_map = []
+            try:
+                with open(filename, 'r') as f:
+                    # Czytamy każdą linię z map.txt i usuwamy znaki nowej linii
+                    for line in f:
+                        game_map.append(list(line.strip()))
+                print(f"Mapa wczytana: {len(game_map)}x{len(game_map[0])}")
+            except FileNotFoundError:
+                # Jeśli pliku nie ma, tworzymy awaryjną trawę 100x100
+                print("Błąd: Nie znaleziono map.txt! Tworzę pustą mapę.")
+                game_map = [["." for _ in range(100)] for _ in range(100)]
+        
+            return game_map
 
     def load(self, map_file, fac_file):
-        self.map = load_map(map_file)
+        self.map = self.load_map(map_file)
+        # Zakładam, że load_fac_objects zwraca słownik z listami
         self.objects = load_fac_objects(fac_file)
 
         castle_places = self.objects.get("zamek_place", [])
+        # Musisz wyciągnąć informację o tym, co jest zbudowane
+        built_indices = self.objects.get("zbudowano_zamek", [0, 1]) # Domyślnie 0 i 1
+
+        self.castles = []
+        self.castle_locations = []
 
         for i, (x, y) in enumerate(castle_places):
-            owner = self.players[i] if i < len(self.players) else None
-            
-            c = Castle(x // 2, y // 4, owner)
-            c.gold = 20000
-            self.castles.append(c)
+            # SPRAWDZAMY: czy ten indeks (i) jest na liście zbudowanych?
+            if i in built_indices:
+                owner = self.players[i] if i < len(self.players) else None
+                # Tworzymy prawdziwy zamek (używamy x i y bezpośrednio, jeśli FAC ma kafelki)
+                c = Castle(x, y, owner) 
+                c.gold = 20000
+                self.castles.append(c)
+            else:
+                # To jest tylko miejsce na budowę - dodajemy do osobnej listy
+                self.castle_locations.append((x, y))
 
-    # jednostki startowe przy zamkach graczy
+        # Jednostki startowe (tylko przy prawdziwych zamkach)
         for c in self.castles:
             if c.owner:
                 self.add_unit(Unit("lekka_piechota", c.x, c.y + 1, c.owner))
 
-
-        print("DEBUG castles:", len(self.castles))
-        print("DEBUG units:", len(self.units))
-        map_width = len(self.map[0]) * 32
-        self.next_turn_button = pygame.Rect(map_width + 20, 10, 170, 40)
-        print("PLAYERS:", len(self.players))
-        print("CASTLES:", len(self.castles))
-
-        for c in self.castles:
-            print("castle owner:", c.owner)
+        print(f"Zbudowano zamków: {len(self.castles)}")
+        print(f"Miejsc pod budowę: {len(self.castle_locations)}")
 
     def add_player(self, player):
         self.players.append(player)
@@ -166,47 +225,65 @@ class World:
             if not castle.destroyed:
                 castle.collect_taxes()
 
-
     def move_unit(self, unit, dx, dy):
-
         if unit.move_points <= 0:
             return
 
         nx = unit.x + dx
         ny = unit.y + dy
 
-        if ny < 0 or ny >= len(self.map):
-            return
-        if nx < 0 or nx >= len(self.map[0]):
+        # 1. Granice mapy
+        if not (0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map)):
             return
 
-        # ====== WALKA ======
+        # 2. ====== LOGIKA WEJŚCIA DO ZAMKU (2x2) ======
+        # Sprawdzamy, czy pole nx, ny (cel ruchu) należy do jakiegoś zbudowanego zamku
+        for castle in self.castles: 
+            if castle.x <= nx <= castle.x + 1 and castle.y <= ny <= castle.y + 1:
+                if castle.destroyed:
+                    print("To są ruiny, nie wejdziesz.")
+                    return
+                
+                print(f"Jednostka {unit.type} wchodzi do zamku na {castle.x}, {castle.y}")
+                
+                # Dodaj do garnizonu
+                castle.garrison.append(unit)
+                
+                # Usuń z mapy i odznacz
+                if unit in self.units:
+                    self.units.remove(unit)
+                if unit in unit.owner.units:
+                    unit.owner.units.remove(unit)
+                
+                # Ustawiamy współrzędne na ujemne, by zniknęła z mapy
+                unit.x, unit.y = -1, -1
+                self.selected_unit = None
+                return  # PRZERWIJ FUNKCJĘ - jednostka weszła do zamku
+
+        # 3. ====== WALKA (jeśli na polu stoi inna jednostka) ======
         for other in self.units:
             if other.x == nx and other.y == ny:
-
                 if other.owner != unit.owner:
                     print("ATAK!")
-
-                    # usuń wroga
                     self.units.remove(other)
-                    other.owner.units.remove(other)
-
-                    # wejdź na jego pole
-                    unit.x = nx
-                    unit.y = ny
+                    if other in other.owner.units:
+                        other.owner.units.remove(other)
+                    
+                    unit.x, unit.y = nx, ny
                     unit.move_points -= 1
                     return
                 else:
                     print("Sojusznik blokuje pole")
                     return
 
-        # ===== NORMALNY RUCH =====
-        if self.map[ny][nx] != ".":
-            return
-
-        unit.x = nx
-        unit.y = ny
-        unit.move_points -= 1
+        # 4. ===== NORMALNY RUCH (tylko na kafelku ".") =====
+        # Sprawdzamy czy teren pozwala na przejście
+        if self.map[ny][nx] in [".", "0", " "]:
+            unit.x = nx
+            unit.y = ny
+            unit.move_points -= 1
+        else:
+            print(f"BLOKADA! Na polu ({nx}, {ny}) jest znak: '{self.map[ny][nx]}'")
     def reset_units(self):
         for u in self.units:
             if u.x < 0:
@@ -254,7 +331,6 @@ class World:
                     print("Ruiny zamku — nie można wejść")
                     return
 
-
                 print("Jednostka weszła do zamku")
 
                 # === PRZEJĘCIE ===
@@ -297,7 +373,6 @@ class World:
                 u.move_points -= 1
                 return
             
-
         u.x = nx
         u.y = ny
         u.move_points -= 1
@@ -444,195 +519,142 @@ class World:
         self.clear_selection()
 
     def train_selected_garrison_units(self):
-        if not self.selected_castle:
-            print("DEBUG: brak wybranego zamku")
+        if not self.selected_castle or not self.selected_units:
+            print("Błąd: Nie wybrano zamku lub jednostek!")
             return
 
-        castle = self.selected_castle
-
-        print("DEBUG: szkolenie jednostek:", len(self.selected_units))
-
-        for unit in self.selected_units:
-            castle.start_training(unit)
-            print("DEBUG: rozpoczęto szkolenie")
-
+        # Wykonaj szkolenie
+        for unit in list(self.selected_units):
+            self.selected_castle.start_training(unit)
+        
+        # WAŻNE: Nie czyść listy, jeśli chcesz widzieć, że jednostki zniknęły 
+        # (przeszły do slotów treningowych) w tym samym widoku.
         self.selected_units.clear()
 
     def handle_events(self):
-
         for event in pygame.event.get():
-            # 1. WYŁĄCZANIE GRY (To naprawia "iksa" w rogu okna)
             if event.type == pygame.QUIT:
                 pygame.quit()
                 import sys
                 sys.exit()
 
-            # 2. OBSŁUGA KLAWIATURY SKRÓTY KLAWISZOWE!!
             elif event.type == pygame.KEYDOWN:
-            # Sprawdzanie konkretnych klawiszy:
-                if event.key == pygame.K_t:
-                    self.train_selected_garrison_units()
-                
-                elif event.key == pygame.K_ESCAPE:
-                    # Na przykład wyjście z rekrutacji do zamku
-                    if self.screen in ["recruitment", "garrison"]:
+                # --- SKRÓTY UNIWERSALNE ---
+                if event.key == pygame.K_ESCAPE:
+                    if self.screen in ["recruitment", "garrison", "forge", "workshop", "hospital", "school", "peasants", "court"]:
                         self.screen = "castle"
                     elif self.screen == "castle":
                         self.screen = "map"
+                    elif self.demolish_confirm:
+                        self.demolish_confirm = False
                 
                 elif event.key == pygame.K_SPACE:
-                    # Na przykład zakończenie tury spacją
-                    self.next_turn()
+                    if self.selected_unit:
+                        self.selected_unit = None
+                    else:
+                        self.next_turn()
 
-                elif event.key == pygame.K_i:
-                    # Otwieranie info o jednostce skrótem klawiszowym
-                    if self.screen == "recruitment":
-                        # Tutaj możesz wywołać tę samą logikę co w przycisku INFO
-                        pass
+                # --- RUCH JEDNOSTKĄ ---
+                if self.screen == "map" and self.selected_unit:
+                    if event.key == pygame.K_UP:    self.move_unit(self.selected_unit, 0, -1)
+                    elif event.key == pygame.K_DOWN:  self.move_unit(self.selected_unit, 0, 1)
+                    elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
+                    elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
 
-            # 3. OBSŁUGA MYSZKI
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 
-                # Kółko myszy
-                if event.button in [4, 5]:
-                    if self.screen == "recruitment":
-                        self.handle_recruitment_scroll(event)
-                    return
+                # Obsługa kółka (Scroll)
+                if event.button in [4, 5] and self.screen == "recruitment":
+                    self.handle_recruitment_scroll(event)
+                    continue # kontynuuj pętlę eventów
 
-                # Lewy przycisk myszy
-                elif event.button == 1:
+                if event.button == 1: # Lewy klik
+                    # Jeśli info o jednostce jest otwarte, kliknięcie je zamyka
                     if self.screen == "unit_info":
                         self.screen = "recruitment"
-                        return
+                        continue
                     
-                    # Reszta logiki ekranów...
-                    if self.screen == "recruitment":
-                        self.handle_recruitment_click(mx, my)
-                        return
-
+                    # Główny procesor kliknięć
                     self.handle_mouse_click(mx, my)
 
-        return None
-
-    def handle_recruitment_scroll(self, event):
-        # event.button 4 = kółko w górę
-        # event.button 5 = kółko w dół
-        unit_types = self.recruitment_unit_types
-        
-        if event.button == 4: # Kręcimy do góry (lista ma jechać w dół)
-            if self.recruitment_scroll > -2:
-                self.recruitment_scroll -= 1
-                
-        elif event.button == 5: # Kręcimy w dół (lista ma jechać do góry)
-            if self.recruitment_scroll < len(unit_types) - 3:
-                self.recruitment_scroll += 1
-        return
     def handle_mouse_click(self, mx, my):
-        # A. NAJPIERW INTERFEJS (Stałe pozycje, nie liczymy kamery!)
-        if self.next_turn_button.collidepoint(mx, my):
-            print("NEXT TURN CLICKED")
-            self.next_turn()
-            return
-
-        # B. POTEM MAPA (Tu dodajemy kamerę, żeby wiedzieć w co na mapie klikamy)
-        real_x = mx + self.camera_x
-        real_y = my + self.camera_y
-        
-        tile_x = real_x // 32
-        tile_y = real_y // 32
-        
-        # ... logika sprawdzania zamków na tile_x, tile_y ...
-
-        # ================= DEMOLISH CONFIRM =================
-            # 1. NAJPIERW INTERFEJS GLOBALNY
-        if self.next_turn_button.collidepoint(mx, my):
-            self.next_turn()
-            return
-
-        # 2. BLOKADA OKNA DEMOLKI
+        # 1. OKNO POTWIERDZENIA DEMOLKI (Najwyższy priorytet)
         if self.demolish_confirm:
+            if hasattr(self, 'demolish_yes') and self.demolish_yes.collidepoint(mx, my):
+                self.demolish_castle(self.selected_castle)
+                self.demolish_confirm = False
+                return
+            if hasattr(self, 'demolish_no') and self.demolish_no.collidepoint(mx, my):
+                self.demolish_confirm = False
+                return
+            return # Blokuj inne kliknięcia gdy okno jest otwarte
 
-            if self.demolish_yes.collidepoint(mx, my):
-                castle = self.selected_castle
-
-                castle.destroyed = True
-
-                    # usunięcie z listy gracza
-                if castle.owner and castle in castle.owner.castles:
-                        castle.owner.castles.remove(castle)
-
-                    # wyrzucenie gracza z zamku
-                self.selected_castle = None
-                self.screen = "map"
-
-            self.demolish_confirm = False
-            return
-
-        if self.demolish_no.collidepoint(mx, my):
-            self.demolish_confirm = False
-            return
-
-        print("CLICK:", self.screen, mx, my)
-
-        # === UNIT INFO SCREEN ===
-        if self.screen == "unit_info":
-            self.screen = "recruitment"
-            return
-
-        # UI screens
-        if self.screen == "court":
-            self.handle_court_click(mx, my)
-            return
-        if self.screen == "peasants":
-            self.handle_peasants_click(mx, my)
-            return
-
+        # 2. PRZEŁĄCZANIE EKRANÓW - REKRUTACJA I GARNIZON
         if self.screen == "recruitment":
             self.handle_recruitment_click(mx, my)
             return
-
         if self.screen == "garrison":
             self.handle_garrison_click(mx, my)
-            return 
-           
+            return
+
+        # 3. MENU ZAMKU
         if self.screen == "castle":
-        #FORGE
-            if self.forge_button and self.forge_button.collidepoint(mx, my):
-                self.screen = "forge"
-                return
-
-            if self.workshop_button and self.workshop_button.collidepoint(mx, my):
-                self.screen = "workshop"
-                return
-
+            # Przyciski budynków - muszą być sprawdzane ZANIM sprawdzimy back_button
+            if hasattr(self, 'forge_button') and self.forge_button and self.forge_button.collidepoint(mx, my):
+                self.screen = "forge"; return
+            if hasattr(self, 'workshop_button') and self.workshop_button and self.workshop_button.collidepoint(mx, my):
+                self.screen = "workshop"; return
+            if hasattr(self, 'hospital_button') and self.hospital_button and self.hospital_button.collidepoint(mx, my):
+                self.screen = "hospital"; return
+            if hasattr(self, 'school_button') and self.school_button and self.school_button.collidepoint(mx, my):
+                self.screen = "school"; return
             
-            if self.hospital_button and self.hospital_button.collidepoint(mx, my):
-                self.screen = "hospital"
-                return
+            # Przycisk rekrutacji (często pomijany w logice Gemini)
+            if hasattr(self, 'recruit_button') and self.recruit_button.collidepoint(mx, my):
+                self.screen = "recruitment"; return
 
-            if self.school_button and self.school_button.collidepoint(mx, my):
-                self.screen = "school"
-                return
-        
-            if self.demolish_button and self.demolish_button.collidepoint(mx, my):
+            if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                self.demolish_confirm = True; return
 
-                self.demolish_confirm = True
-                return
+            if hasattr(self, 'back_button') and self.back_button.collidepoint(mx, my):
+                self.screen = "map"; self.selected_castle = None; return
 
             self.handle_castle_click(mx, my)
             return
 
-        # ================= MAP =================
-        if self.screen == "map":
-        
-            self.handle_map_click(mx, my)
-            return
-        if self.screen in ["forge","workshop","hospital","school"]:
-            if self.back_button.collidepoint(mx, my):
+        # 4. EKRANY SPECJALNE (Powrót do zamku)
+        if self.screen in ["forge", "workshop", "hospital", "school", "peasants", "court"]:
+            if hasattr(self, 'back_button') and self.back_button.collidepoint(mx, my):
                 self.screen = "castle"
                 return
+            
+            # Jeśli to ekran chłopów, pozwól na ich specyficzne kliknięcia
+            if self.screen == "peasants":
+                self.handle_peasants_click(mx, my)
+            return
 
+        # 5. MAPA
+        if self.screen == "map":
+            # UI Paska górnego
+            if self.show_top_ui and self.top_ui_full_area.collidepoint(mx, my):
+                if self.btn_system.collidepoint(mx, my): self.active_dropdown = "System"; return
+                if self.btn_mapa.collidepoint(mx, my): self.active_dropdown = "Mapa"; return
+                if self.next_turn_button.collidepoint(mx, my): self.next_turn(); return
+                return
+
+            # UI Paska dolnego
+            for i, rect in enumerate(self.action_buttons):
+                if rect.collidepoint(mx, my):
+                    if self.build_menu_open:
+                        self.execute_build_action(i)
+                    else:
+                        if i == 4: self.build_menu_open = True
+                        elif i == 5: # Przycisk REC na mapie (jeśli zamek wybrany)
+                            if self.selected_castle: self.screen = "recruitment"
+                    return
+
+            self.handle_map_click(mx, my)
     def handle_garrison_click(self, mx, my):
 
         castle = self.selected_castle
@@ -666,13 +688,15 @@ class World:
         # ================= TRAIN ================= 
         if "school" in castle.buildings:
             if self.train_button.collidepoint(mx, my):
-                print("trenuj")
                 if self.selected_units:
-                    castle.start_training_group(self.selected_units)
-                    self.selected_units.clear()
-                    print("Przeszkolono jednostki")
+                    # Używamy pętli, aby przeszkolić każdą zaznaczoną jednostkę z osobna
+                    for unit in list(self.selected_units):
+                        castle.start_training(unit) 
+                    
+                    self.selected_units.clear() # Czyścimy dopiero PO przeszkoleniu wszystkich
+                    print("Zakończono wydawanie rozkazów szkolenia")
                 else:
-                    print("Brak zaznaczonych jednostek")
+                    print("Brak zaznaczonych jednostek do szkolenia")
                 return
         #=================wyślij wojsko======================
         
@@ -702,7 +726,6 @@ class World:
         else:
             if len(self.selected_units) < 10:
                 self.selected_units.append(unit)
-
 
     def calculate_army_power(self, player):
         power = 0
@@ -749,6 +772,7 @@ class World:
         elif self.screen == "school":
             self.draw_school(screen)
             return
+        
     def draw_garrison(self, screen):
         if not self.selected_castle:
             return
@@ -828,86 +852,69 @@ class World:
         pygame.draw.rect(screen, (160,120,60), self.button_send_army)
         screen.blit(font.render("RELEASE", True, (255,255,255)), (890,610))
 
-
     def draw_map(self, screen):
         TILE_SIZE = 32
         
-        # 1. SIATKA (Musi uwzględniać kamerę!)
-        # Rysujemy tylko to, co widać na ekranie, by nie obciążać procesora
+        # 1. SIATKA (Uwzględnia kamerę)
         start_x = self.camera_x // TILE_SIZE
         start_y = self.camera_y // TILE_SIZE
         
-        for y in range(max(0, start_y), min(100, start_y + 25)): # 25 to ok. wysokość ekranu
-            for x in range(max(0, start_x), min(100, start_x + 35)): # 35 to ok. szerokość
+        # Zakładamy mapę 100x100, rysujemy tylko wycinek widoczny na ekranie
+        for y in range(max(0, start_y), min(100, start_y + 25)): 
+            for x in range(max(0, start_x), min(100, start_x + 40)): 
                 pos_x = (x * TILE_SIZE) - self.camera_x
                 pos_y = (y * TILE_SIZE) - self.camera_y
-                pygame.draw.rect(screen, (34, 139, 34), (pos_x, pos_y, TILE_SIZE - 1, TILE_SIZE - 1))
+                # Wewnątrz draw_map, w pętli rysującej kafelki:
+                tile_type = self.map[y][x] 
 
-        # 2. ZAMKI I JEDNOSTKI (Też z kamerą)
-        for c in self.castles:
-            rect = pygame.Rect((c.x * TILE_SIZE) - self.camera_x, (c.y * TILE_SIZE) - self.camera_y, TILE_SIZE, TILE_SIZE)
-            color = (200, 0, 0) if c.destroyed else (150, 150, 255)
-            pygame.draw.rect(screen, color, rect)
-        # 3. RYSOWANIE JEDNOSTEK (Logika zgrupowanych jednostek)
-        tile_units = {}
-        for player in self.players:
-            for u in player.units:
-                key = (u.x, u.y)
-                tile_units[key] = tile_units.get(key, 0) + 1
+                if tile_type == "#":
+                    color = (139, 69, 19)   # Brązowy (Pułapka/Przeszkoda)
+                elif tile_type == "$":
+                    color = (255, 215, 0)   # Złoty (Skarb)
+                elif tile_type == "S":
+                    color = (255, 255, 255) # Biały (Świątynia)
+                else:
+                    color = (34, 139, 34)   # Zielony (Trawa)
+                pygame.draw.rect(screen, color, (pos_x, pos_y, TILE_SIZE - 1, TILE_SIZE - 1))
+
+            # 1. RYSOWANIE PUSTYCH PLACÓW (z listy castle_locations)
+        for px, py in self.castle_locations:
+            rect = pygame.Rect((px * 32) - self.camera_x, (py * 32) - self.camera_y, 64, 64)
+            # Rysujemy tylko SZARĄ RAMKĘ (puste miejsce)
+            pygame.draw.rect(screen, (150, 150, 150), rect, 2) 
+            # Dodajemy napis, żeby mieć pewność
+            # (jeśli masz zainicjowane self.font)
+            # screen.blit(self.font.render("SITE", True, (100,100,100)), (rect.x + 5, rect.y + 5))
+
+        # 2. RYSOWANIE ZBUDOWANYCH ZAMKÓW (z listy self.castles)
+        for castle in self.castles:
+            rect = pygame.Rect((castle.x * 32) - self.camera_x, (castle.y * 32) - self.camera_y, 64, 64)
+            # Pełny NIEBIESKI blok (aktywny zamek)
+            pygame.draw.rect(screen, (0, 0, 200), rect) 
+            # Czarna grubsza obwódka
+            pygame.draw.rect(screen, (0, 0, 0), rect, 3)
+            # 3. RYSOWANIE JEDNOSTEK (Z poprawioną kamerą)
+            tile_units = {}
+            for player in self.players:
+                for u in player.units:
+                    # Rysujemy tylko jednostki, które są na mapie (x, y >= 0)
+                    if u.x >= 0 and u.y >= 0:
+                        key = (u.x, u.y)
+                        tile_units[key] = tile_units.get(key, 0) + 1
 
         font = pygame.font.SysFont(None, 24)
         for (x, y), count in tile_units.items():
-            rect = pygame.Rect(x * TILE_SIZE + 8, y * TILE_SIZE + 8, 16, 16)
+            # Tutaj DODANO odejmowanie kamery, inaczej jednostki "zostawały" w miejscu przy przewijaniu
+            pos_x = (x * TILE_SIZE) - self.camera_x
+            pos_y = (y * TILE_SIZE) - self.camera_y
+            
+            rect = pygame.Rect(pos_x + 8, pos_y + 8, 16, 16)
             pygame.draw.rect(screen, (255, 255, 0), rect) # Żółty kwadracik jednostki
+            
             if count > 1:
                 txt = font.render(str(count), True, (0, 0, 0))
-                screen.blit(txt, (x * TILE_SIZE + 10, y * TILE_SIZE + 6))
+                screen.blit(txt, (pos_x + 10, pos_y + 6))
 
-        # 1. Definiujemy pozycję przycisku
-        # Umieśćmy go w prawym górnym rogu
-        self.next_turn_button = pygame.Rect(screen.get_width() - 180, 10, 170, 45)
-
-        # 2. Pobieramy aktualną pozycję myszy
-        mx, my = pygame.mouse.get_pos()
-
-        # 3. Sprawdzamy, czy myszka znajduje się nad przyciskiem
-        if self.next_turn_button.collidepoint(mx, my):
-            # Rysujemy przycisk tylko, gdy mysz jest nad nim
-            # Możesz dodać lekką przezroczystość, by wyglądało to nowocześniej
-            s = pygame.Surface((self.next_turn_button.width, self.next_turn_button.height), pygame.SRCALPHA)
-            s.fill((80, 120, 200, 200)) # Kolor z kanałem Alpha (200/255)
-            screen.blit(s, (self.next_turn_button.x, self.next_turn_button.y))
-            
-            # Ramka
-            pygame.draw.rect(screen, (255, 255, 255), self.next_turn_button, 2)
-            
-            # Tekst
-            font = pygame.font.SysFont(None, 24)
-            text = font.render(f"NEXT TURN ({self.turn})", True, (255, 255, 255))
-            screen.blit(text, (self.next_turn_button.x + 15, self.next_turn_button.y + 12))
-
-        # 6. MENU ZAMKU (Pojawia się na wierzchu mapy)
-        if self.screen == "castle":
-            self.draw_castle_menu(screen)
-
-        # 7. EKRAN DEMOLKI (Przezroczysta nakładka na samym końcu)
-        if self.demolish_confirm:
-            # Tworzymy półprzezroczyste tło na całe okno
-            s = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
-            s.fill((0, 0, 0, 180)) 
-            screen.blit(s, (0, 0))
-            
-            # Przycisk TAK (Czerwony)
-            self.demolish_yes = pygame.Rect(screen.get_width()//2 - 110, 300, 100, 50)
-            pygame.draw.rect(screen, (200, 0, 0), self.demolish_yes)
-            screen.blit(font.render("TAK", True, (255,255,255)), (self.demolish_yes.x + 30, self.demolish_yes.y + 15))
-            
-            # Przycisk NIE (Szary)
-            self.demolish_no = pygame.Rect(screen.get_width()//2 + 10, 300, 100, 50)
-            pygame.draw.rect(screen, (100, 100, 100), self.demolish_no)
-            screen.blit(font.render("NIE", True, (255,255,255)), (self.demolish_no.x + 35, self.demolish_no.y + 15))
-
-    
     def draw_castle(self, screen):
         if self.demolish_confirm:
             return
@@ -970,15 +977,14 @@ class World:
         else:
             self.hospital_button = None
 
-        #SZKOŁA — tylko jeśli school zbudowany
+        #SZKOŁA — tylko jeśli Szkoła zbudowany
         if self.selected_castle and "school" in self.selected_castle.buildings:
             self.school_button = pygame.Rect(830, 250, 160, 40)
             pygame.draw.rect(screen, (90, 90, 240), self.school_button)
-            screen.blit(font.render("SZKOŁA", True, (255,255,255)),
+            screen.blit(font.render("school", True, (255,255,255)),
                         (self.school_button.x + 15, self.school_button.y + 10))
         else:
             self.school_button = None
-
 
     # --- BUTTON: BACK ---
         self.back_button = pygame.Rect(40, 700, 160, 40)
@@ -1072,6 +1078,7 @@ class World:
     # DRAW RECRUITMENT
     # =======================
     def draw_recruitment(self, screen):
+        screen.fill((60, 50, 40)) # Ten sam brąz co w zamku, lub (30, 30, 30) dla ciemnego menu
         font = pygame.font.SysFont(None, 24)
         castle = self.selected_castle
         if not castle:
@@ -1227,7 +1234,6 @@ class World:
         happiness_factor = 0.5 + (castle.happiness / 100) * 0.5
         tax_income = int(castle.peasants * 0.1 * castle.tax_rate * happiness_factor)
 
-
         # =====================================================
         # TOP HUD
         # =====================================================
@@ -1268,8 +1274,6 @@ class World:
             c for c in self.castles
             if c.owner == self.players[self.current_player] and not c.destroyed
         ]
-
-
 
         for i, c in enumerate(visible):
             txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
@@ -1340,7 +1344,6 @@ class World:
         self.draw_queen_panel(screen)
         self.draw_prison_sections(screen)
 
-
     def draw_court_players_header(self, screen):
         font = pygame.font.SysFont(None, 26)
 
@@ -1372,17 +1375,19 @@ class World:
                 # Zakładam, że draw_text to Twoja pomocnicza funkcja lub używasz font.render
                 draw_text(screen, p.name, rect.x + 10, rect.y + 5)
 
+    def draw_court(self, screen):
+        screen.fill((30, 30, 30)) # Tło
 
-    def draw_court_header(self, screen):
-        screen.fill((255, 0, 0))
-        x = 200 
-        y = 100
-        for p in self.players:
-            pygame.draw.rect(screen, p.color, (x, y, 120, 30))
-            draw_text(screen,p.name, x + 10, y + 10)
-            x += 140
-        self.back_button = pygame.Rect(20, 10, 100, 40)
-        draw_button(screen, "BACK", 20, 10, 100, 40)
+        # Rysowanie wszystkich paneli
+        self.draw_court_players_header(screen)
+        self.draw_court_stats(screen)
+        self.draw_queen_panel(screen)
+        self.draw_prison_sections(screen)
+
+        self.back_button = pygame.Rect(10, 130, 100, 40) # Dopasowałem rozmiar do screena
+        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
+        # Tekst "BACK" wyśrodkowany w tym prostokącie
+        draw_text(screen, "BACK", self.back_button.x + 25, self.back_button.y + 12)
 
     def draw_queen_panel(self, screen):
         w = screen.get_width()
@@ -1470,45 +1475,93 @@ class World:
         print("Generał zmienił stronę")
 
     def draw(self, screen):
-        if self.screen == "court":
+        mx, my = pygame.mouse.get_pos()
+
+        # 1. LOGIKA EKRANU MAPY
+        if self.screen == "map":
+            self.draw_map(screen)
+            if not self.demolish_confirm:
+                self.draw_top_bar(screen)
+                self.draw_bottom_bar(screen)
+
+        # 2. LOGIKA EKRANU ZAMKU
+        elif self.screen == "castle":
+            self.draw_castle(screen) 
+
+        # 3. LOGIKA EKRANU GARNIZONU / REKRUTACJI
+        elif self.screen == "garrison":
+            self.draw_garrison(screen)
+        
+        elif self.screen == "recruitment":
+            self.draw_recruitment(screen) # Dodaj to, jeśli masz taką metodę
+
+        # 4. LOGIKA DWORU I CHŁOPÓW
+        elif self.screen == "court":
             self.draw_court(screen)
-        else:
-            self.draw_pygame(screen)
+        
+        elif self.screen == "peasants":
+            self.draw_peasants(screen) # Dodaj to, jeśli masz taką metodę
 
-            #demolowanie zamku
-        if self.demolish_confirm:
-            self.draw_demolish_confirm(screen)
-            pygame.draw.rect(screen, (0,255,0), (0,0,50,50))
-
+        # 5. NOWE EKRANY BUDYNKÓW (Tego brakowało!)
+        elif self.screen == "forge":
+            self.draw_forge(screen)
             
-    def draw_demolish_confirm(self, screen):
-   
-        # ===== PRZEZROCZYSTA WARSTWA =====
-        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        elif self.screen == "workshop":
+            self.draw_workshop(screen)
+            
+        elif self.screen == "hospital":
+            self.draw_hospital(screen)
+            
+        elif self.screen == "school":
+            self.draw_school(screen)
+            
+        elif self.screen == "unit_info":
+            self.draw_unit_info(screen)
 
-        overlay.fill((0, 0, 0, 120))  # 120 = lekko przyciemnione
+        # 6. NAKŁADKI (Zawsze na wierzchu)
+        if self.demolish_confirm:
+            # Przekazujemy tylko screen, bo w definicji draw_demolish_confirm masz tylko screen
+            self.draw_demolish_confirm(screen)
+    def draw_demolish_confirm(self, screen):
+        # ===== PRZEZROCZYSTA WARSTWA =====
+        # Tworzymy powierzchnię o wielkości całego ekranu
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))  # Czerń, 180 = wyraźne przyciemnienie mapy
         screen.blit(overlay, (0, 0))
 
-        # ===== OKNO =====
-        rect = pygame.Rect(350, 260, 300, 140)
-        pygame.draw.rect(screen, (40, 40, 40), rect)
-        pygame.draw.rect(screen, (200, 200, 200), rect, 2)
+        # ===== OKNO MODALNE =====
+        rect = pygame.Rect(0, 0, 320, 160)
+        rect.center = (screen.get_width() // 2, screen.get_height() // 2) # Środek ekranu
+        
+        # Cień okna
+        pygame.draw.rect(screen, (20, 20, 20), (rect.x + 5, rect.y + 5, rect.width, rect.height))
+        # Główne okno
+        pygame.draw.rect(screen, (50, 50, 50), rect)
+        pygame.draw.rect(screen, (200, 180, 100), rect, 3) # Złota ramka
 
-        font = pygame.font.SysFont(None, 28)
-        screen.blit(font.render("Wyburzyć zamek?", True, (255,255,255)),
-                    (rect.x + 60, rect.y + 20))
+        font = pygame.font.SysFont(None, 32)
+        text = font.render("Zburzyć twierdzę?", True, (255, 255, 255))
+        screen.blit(text, (rect.centerx - text.get_width() // 2, rect.y + 25))
 
-        self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 70, 80, 40)
-        self.demolish_no = pygame.Rect(rect.x + 180, rect.y + 70, 80, 40)
+        # Przyciski
+        self.demolish_yes = pygame.Rect(rect.x + 40, rect.y + 85, 90, 45)
+        self.demolish_no = pygame.Rect(rect.x + 190, rect.y + 85, 90, 45)
 
-        pygame.draw.rect(screen, (120,180,120), self.demolish_yes)
-        pygame.draw.rect(screen, (180,120,120), self.demolish_no)
+        # Rysowanie przycisków (z prostym hoverem)
+        mx, my = pygame.mouse.get_pos()
+        color_yes = (100, 200, 100) if self.demolish_yes.collidepoint(mx, my) else (60, 130, 60)
+        color_no = (200, 100, 100) if self.demolish_no.collidepoint(mx, my) else (130, 60, 60)
 
-        screen.blit(font.render("TAK", True, (0,0,0)),
-                    (self.demolish_yes.x + 20, self.demolish_yes.y + 10))
-        screen.blit(font.render("NIE", True, (0,0,0)),
-                    (self.demolish_no.x + 20, self.demolish_no.y + 10))
-
+        pygame.draw.rect(screen, color_yes, self.demolish_yes)
+        pygame.draw.rect(screen, color_no, self.demolish_no)
+        
+        # Napisy na przyciskach
+        btn_font = pygame.font.SysFont(None, 28, bold=True)
+        txt_yes = btn_font.render("TAK", True, (255, 255, 255))
+        txt_no = btn_font.render("NIE", True, (255, 255, 255))
+        
+        screen.blit(txt_yes, (self.demolish_yes.centerx - txt_yes.get_width() // 2, self.demolish_yes.centery - txt_yes.get_height() // 2))
+        screen.blit(txt_no, (self.demolish_no.centerx - txt_no.get_width() // 2, self.demolish_no.centery - txt_no.get_height() // 2))
 
     def select_castle(self, x, y):
         for c in self.castles:
@@ -1519,7 +1572,6 @@ class World:
 
         self.selected_castle = None
         return
-
 
     def create_unit(self, unit_type, x, y, owner):
         u = Unit(unit_type, x, y, owner)
@@ -1550,6 +1602,7 @@ class World:
 
         print("Rozpoczęto produkcję:", utype)
         self.screen = "garrison"
+
     def click_on_garrison(self, mx, my):
         start_x = 100
         start_y = 120
@@ -1610,7 +1663,6 @@ class World:
         else:
             self.build_open = False
 
-
         if self.build_open:
             self.draw_build_submenu(screen, menu_x, menu_y)
         # BURZ
@@ -1625,6 +1677,8 @@ class World:
 
     def draw_build_submenu(self, screen, menu_x, menu_y):
         font = pygame.font.SysFont(None, 24)
+        castle = self.selected_castle  # Pobieramy aktualny zamek
+        if not castle: return
 
         sub_x = menu_x - 160
         sub_y = menu_y
@@ -1635,17 +1689,21 @@ class World:
         for i, b in enumerate(buildings):
             rect = pygame.Rect(sub_x, sub_y + i*40, 160, 40)
             pygame.draw.rect(screen, (80, 80, 120), rect)
-            color = (255, 255, 255) if not self.build_clicked.get(b, False) else (100, 100, 100)
-            screen.blit(font.render(b, True, color),
-                    (sub_x + 10, sub_y + 10 + i*40))
+
+            # --- KLUCZOWA ZMIANA ---
+            # Sprawdzamy czy budynek 'b' jest już zbudowany w tym konkretnym zamku
+            is_built = b in castle.buildings 
+            
+            color = (100, 100, 100) if is_built else (255, 255, 255)
+            
+            label = f"{b}" if is_built else b
+            screen.blit(font.render(label, True, color), (sub_x + 10, sub_y + 10 + i*40))
 
             self.build_rects[b] = rect
     
     def handle_court_click(self, mx, my):
-
-        # EXIT
-        exit_rect = pygame.Rect(20, 10, 100, 40)
-        if exit_rect.collidepoint(mx, my):
+        # Używamy zmiennej, którą zdefiniowaliśmy w draw_court
+        if hasattr(self, 'back_button') and self.back_button.collidepoint(mx, my):
             self.screen = "castle"
             return
 
@@ -1664,61 +1722,56 @@ class World:
                 self.bribe_general(slot)
 
     def handle_map_click(self, mx, my):
+        if mx > 800: 
+            return
 
-        # Dodajemy przesunięcie kamery do pozycji myszy
-        real_x = mx + self.camera_x
-        real_y = my + self.camera_y
+        tile_x = (mx + self.camera_x) // 32
+        tile_y = (my + self.camera_y) // 32
 
-        tile_x = real_x // 32
-        tile_y = real_y // 32
-        
-        # Teraz porównanie zadziała dla każdego zamku na mapie 100x100
+        # 1. NAJPIERW SPRAWDZAMY CZY KLIKNIĘTO W ZAMEK
+        # Robimy to najpierw, żeby kliknięcie w zamek zawsze go otwierało, 
+        # niezależnie od tego czy mamy zaznaczoną jednostkę czy nie.
         for castle in self.castles:
-            if castle.x == tile_x and castle.y == tile_y:
+            if castle.x <= tile_x <= castle.x + 1 and castle.y <= tile_y <= castle.y + 1:
+                if castle.destroyed:
+                    print("To są ruiny.")
+                    return
+
+                # Jeśli mamy jednostkę i klikamy w zamek obok niej - najpierw ją przesuń
+                if self.selected_unit:
+                    u = self.selected_unit
+                    dx = tile_x - u.x
+                    dy = tile_y - u.y
+                    if max(abs(dx), abs(dy)) == 1:
+                        self.move_unit(u, dx, dy)
+                        # Nie dajemy tu return! Pozwalamy kodowi przejść niżej, 
+                        # aby po ruchu od razu otworzył menu zamku.
+
                 self.selected_castle = castle
+                self.selected_unit = None 
                 self.screen = "castle"
-                return
+                print(f"Opened castle at {castle.x}, {castle.y}")
+                return 
 
-        # ===============================
-        # 1. JEŚLI MAMY ZAZNACZONĄ JEDNOSTKĘ → PRÓBUJ RUCHU
-        # ===============================
-        if self.selected_unit:
-
-            u = self.selected_unit
-            dx = tile_x - u.x
-            dy = tile_y - u.y
-
-            # tylko pola OBOK (bez skosów)
-            if max(abs(dx), abs(dy)) == 1:
-                self.move_unit(u, dx, dy)
-                return
-
-        # ===============================
-        # 2. KLIKNIĘCIE W JEDNOSTKĘ → ZAZNACZ
-        # ===============================
+        # 2. KLIKNIĘCIE W JEDNOSTKĘ (Zaznaczanie)
         for player in self.players:
             for unit in player.units:
                 if unit.x == tile_x and unit.y == tile_y:
                     if unit.owner == self.players[self.current_player]:
                         self.selected_unit = unit
                         self.selected_castle = None
-                        print("Selected unit:", unit.type)
-                    return
+                        return
 
-        # ===============================
-        # 3. KLIKNIĘCIE W ZAMEK
-        # ===============================
-        for castle in self.castles:
-            if castle.x == tile_x and castle.y == tile_y:
+        # 3. RUCH JEDNOSTKI (Tylko jeśli nie kliknięto w zamek ani inną jednostkę)
+        if self.selected_unit:
+            u = self.selected_unit
+            dx = tile_x - u.x
+            dy = tile_y - u.y
+            if max(abs(dx), abs(dy)) == 1:
+                self.move_unit(u, dx, dy)
+                return
 
-                if castle.destroyed:
-                    return
-
-                self.selected_castle = castle
-                self.screen = "castle"
-                return 
-
-
+        # Puste pole
         self.selected_unit = None
         self.selected_castle = None
 
@@ -1860,7 +1913,6 @@ class World:
                     self.selected_patent_index = None
                     return
             
-
         # Kliknięcie w patenty
         for i, rect in enumerate(self.patent_rects):
             if rect.collidepoint(mx, my):
@@ -1975,6 +2027,7 @@ class World:
         self.selected_unit = None
         self.selected_units.clear()
         self.screen = "map"
+
     def draw_forge(self, screen):
         screen.fill((40, 70, 70))  # tło "kamień"
 
@@ -2091,7 +2144,7 @@ class World:
         pygame.draw.rect(screen, (100, 100, 130), panel)
         pygame.draw.rect(screen, (180, 180, 220), panel, 6)
 
-        title = font_title.render("Szkoła", True, (220, 220, 255))
+        title = font_title.render("school", True, (220, 220, 255))
         screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y - 40))
 
         lines = [
@@ -2119,10 +2172,8 @@ class World:
     
     def release_selected_units(self):
         castle = self.selected_castle
-        if not castle:
-            return
-        if castle.owner is None:
-            print("Castle has no owner!")
+        if not castle or castle.owner is None:
+            print("Błąd zamku lub właściciela")
             return
 
         if not self.selected_units:
@@ -2131,40 +2182,49 @@ class World:
 
         player = castle.owner
 
+        # Poprawione kierunki z brakującymi przecinkami
         directions = [
-        (0, 1), (-1, 1), (1, 1),     # dół
-        (-1, 0),         (1, 0),     # boki
-        (0,-1), (-1,-1), (1,-1),     # góra
-]
+            (-1, 1), (0, 1), (1, 1), (2, 1),
+            (-1, 0),                 (2, 0),
+            (-1,-1),                 (2,-1),
+            (-1,-2), (0,-2), (1,-2), (2,-2)
+        ]
 
-        occupied = {(u.x, u.y) for p in self.players for u in p.units}
+        # Pobieramy aktualne pozycje wszystkich jednostek na mapie
+        occupied = {(u.x, u.y) for u in self.units}
 
         spawn_pos = None
         for dx, dy in directions:
-            nx = castle.x + dx
-            ny = castle.y + dy
-            if (nx, ny) not in occupied:
-                spawn_pos = (nx, ny)
-                break
+            nx, ny = castle.x + dx, castle.y + dy
+            # Sprawdzamy czy pole jest wolne i czy mieści się na mapie
+            if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
+                if (nx, ny) not in occupied and self.map[ny][nx] in [".", "0", " "]:
+                    spawn_pos = (nx, ny)
+                    break
 
         if not spawn_pos:
             print("Brak miejsca wokół zamku")
             return
 
         nx, ny = spawn_pos
-
+        
+        # Tworzymy jednostkę "Armia" (upewnij się, że klasa Unit to obsługuje)
         army = Unit("army", nx, ny, player)
+        army.move_points = 1
         army.garrison = []
 
+        # Przenosimy jednostki z garnizonu zamku do garnizonu armii
         for u in list(self.selected_units):
             castle.garrison.remove(u)
             army.garrison.append(u)
 
+        # Dodajemy armię do list systemowych
         player.units.append(army)
+        self.units.append(army) # WAŻNE: dodanie do globalnej listy jednostek
 
         self.selected_units.clear()
-        print("Wypuszczono armię")
-        return False
+        #self.screen = "map" # Automatyczny powrót na mapę, by zobaczyć nową jednostkę
+        print(f"Wypuszczono armię na pozycję {nx}, {ny}")
     
     def draw_unit_info(self, screen):
         screen.fill((20,20,20))
@@ -2194,6 +2254,164 @@ class World:
 
         info = font_text.render("Kliknij dowolny klawisz lub przycisk myszy, aby wrócić", True, (120,120,120))
         screen.blit(info, (120, screen.get_height()-80))
+
+    def load_castles_from_fac(self, fac_path):
+        import re
+        with open(fac_path, 'r') as f:
+            content = f.read()
+
+        # Szukamy wszystkich zdefiniowanych miejsc 
+        all_places = re.findall(r"\(zamek_place (\d+) (\d+)\)", content)
+        # Szukamy indeksów tych, które są już gotowe 
+        built_indices = re.findall(r"\(zbudowano zamek (\d+)\)", content)
+        built_indices = [int(i) for i in built_indices]
+        print(f"DEBUG: Zbudowane zamki to: {built_indices}") # <--- DODAJ TO
+        self.castles = []           # Tu obiekty z garnizonem
+        self.castle_locations = []  # Tu tylko koordynaty pustych miejsc
+
+        for i, (x, y) in enumerate(all_places):
+            ix, iy = int(x), int(y)
+                    # Wewnątrz load_castles_from_fac
+            if i in built_indices:
+                self.castles.append(Castle(ix, iy)) # Tu idzie ZBUDOWANY
+            else:
+                self.castle_locations.append((ix, iy)) # Tu idzie PUSTY PLAC
+
+    def handle_camera(self):
+        keys = pygame.key.get_pressed()
+        scroll_speed = 10  # Prędkość przesuwania w pikselach
+
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            self.camera_x -= scroll_speed
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            self.camera_x += scroll_speed
+        if keys[pygame.K_UP] or keys[pygame.K_w]:
+            self.camera_y -= scroll_speed
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            self.camera_y += scroll_speed
+
+        # Ograniczenia kamery (mapa 100x100, kafelek 32px -> 3200px szerokości)
+        # Zakładając okno 800x600:
+        self.camera_x = max(0, min(self.camera_x, 3200 - 800))
+        self.camera_y = max(0, min(self.camera_y, 3200 - 600))
+
+    def draw_top_bar(self, screen):
+        mx, my = pygame.mouse.get_pos()
+    
+        # 1. Logika pokazywania: jeśli dotkniesz góry
+        if self.top_ui_trigger_area.collidepoint(mx, my):
+            self.show_top_ui = True
+        
+        # 2. POPRAWKA: Logika chowania
+        # Pasek znika tylko jeśli: myszka jest poza obszarem paska I nie mamy otwartego dropdowna
+        elif not self.top_ui_full_area.collidepoint(mx, my) and self.active_dropdown is None:
+            self.show_top_ui = False
+
+        if self.show_top_ui:
+            # Rysujemy tło paska (teraz nie zniknie pod dropdownem)
+            pygame.draw.rect(screen, (40, 40, 40), (0, 0, 1024, 40))
+            # 1. Przycisk SYSTEM
+            pygame.draw.rect(screen, (100, 100, 100), self.btn_system)
+            screen.blit(self.font.render("System", True, (255, 255, 255)), (self.btn_system.x + 5, 10))
+
+            # 2. Przycisk MAPA
+            pygame.draw.rect(screen, (100, 100, 100), self.btn_mapa)
+            screen.blit(self.font.render("Mapa", True, (255, 255, 255)), (self.btn_mapa.x + 15, 10))
+
+            # 3. Przycisk KONIEC TURY (Twój zwój)
+            pygame.draw.rect(screen, (139, 69, 19), self.next_turn_button)
+            pygame.draw.rect(screen, (212, 175, 55), self.next_turn_button, 2)
+            txt = self.font.render(f"Koniec tury {self.turn}", True, (255, 255, 255))
+            screen.blit(txt, (self.next_turn_button.x + 10, 10))
+
+            if self.show_top_ui:
+                # Rysujemy przyciski główne (System, Mapa, Koniec Tury)
+                pygame.draw.rect(screen, (100, 100, 100), self.btn_system)
+                screen.blit(self.font.render("System", True, (255, 255, 255)), (self.btn_system.x + 5, 10))
+                
+                pygame.draw.rect(screen, (100, 100, 100), self.btn_mapa)
+                screen.blit(self.font.render("Mapa", True, (255, 255, 255)), (self.btn_mapa.x + 15, 10))
+            # Rysowanie dropdowna (jeśli aktywny)
+        if self.active_dropdown in self.menu_options:
+            options = self.menu_options[self.active_dropdown]
+            # Ustawiamy start X pod odpowiednim przyciskiem
+            start_x = self.btn_system.x if self.active_dropdown == "System" else self.btn_mapa.x
+            
+            for i, opt in enumerate(options):
+                rect = pygame.Rect(start_x, 40 + (i * self.option_height), 150, self.option_height)
+                
+                # Podświetlenie opcji, nad którą jest myszka
+                is_hovered = rect.collidepoint(mx, my)
+                color = (150, 150, 150) if is_hovered else (80, 80, 80)
+                
+                pygame.draw.rect(screen, color, rect)
+                pygame.draw.rect(screen, (200, 200, 200), rect, 1) # obramowanie
+                
+                txt = self.font.render(opt, True, (255, 255, 255))
+                screen.blit(txt, (rect.x + 10, rect.y + 5))
+
+    def draw_bottom_bar(self, screen):
+        # ... Twój kod rysujący tło panelu ...
+
+        # Wybór napisów w zależności od stanu
+        if self.build_menu_open:
+            labels = ["DROGA", "PUŁAPKA", "SKARB", "WIEŻA", "TWIERDZA", "ZAMEK"]
+            header_text = "BUDOWANIE:"
+        else:
+            labels = ["MOVE", "ATK", "SPL", "WAIT", "BUILD", "REC"]
+
+        for i, rect in enumerate(self.action_buttons):
+            mx, my = pygame.mouse.get_pos()
+            
+            # Inny kolor dla menu budowania, żeby gracz wiedział, że coś się zmieniło
+            if self.build_menu_open:
+                color = (34, 139, 34) if not rect.collidepoint(mx, my) else (50, 205, 50) # Zielenie
+            else:
+                color = (139, 69, 19) if not rect.collidepoint(mx, my) else (160, 82, 45) # Brązy
+            
+            pygame.draw.rect(screen, color, rect)
+            pygame.draw.rect(screen, (212, 175, 55), rect, 2)
+            
+            txt = self.font.render(labels[i], True, (255, 255, 255))
+            text_rect = txt.get_rect(center=rect.center)
+            screen.blit(txt, text_rect)
+
+    def handle_mouse_up(self, mx, my):
+        if self.active_dropdown:
+            options = self.menu_options[self.active_dropdown]
+            start_x = self.btn_system.x if self.active_dropdown == "System" else self.btn_mapa.x
+            
+            # Sprawdzamy, na której opcji puściliśmy przycisk
+            for i, opt in enumerate(options):
+                rect = pygame.Rect(start_x, 40 + (i * self.option_height), 150, self.option_height)
+                if rect.collidepoint(mx, my):
+                    print(f"Wybrano z menu {self.active_dropdown}: {opt}")
+                    self.execute_menu_command(self.active_dropdown, i)
+                    break
+            
+            # Po puszczeniu myszki zawsze zamykamy menu
+            self.active_dropdown = None
+
+    def execute_menu_command(self, menu, index):
+        # Sprawdzamy menu System
+        if menu == "System":
+            if index == 5:  # "Koniec" (szósta opcja, więc indeks 5)
+                print("Zamykanie gry...")
+                pygame.quit()
+                import sys
+                sys.exit()
+                
+            elif index == 2: # Zapisz grę
+                print("Zapisywanie stanu gry...")
+                # Tutaj w przyszłości dodasz self.save_game()
+                    
+        # Sprawdzamy menu Mapa
+        elif menu == "Mapa":
+            opcja = self.menu_options['Mapa'][index]
+            print(f"Wybrano opcję mapy: {opcja}")
+            
+            if index == 3: # "Nic"
+                print("Ukrywam elementy mapy...")
 
         return None
     
