@@ -15,14 +15,12 @@ def draw_button(screen, text, x, y, w, h):
     pygame.draw.rect(screen, (0,0,0), (x, y, w, h), 2)
     draw_text(screen, text, x + 10, y + 5)
 
-
 class PrisonSlot:
     def __init__(self, general=None):
         self.general = general
         self.turns_in_prison = 0
 
 class World:
-
     def __init__(self):
         self.map = None
         self.objects = None
@@ -57,7 +55,6 @@ class World:
         self.victories = 0
         self.defeats = 0
         self.court_button = pygame.Rect(40, 140, 160, 40)
-
         self.exit_button = pygame.Rect(20, 20, 120, 50)
         self.prison_slots = [PrisonSlot(), PrisonSlot(), PrisonSlot()]
         self.unit_scroll = 0
@@ -101,7 +98,11 @@ class World:
         self.demolish_confirm = False
         self.button_send_army = pygame.Rect(860, 600, 100, 40)
         self.demolish_button = None
-
+        # Tworzymy puste prostokąty, żeby collidepoint miał na czym pracować
+        self.demolish_yes = pygame.Rect(0, 0, 0, 0)
+        self.demolish_no = pygame.Rect(0, 0, 0, 0)
+        self.camera_x = 0
+        self.camera_y = 0
 
     def load(self, map_file, fac_file):
         self.map = load_map(map_file)
@@ -112,7 +113,7 @@ class World:
         for i, (x, y) in enumerate(castle_places):
             owner = self.players[i] if i < len(self.players) else None
             
-            c = Castle(x // 5, y // 10, owner)
+            c = Castle(x // 2, y // 4, owner)
             c.gold = 20000
             self.castles.append(c)
 
@@ -120,7 +121,6 @@ class World:
         for c in self.castles:
             if c.owner:
                 self.add_unit(Unit("lekka_piechota", c.x, c.y + 1, c.owner))
-
 
         print("DEBUG castles:", len(self.castles))
         print("DEBUG units:", len(self.units))
@@ -161,7 +161,6 @@ class World:
         for castle in self.castles:
             if not castle.destroyed:
                 castle.collect_taxes()
-
 
     def move_unit(self, unit, dx, dy):
 
@@ -254,8 +253,6 @@ class World:
                 if castle.destroyed:
                     print("Ruiny zamku — nie można wejść")
                     return
-
-
                 print("Jednostka weszła do zamku")
 
                 # === PRZEJĘCIE ===
@@ -276,7 +273,6 @@ class World:
                 u.move_points -= 1
                 self.selected_unit = None
                 self.selected_units.clear()
-
                 return
 
         # blokada terenu (ALE NIE ZAMEK)
@@ -296,8 +292,7 @@ class World:
                 u.x = nx
                 u.y = ny
                 u.move_points -= 1
-                return
-            
+                return            
 
         u.x = nx
         u.y = ny
@@ -460,68 +455,119 @@ class World:
         self.selected_units.clear()
 
     def handle_events(self):
+
         for event in pygame.event.get():
-
+            # 1. WYŁĄCZANIE GRY (To naprawia "iksa" w rogu okna)
             if event.type == pygame.QUIT:
-                return "quit"
+                pygame.quit()
+                import sys
+                sys.exit()
 
+            # 2. OBSŁUGA KLAWIATURY SKRÓTY KLAWISZOWE!!
             elif event.type == pygame.KEYDOWN:
+            # Sprawdzanie konkretnych klawiszy:
                 if event.key == pygame.K_t:
                     self.train_selected_garrison_units()
+                
+                elif event.key == pygame.K_ESCAPE:
+                    # Na przykład wyjście z rekrutacji do zamku
+                    if self.screen in ["recruitment", "garrison"]:
+                        self.screen = "castle"
+                    elif self.screen == "castle":
+                        self.screen = "map"
+                
+                elif event.key == pygame.K_SPACE:
+                    # Na przykład zakończenie tury spacją
+                    self.next_turn()
 
+                elif event.key == pygame.K_i:
+                    # Otwieranie info o jednostce skrótem klawiszowym
+                    if self.screen == "recruitment":
+                        # Tutaj możesz wywołać tę samą logikę co w przycisku INFO
+                        pass
+
+            # 3. OBSŁUGA MYSZKI
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
+                
+                # Kółko myszy
+                if event.button in [4, 5]:
+                    if self.screen == "recruitment":
+                        self.handle_recruitment_scroll(event)
+                    return
 
-                # ===== BACK z dworu =====
-                if self.screen == "court":
-                    if hasattr(self, "back_button") and self.back_button.collidepoint(mx, my):
-                        print("BACK pressed")
-                        self.screen = "castle"
+                # Lewy przycisk myszy
+                elif event.button == 1:
+                    if self.screen == "unit_info":
+                        self.screen = "recruitment"
+                        return
+                    
+                    # Reszta logiki ekranów...
+                    if self.screen == "recruitment":
+                        self.handle_recruitment_click(mx, my)
                         return
 
-                # ===== MAPA =====
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    mx, my = event.pos
                     self.handle_mouse_click(mx, my)
-
-
-                # ===== ZAMEK =====
-                elif self.screen == "castle":
-                    if self.exit_button.collidepoint(mx, my):
-                        self.screen = "map"
-
-                if self.screen in ["forge","workshop","hospital","school"]:
-                    if self.back_button.collidepoint(mx, my):
-                        self.screen = "castle"
-                        return
-    
 
         return None
 
+    def handle_recruitment_scroll(self, event):
+        # event.button 4 = kółko w górę
+        # event.button 5 = kółko w dół
+        unit_types = self.recruitment_unit_types
+        
+        if event.button == 4: # Kręcimy do góry (lista ma jechać w dół)
+            if self.recruitment_scroll > -2:
+                self.recruitment_scroll -= 1
+                
+        elif event.button == 5: # Kręcimy w dół (lista ma jechać do góry)
+            if self.recruitment_scroll < len(unit_types) - 3:
+                self.recruitment_scroll += 1
+        return
     def handle_mouse_click(self, mx, my):
-        if self.demolish_confirm:
+        # A. NAJPIERW INTERFEJS (Stałe pozycje, nie liczymy kamery!)
+        if self.next_turn_button.collidepoint(mx, my):
+            print("NEXT TURN CLICKED")
+            self.next_turn()
+            return
 
-            if self.demolish_yes.collidepoint(mx, my):
-                self.demolish_castle(self.selected_castle)
-                self.demolish_confirm = False
-                return
-
-            if self.demolish_no.collidepoint(mx, my):
-                self.demolish_confirm = False
-                return
-
-            return  # <- BLOKUJE resztę kliknięć
+        # B. POTEM MAPA (Tu dodajemy kamerę, żeby wiedzieć w co na mapie klikamy)
+        real_x = mx + self.camera_x
+        real_y = my + self.camera_y
+        
+        tile_x = real_x // 32
+        tile_y = real_y // 32
+        
+        # ... logika sprawdzania zamków na tile_x, tile_y ...
 
         # ================= DEMOLISH CONFIRM =================
+            # 1. NAJPIERW INTERFEJS GLOBALNY
+        if self.next_turn_button.collidepoint(mx, my):
+            self.next_turn()
+            return
+
+        # 2. BLOKADA OKNA DEMOLKI
         if self.demolish_confirm:
 
             if self.demolish_yes.collidepoint(mx, my):
+                castle = self.selected_castle
 
-                if self.selected_castle:
+                castle.destroyed = True
 
-                    castle = self.selected_castle
+                    # usunięcie z listy gracza
+                if castle.owner and castle in castle.owner.castles:
+                        castle.owner.castles.remove(castle)
 
+                    # wyrzucenie gracza z zamku
+                self.selected_castle = None
+                self.screen = "map"
 
+            self.demolish_confirm = False
+            return
+
+        if self.demolish_no.collidepoint(mx, my):
+            self.demolish_confirm = False
+            return
 
         print("CLICK:", self.screen, mx, my)
 
@@ -556,7 +602,6 @@ class World:
                 self.screen = "workshop"
                 return
 
-            
             if self.hospital_button and self.hospital_button.collidepoint(mx, my):
                 self.screen = "hospital"
                 return
@@ -578,7 +623,10 @@ class World:
         
             self.handle_map_click(mx, my)
             return
-        
+        if self.screen in ["forge","workshop","hospital","school"]:
+            if self.back_button.collidepoint(mx, my):
+                self.screen = "castle"
+                return
 
     def handle_garrison_click(self, mx, my):
 
@@ -597,8 +645,8 @@ class World:
             and self.recruit_button.collidepoint(mx, my)):
             self.screen = "recruitment"
             self.recruitment_open = True
-            self.recruitment_scroll = 0
-            self.update_selected_from_scroll()
+            self.recruitment_scroll = -2  # To sprawi, że pierwsza jednostka będzie na środku
+            self.selected_unit_type = 0   # Od razu zaznacza pierwszą jednostkę
             self.selected_patent_index = None
 
             return
@@ -650,7 +698,6 @@ class World:
             if len(self.selected_units) < 10:
                 self.selected_units.append(unit)
 
-
     def calculate_army_power(self, player):
         power = 0
         for u in player.units:
@@ -696,6 +743,7 @@ class World:
         elif self.screen == "school":
             self.draw_school(screen)
             return
+
     def draw_garrison(self, screen):
         if not self.selected_castle:
             return
@@ -775,61 +823,84 @@ class World:
         pygame.draw.rect(screen, (160,120,60), self.button_send_army)
         screen.blit(font.render("RELEASE", True, (255,255,255)), (890,610))
 
-
     def draw_map(self, screen):
-        tile = 32
-        font = pygame.font.SysFont(None, 18)
+        TILE_SIZE = 32
+        
+        # 1. SIATKA (Musi uwzględniać kamerę!)
+        # Rysujemy tylko to, co widać na ekranie, by nie obciążać procesora
+        start_x = self.camera_x // TILE_SIZE
+        start_y = self.camera_y // TILE_SIZE
+        
+        for y in range(max(0, start_y), min(100, start_y + 25)): # 25 to ok. wysokość ekranu
+            for x in range(max(0, start_x), min(100, start_x + 35)): # 35 to ok. szerokość
+                pos_x = (x * TILE_SIZE) - self.camera_x
+                pos_y = (y * TILE_SIZE) - self.camera_y
+                pygame.draw.rect(screen, (34, 139, 34), (pos_x, pos_y, TILE_SIZE - 1, TILE_SIZE - 1))
 
-        for y, row in enumerate(self.map):
-            for x, cell in enumerate(row):
-                rect = pygame.Rect(x * tile, y * tile, tile, tile)
-
-                pygame.draw.rect(screen, (60, 140, 60), rect)
-                pygame.draw.rect(screen, (0, 0, 0), rect, 1)
-
-    # zamki
+        # 2. ZAMKI I JEDNOSTKI (Też z kamerą)
         for c in self.castles:
-            rect = pygame.Rect(c.x * tile, c.y * tile, tile, tile)
-            if c.destroyed:
-                pygame.draw.rect(screen, (200, 0, 0), rect)
-            else:
-                pygame.draw.rect(screen, (150, 150, 255), rect)
-
-    # jednostki
+            rect = pygame.Rect((c.x * TILE_SIZE) - self.camera_x, (c.y * TILE_SIZE) - self.camera_y, TILE_SIZE, TILE_SIZE)
+            color = (200, 0, 0) if c.destroyed else (150, 150, 255)
+            pygame.draw.rect(screen, color, rect)
+        # 3. RYSOWANIE JEDNOSTEK (Logika zgrupowanych jednostek)
         tile_units = {}
-
         for player in self.players:
             for u in player.units:
                 key = (u.x, u.y)
                 tile_units[key] = tile_units.get(key, 0) + 1
 
-        for (x, y), count in tile_units.items():
-            rect = pygame.Rect(x * tile + 8, y * tile + 8, 16, 16)
-            pygame.draw.rect(screen, (255, 255, 0), rect)
-
-            if count > 1:
-                screen.blit(font.render(str(count), True, (0,0,0)),
-                            (x * tile + 10, y * tile + 6))
-
-    # selected unit
-        if self.selected_unit:
-            rect = pygame.Rect(
-                self.selected_unit.x * tile,
-                self.selected_unit.y * tile,
-                tile,
-                tile,
-            )
-            pygame.draw.rect(screen, (255, 255, 255), rect, 2)
-
-    # ← PRZYCISK ZAWSZE RYSUJEMY
-        pygame.draw.rect(screen, (80, 120, 200), self.next_turn_button)
-
         font = pygame.font.SysFont(None, 24)
-        text = f"NEXT TURN ({self.turn})"
-        screen.blit(font.render(text, True, (255,255,255)),
-                    (self.next_turn_button.x + 10, self.next_turn_button.y + 10))
+        for (x, y), count in tile_units.items():
+            rect = pygame.Rect(x * TILE_SIZE + 8, y * TILE_SIZE + 8, 16, 16)
+            pygame.draw.rect(screen, (255, 255, 0), rect) # Żółty kwadracik jednostki
+            if count > 1:
+                txt = font.render(str(count), True, (0, 0, 0))
+                screen.blit(txt, (x * TILE_SIZE + 10, y * TILE_SIZE + 6))
 
-    
+        # 1. Definiujemy pozycję przycisku
+        # Umieśćmy go w prawym górnym rogu
+        self.next_turn_button = pygame.Rect(screen.get_width() - 180, 10, 170, 45)
+
+        # 2. Pobieramy aktualną pozycję myszy
+        mx, my = pygame.mouse.get_pos()
+
+        # 3. Sprawdzamy, czy myszka znajduje się nad przyciskiem
+        if self.next_turn_button.collidepoint(mx, my):
+            # Rysujemy przycisk tylko, gdy mysz jest nad nim
+            # Możesz dodać lekką przezroczystość, by wyglądało to nowocześniej
+            s = pygame.Surface((self.next_turn_button.width, self.next_turn_button.height), pygame.SRCALPHA)
+            s.fill((80, 120, 200, 200)) # Kolor z kanałem Alpha (200/255)
+            screen.blit(s, (self.next_turn_button.x, self.next_turn_button.y))
+            
+            # Ramka
+            pygame.draw.rect(screen, (255, 255, 255), self.next_turn_button, 2)
+            
+            # Tekst
+            font = pygame.font.SysFont(None, 24)
+            text = font.render(f"NEXT TURN ({self.turn})", True, (255, 255, 255))
+            screen.blit(text, (self.next_turn_button.x + 15, self.next_turn_button.y + 12))
+
+        # 6. MENU ZAMKU (Pojawia się na wierzchu mapy)
+        if self.screen == "castle":
+            self.draw_castle_menu(screen)
+
+        # 7. EKRAN DEMOLKI (Przezroczysta nakładka na samym końcu)
+        if self.demolish_confirm:
+            # Tworzymy półprzezroczyste tło na całe okno
+            s = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            s.fill((0, 0, 0, 180)) 
+            screen.blit(s, (0, 0))
+            
+            # Przycisk TAK (Czerwony)
+            self.demolish_yes = pygame.Rect(screen.get_width()//2 - 110, 300, 100, 50)
+            pygame.draw.rect(screen, (200, 0, 0), self.demolish_yes)
+            screen.blit(font.render("TAK", True, (255,255,255)), (self.demolish_yes.x + 30, self.demolish_yes.y + 15))
+            
+            # Przycisk NIE (Szary)
+            self.demolish_no = pygame.Rect(screen.get_width()//2 + 10, 300, 100, 50)
+            pygame.draw.rect(screen, (100, 100, 100), self.demolish_no)
+            screen.blit(font.render("NIE", True, (255,255,255)), (self.demolish_no.x + 35, self.demolish_no.y + 15))
+
     def draw_castle(self, screen):
         if self.demolish_confirm:
             return
@@ -901,7 +972,6 @@ class World:
         else:
             self.school_button = None
 
-
     # --- BUTTON: BACK ---
         self.back_button = pygame.Rect(40, 700, 160, 40)
         pygame.draw.rect(screen, (120, 80, 80), self.back_button)
@@ -969,8 +1039,15 @@ class World:
         return False
 
     def update_selected_from_scroll(self):
-        center = self.visible_recruitment_count // 2
-        self.selected_unit_type = self.recruitment_scroll + center
+        center_offset = self.visible_recruitment_count // 2
+        idx = self.recruitment_scroll + center_offset
+        
+        # Sprawdzamy, czy wyliczony indeks faktycznie mieści się w liście jednostek
+        if 0 <= idx < len(self.recruitment_unit_types):
+            self.selected_unit_type = idx
+        else:
+            # Jeśli na środku jest "pustka" (przewinięte za mocno), nic nie jest zaznaczone
+            self.selected_unit_type = None
 
     def center_on_selected_unit(self):
         visible = self.visible_recruitment_count
@@ -987,7 +1064,6 @@ class World:
     # DRAW RECRUITMENT
     # =======================
     def draw_recruitment(self, screen):
-        
         font = pygame.font.SysFont(None, 24)
         castle = self.selected_castle
         if not castle:
@@ -997,96 +1073,70 @@ class World:
         w = screen.get_width()
         h = screen.get_height()
 
-        # ---- LEWE PRZYCISKI ----
+        # ---- LEWE PRZYCISKI (Koordynaty z Twojego starego draw) ----
         self.info_button = pygame.Rect(120, 590, 100, 30)
         self.back_button = pygame.Rect(40, 630, 100, 30)
         self.buy_patent_button = pygame.Rect(160, 630, 140, 30)
 
-        pygame.draw.rect(screen, (120,120,120), self.info_button)
-        pygame.draw.rect(screen, (140,80,80), self.back_button)
-        pygame.draw.rect(screen, (80,140,80), self.buy_patent_button)
+        pygame.draw.rect(screen, (120, 120, 120), self.info_button)
+        pygame.draw.rect(screen, (140, 80, 80), self.back_button)
+        pygame.draw.rect(screen, (80, 140, 80), self.buy_patent_button)
 
-        screen.blit(font.render("INFO", True, (255,255,255)), (150,595))
-        screen.blit(font.render("BACK", True, (255,255,255)), (65,635))
-        screen.blit(font.render("KUP PATENT", True, (255,255,255)), (170,635))
+        screen.blit(font.render("INFO", True, (255, 255, 255)), (150, 595))
+        screen.blit(font.render("BACK", True, (255, 255, 255)), (65, 635))
+        screen.blit(font.render("KUP PATENT", True, (255, 255, 255)), (170, 635))
 
-        # ---- PANEL PATENTÓW ----
-        patents_panel = pygame.Rect(w-310, 40, 250, 320)
-        pygame.draw.rect(screen, (70,50,40), patents_panel)
+        # ---- PANEL PATENTÓW (Koordynaty z Twojego starego draw) ----
+        patents_panel = pygame.Rect(w - 310, 40, 250, 320)
+        pygame.draw.rect(screen, (70, 50, 40), patents_panel)
 
         self.patent_rects = []
+        current_patent_name = None
         for i in range(12):
-            x = w-300 + (i % 4)*60
-            y = 30 + (i // 4)*90
+            x = w - 300 + (i % 4) * 60
+            y = 30 + (i // 4) * 90
             rect = pygame.Rect(x, y + 50, 50, 80)
             self.patent_rects.append(rect)
 
-            # Highlight zaznaczonego patentu
             if i == self.selected_patent_index:
-                pygame.draw.rect(screen, (255,255,0), rect, 3)
+                pygame.draw.rect(screen, (255, 255, 0), rect, 3)
+                # Pobieramy nazwę dla statystyk jeśli zaznaczono patent
+                if i < len(castle.patents) and castle.patents[i]:
+                    p = castle.patents[i]
+                    current_patent_name = p["unit_type"] if isinstance(p, dict) else p
             else:
-                pygame.draw.rect(screen, (120,120,120), rect, 3)
+                pygame.draw.rect(screen, (120, 120, 120), rect, 3)
 
-            # Kupiony patent
             if i < len(castle.patents) and castle.patents[i] is not None:
-                screen.blit(font.render("U", True, (255,255,0)), (x+18, y+80))
+                screen.blit(font.render("U", True, (255, 255, 0)), (x + 18, y + 80))
 
         # ---- PRODUKCJA INFO ----
         if castle.production_enabled:
             text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
-            color = (0,255,0)
+            color = (0, 255, 0)
         else:
             text = "Produkcja nieaktywna"
-            color = (200,200,200)
-        screen.blit(font.render(text, True, color), (x - 150, y + 300))
+            color = (200, 200, 200)
+        # y z pętli patentów jest dostępny tutaj (zostaje z ostatniego i)
+        screen.blit(font.render(text, True, color), (w - 300, 380))
 
-        # ---- PRAWE PRZYCISKI ----
-        self.remove_patent_button = pygame.Rect(w-230, 590, 100, 30)
-        self.start_prod_button = pygame.Rect(w-300, 630, 120, 30)
-        self.stop_prod_button = pygame.Rect(w-160, 630, 120, 30)
+        # ---- PRAWE PRZYCISKI (Koordynaty z Twojego starego draw) ----
+        self.remove_patent_button = pygame.Rect(w - 230, 590, 100, 30)
+        self.start_prod_button = pygame.Rect(w - 300, 630, 120, 30)
+        self.stop_prod_button = pygame.Rect(w - 160, 630, 120, 30)
 
-        pygame.draw.rect(screen, (120,80,80), self.remove_patent_button)
-        pygame.draw.rect(screen, (80,140,80), self.start_prod_button)
-        pygame.draw.rect(screen, (140,80,80), self.stop_prod_button)
+        pygame.draw.rect(screen, (120, 80, 80), self.remove_patent_button)
+        pygame.draw.rect(screen, (80, 140, 80), self.start_prod_button)
+        pygame.draw.rect(screen, (140, 80, 80), self.stop_prod_button)
 
-        screen.blit(font.render("USUŃ", True, (255,255,255)), (w-210,595))
-        screen.blit(font.render("START", True, (255,255,255)), (w-270,635))
-        screen.blit(font.render("STOP", True, (255,255,255)), (w-130,635))
+        screen.blit(font.render("USUŃ", True, (255, 255, 255)), (w - 210, 595))
+        screen.blit(font.render("START", True, (255, 255, 255)), (w - 270, 635))
+        screen.blit(font.render("STOP", True, (255, 255, 255)), (w - 130, 635))
 
         # ---- GOLD INFO ----
-        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)), (w//2 - 30, 640))
+        screen.blit(font.render(f"Gold: {castle.gold}", True, (255, 215, 0)), (w // 2 - 30, 640))
 
-        # ---- INFO O WYBRANEJ JEDNOSTCE / PATENCIE ----
-        stats = None
-        unit_name = None
-
-        if self.selected_unit_type is not None:
-            unit_name = unit_types[self.selected_unit_type]
-            stats = UNIT_STATS[unit_name]
-        elif self.selected_patent_index is not None:
-            p = castle.patents[self.selected_patent_index]
-            if p is not None:
-                if isinstance(p, dict):
-                    unit_name = p["unit_type"]
-                    stats = p["stats"]
-                else:
-                    unit_name = p
-                    stats = UNIT_STATS[unit_name]
-                    castle.patents[self.selected_patent_index] = {"unit_type": unit_name, "stats": stats}
-
-        if stats is not None:
-            screen.blit(font.render(f"Jednostka: {unit_name}", True, (255,255,255)), (180,250))
-            screen.blit(font.render(f"ATK: {stats['attack']}", True, (255,255,255)), (180,300))
-            screen.blit(font.render(f"DEF: {stats['defense']}", True, (255,255,255)), (180,350))
-            screen.blit(font.render(f"MOR:{stats['morale']}", True, (255,255,255)), (320,300))
-            screen.blit(font.render(f"MOV: {stats['moves']}", True, (255,255,255)), (320,350))
-            screen.blit(font.render(f"ZME: {stats['fatigue']}", True, (255,255,255)), (460,300))
-            screen.blit(font.render(f"EXP: {stats['exp']}", True, (255,255,255)), (460,350))
-            screen.blit(font.render(f"Patent: {stats['patent_cost']}", True,(255,255,0)), (40,500))
-            screen.blit(font.render(f"Prod: {stats['production_cost']}", True,(255,255,0)), (200,500))
-            screen.blit(font.render(f"Tury: {stats['production_time']}", True,(255,255,0)), (360,500))
-
-        # ---- LISTA JEDNOSTEK ----
+        # ---- LISTA JEDNOSTEK (Logika przewijania i podświetlania) ----
         self.unit_list_rects.clear()
         start_x = 30
         start_y = 80
@@ -1094,41 +1144,67 @@ class World:
         box_h = 30
         gap = 2
 
-        visible_count = self.visible_recruitment_count
-        center_index = visible_count // 2
-        unit_types = self.recruitment_unit_types
+        visible_count = 5
+        center_index = 2 # Stałe środkowe miejsce (Pospolite Ruszenie tu ląduje na starcie)
+        
+        # KLUCZOWA POPRAWKA: Aktualizujemy zaznaczoną jednostkę na podstawie scrolla
+        if self.selected_patent_index is None:
+            idx_on_center = self.recruitment_scroll + center_index
+            if 0 <= idx_on_center < len(unit_types):
+                self.selected_unit_type = idx_on_center
+            else:
+                self.selected_unit_type = None
 
         for i in range(visible_count):
-
             scroll_index = self.recruitment_scroll + i
+            
+            # Rysujemy tylko istniejące elementy (brak ciemnych prostokątów w pustych polach)
+            if 0 <= scroll_index < len(unit_types):
+                unit_name = unit_types[scroll_index]
+                y = start_y + i * (box_h + gap)
+                rect = pygame.Rect(start_x, y, box_w, box_h)
+                self.unit_list_rects.append(rect)
+                
+                has_patent = self.castle_has_patent(castle, unit_name)
+                is_center = (i == center_index)
 
-            if scroll_index >= len(unit_types):
-                continue
+                # KOLOR TEKSTU WEDŁUG TWOICH WYMAGAŃ
+                if is_center:
+                    text_color = (255, 255, 255)    # Środek: Jasny biały
+                elif has_patent:
+                    text_color = (90, 90, 90)      # Kupiony: Wygaszony
+                else:
+                    text_color = (180, 180, 180)    # Reszta: Mniej jasny biały
 
-            unit_name = unit_types[scroll_index]
+                pygame.draw.rect(screen, (30, 30, 30), rect)
+                screen.blit(font.render(unit_name, True, text_color), (rect.x + 10, rect.y + 8))
 
-            y = start_y + i * (box_h + gap)
-            rect = pygame.Rect(start_x, y, box_w, box_h)
-            self.unit_list_rects.append(rect)
-            has_patent = self.castle_has_patent(castle, unit_name)
-            is_center = (i == center_index)
+        # ---- INFO O WYBRANEJ JEDNOSTCE / PATENCIE ----
+        # Wybieramy nazwę jednostki (albo z listy albo z zaznaczonego patentu)
+        unit_name_to_show = None
+        if self.selected_patent_index is not None:
+            unit_name_to_show = current_patent_name
+        elif self.selected_unit_type is not None:
+            unit_name_to_show = unit_types[self.selected_unit_type]
 
-            # -------- KOLOR TEKSTU --------
-            if is_center:
-                text_color = (255,255,255)      # oglądasz staty
-            elif has_patent:
-                text_color = (90,90,90)         # już kupiony (nie kupisz drugi raz)
-            else:
-                text_color = (200,200,200)      # możesz kupić
-
-            pygame.draw.rect(screen, (30,30,30), rect)
-            screen.blit(font.render(unit_name, True, text_color), (rect.x + 10, rect.y + 8))
+        if unit_name_to_show:
+            stats = UNIT_STATS[unit_name_to_show]
+            screen.blit(font.render(f"Jednostka: {unit_name_to_show}", True, (255, 255, 255)), (180, 250))
+            screen.blit(font.render(f"ATK: {stats['attack']}", True, (255, 255, 255)), (180, 300))
+            screen.blit(font.render(f"DEF: {stats['defense']}", True, (255, 255, 255)), (180, 350))
+            screen.blit(font.render(f"MOR:{stats['morale']}", True, (255, 255, 255)), (320, 300))
+            screen.blit(font.render(f"MOV: {stats['moves']}", True, (255, 255, 255)), (320, 350))
+            screen.blit(font.render(f"ZME: {stats['fatigue']}", True, (255, 255, 255)), (460, 300))
+            screen.blit(font.render(f"EXP: {stats['exp']}", True, (255, 255, 255)), (460, 350))
+            screen.blit(font.render(f"Patent: {stats['patent_cost']}", True, (255, 255, 0)), (40, 500))
+            screen.blit(font.render(f"Prod: {stats['production_cost']}", True, (255, 255, 0)), (200, 500))
+            screen.blit(font.render(f"Tury: {stats['production_time']}", True, (255, 255, 0)), (360, 500))
 
         # ---- SCROLL BUTTONS ----
-        pygame.draw.rect(screen, (100,100,100), self.scroll_up_button)
-        screen.blit(font.render("▲", True, (255,255,255)), (self.scroll_up_button.x+12, self.scroll_up_button.y+8))
-        pygame.draw.rect(screen, (100,100,100), self.scroll_down_button)
-        screen.blit(font.render("▼", True, (255,255,255)), (self.scroll_down_button.x+12, self.scroll_down_button.y+8))
+        pygame.draw.rect(screen, (100, 100, 100), self.scroll_up_button)
+        screen.blit(font.render("▲", True, (255, 255, 255)), (self.scroll_up_button.x + 12, self.scroll_up_button.y + 8))
+        pygame.draw.rect(screen, (100, 100, 100), self.scroll_down_button)
+        screen.blit(font.render("▼", True, (255, 255, 255)), (self.scroll_down_button.x + 12, self.scroll_down_button.y + 8))
 
     def draw_peasants(self, screen):
         font = pygame.font.SysFont(None, 24)
@@ -1142,7 +1218,6 @@ class World:
 
         happiness_factor = 0.5 + (castle.happiness / 100) * 0.5
         tax_income = int(castle.peasants * 0.1 * castle.tax_rate * happiness_factor)
-
 
         # =====================================================
         # TOP HUD
@@ -1184,7 +1259,6 @@ class World:
             c for c in self.castles
             if c.owner == self.players[self.current_player] and not c.destroyed
         ]
-
 
 
         for i, c in enumerate(visible):
@@ -1395,7 +1469,6 @@ class World:
         if self.demolish_confirm:
             self.draw_demolish_confirm(screen)
             pygame.draw.rect(screen, (0,255,0), (0,0,50,50))
-
             
     def draw_demolish_confirm(self, screen):
    
@@ -1425,7 +1498,6 @@ class World:
         screen.blit(font.render("NIE", True, (0,0,0)),
                     (self.demolish_no.x + 20, self.demolish_no.y + 10))
 
-
     def select_castle(self, x, y):
         for c in self.castles:
             if c.x == x and c.y == y:
@@ -1442,29 +1514,20 @@ class World:
         self.add_unit(u)
         return u
     def click_on_recruitment(self, mx, my):
-       for i, rect in enumerate(self.unit_list_rects):
-        if rect.collidepoint(mx, my):
-            index = self.recruitment_scroll + i
-            self.selected_unit_type = index
-            self.center_on_selected_unit()
-            return
-
+        # Sprawdzamy, który z narysowanych slotów został kliknięty
+        for i, rect in enumerate(self.unit_list_rects):
+            if rect.collidepoint(mx, my):
+                return i  # Zwraca numer slotu (0, 1, 2, 3 lub 4)
+        return None
 
     def start_recruitment(self, index):
         
-        if index is None:
-            return
-
         if index is None:
             return
         
         utype = UNIT_STATS[index]
         cost = 50
         castle = self.selected_castle
-
-        if castle.gold < cost:
-            print("Za mało złota")
-            return
 
         if castle.gold < cost:
             print("Za mało złota")
@@ -1535,7 +1598,6 @@ class World:
         else:
             self.build_open = False
 
-
         if self.build_open:
             self.draw_build_submenu(screen, menu_x, menu_y)
         # BURZ
@@ -1590,17 +1652,19 @@ class World:
 
     def handle_map_click(self, mx, my):
 
-        if self.next_turn_button.collidepoint(mx, my):
-            self.next_turn()
-            return
+        # Dodajemy przesunięcie kamery do pozycji myszy
+        real_x = mx + self.camera_x
+        real_y = my + self.camera_y
 
-        tile_x = mx // 32
-        tile_y = my // 32
-
-        if tile_y < 0 or tile_y >= len(self.map):
-            return
-        if tile_x < 0 or tile_x >= len(self.map[0]):
-            return
+        tile_x = real_x // 32
+        tile_y = real_y // 32
+        
+        # Teraz porównanie zadziała dla każdego zamku na mapie 100x100
+        for castle in self.castles:
+            if castle.x == tile_x and castle.y == tile_y:
+                self.selected_castle = castle
+                self.screen = "castle"
+                return
 
         # ===============================
         # 1. JEŚLI MAMY ZAZNACZONĄ JEDNOSTKĘ → PRÓBUJ RUCHU
@@ -1641,7 +1705,6 @@ class World:
                 self.screen = "castle"
                 return 
 
-
         self.selected_unit = None
         self.selected_castle = None
 
@@ -1673,11 +1736,9 @@ class World:
             and self.koszary_button.collidepoint(mx, my)
         ):
             self.screen = "recruitment"
-
             self.recruitment_open = True
-            
-            self.recruitment_scroll = 0
-            self.update_selected_from_scroll()
+            self.recruitment_scroll = -2  # USTAWIAMY TAK SAMO JAK WYŻEJ
+            self.selected_unit_type = 0   # USTAWIAMY TAK SAMO
             self.selected_patent_index = None
             return
 
@@ -1705,165 +1766,93 @@ class World:
     # =======================
     def handle_recruitment_click(self, mx, my):
         castle = self.selected_castle
-        if not castle:
+        unit_types = self.recruitment_unit_types
+        # MUSIMY zdefiniować Recty tu identycznie jak w Draw (najlepiej użyć tych samych zmiennych)
+        w = pygame.display.get_surface().get_width()
+
+        # Logika przycisków piramid (Lewa)
+        if self.info_button.collidepoint(mx, my):
+            # Wybieramy nazwę jednostki (ze środka listy lub z patentu)
+            u_name = None
+            if self.selected_patent_index is not None:
+                p = castle.patents[self.selected_patent_index]
+                u_name = p["unit_type"] if isinstance(p, dict) else p
+            elif self.selected_unit_type is not None:
+                u_name = self.recruitment_unit_types[self.selected_unit_type]
+
+            if u_name:
+                stats = UNIT_STATS[u_name]
+                # Formatuje tekst: Pierwsza linia to nagłówek, reszta to opis
+                self.unit_info_text = (f"{stats['description']}"
+                )
+                self.screen = "unit_info"
             return
-
-        # KLIK NA PATENT
-        if hasattr(self, "patent_rects"):
-            for i, rect in enumerate(self.patent_rects):
-                if rect.collidepoint(mx, my):
-                    p = castle.patents[i]
-                    if p is not None:
-                        if isinstance(p, dict):
-                            unit_name = p["unit_type"]
-                        else:
-                            unit_name = p
-                            castle.patents[i] = {"unit_type": unit_name, "stats": UNIT_STATS[unit_name]}
-
-                        self.selected_patent_index = i
-                        self.selected_unit_type = None
-
-                        # --- PRZESUŃ NA ŚRODEK LISTY ---
-                        idx = self.recruitment_unit_types.index(unit_name)
-                        visible_count = self.visible_recruitment_count
-                        # ograniczamy scroll do początku i końca listy
-                        self.recruitment_scroll = max(0, min(idx - visible_count // 2,
-                                                            len(self.recruitment_unit_types) - visible_count))
-
-                        # highlight zawsze w środku
-                        self.selected_unit_type = self.recruitment_scroll + visible_count // 2
-
-                        print("Selected patent:", unit_name)
-                    return
-
-
-        # ---------------------------
-        # BACK
-        # ---------------------------
         if self.back_button.collidepoint(mx, my):
             self.screen = "garrison"
             return
-
-        # ---------------------------
-        # LISTA JEDNOSTEK
-        # ---------------------------
-        index = self.click_on_recruitment(mx, my)
-        if index is not None:
-            if index < len(self.recruitment_unit_types):
-                
-                self.recruitment_scroll = max(
-                    0,
-                    min(
-                        index - self.visible_recruitment_count // 2,
-                        len(self.recruitment_unit_types) - self.visible_recruitment_count
-                    )
-                )
-
-                self.update_selected_from_scroll()
-                self.selected_patent_index = None
- # odznacz patent
-                print("Selected unit type:", self.recruitment_unit_types[index])
-            return
-
-        # ---------------------------
-        # BUY PATENT
-        # ---------------------------
         if self.buy_patent_button.collidepoint(mx, my):
             if self.selected_unit_type is not None:
-                unit_type = self.recruitment_unit_types[self.selected_unit_type]
-                castle.buy_patent(unit_type)
-                print("Patent bought:", unit_type)
+                castle.buy_patent(unit_types[self.selected_unit_type])
             return
 
-        # ---------------------------
-        # REMOVE PATENT
-        # ---------------------------
-        if self.remove_patent_button.collidepoint(mx, my):
-            idx = self.selected_patent_index
-            if idx is not None and castle.patents[idx] is not None:
-                p = castle.patents[idx]
-                if isinstance(p, dict):
-                    removed = p["unit_type"]
-                else:
-                    removed = p
-                castle.patents[idx] = None
-                if castle.production_unit_type == removed:
-                    castle.stop_production()
-                self.selected_patent_index = None
-                print("Usunięto patent:", removed)
-            return
-
-        # ---------------------------
-        # START PRODUCTION
-        # ---------------------------
+        # Logika przycisków piramid (Prawa)
         if self.start_prod_button.collidepoint(mx, my):
-            idx = self.selected_patent_index
-            if idx is not None and castle.patents[idx] is not None:
-                p = castle.patents[idx]
-                if isinstance(p, dict):
-                    unit_type = p["unit_type"]
-                else:
-                    unit_type = p
-                    castle.patents[idx] = {"unit_type": unit_type, "stats": UNIT_STATS[unit_type]}
-                castle.start_production(unit_type)
-                print("Production started:", unit_type)
-            else:
-                print("Wybierz patent do produkcji")
-            return
-
-        # ---------------------------
-        # STOP PRODUCTION
-        # ---------------------------
-        if self.stop_prod_button.collidepoint(mx, my):
-            castle.stop_production()
-            print("Production stopped")
-            return
-
-        # ---------------------------
-        # SCROLL UP/DOWN
-        # ---------------------------
-        if self.scroll_up_button.collidepoint(mx, my):
-            if self.recruitment_scroll > 0:
-                self.recruitment_scroll -= 1
-                self.update_selected_from_scroll()
-                self.selected_patent_index = None
-            return
-
-        if self.scroll_down_button.collidepoint(mx, my):
-            if self.recruitment_scroll < len(self.recruitment_unit_types) - self.visible_recruitment_count:
-                self.recruitment_scroll += 1
-                self.update_selected_from_scroll()
-                self.selected_patent_index = None
-            return
-
-        # ---------------------------
-        # INFO BUTTON
-        # ---------------------------
-        if self.info_button.collidepoint(mx, my):
-
-            unit_info = None
-            unit_name = None
-
-            # jeśli zaznaczono patent
             if self.selected_patent_index is not None:
                 p = castle.patents[self.selected_patent_index]
-                if p is not None:
-                    if isinstance(p, dict):
-                        unit_name = p["unit_type"]
-                    else:
-                        unit_name = p
-
-            # jeśli lista (środkowy element)
-            elif self.selected_unit_type is not None:
-                unit_name = self.recruitment_unit_types[self.selected_unit_type]
-
-            if unit_name:
-                unit_info = UNIT_STATS[unit_name].get("description", "Brak opisu")
-                self.unit_info_text = f"{unit_name.upper()}\n\n{unit_info}"
-                self.screen = "unit_info"
-
+                u_name = p["unit_type"] if isinstance(p, dict) else p
+                castle.start_production(u_name)
+            return
+        if self.stop_prod_button.collidepoint(mx, my):
+            castle.stop_production()
+            return
+        if self.remove_patent_button.collidepoint(mx, my):
+            if self.selected_patent_index is not None:
+                castle.patents[self.selected_patent_index] = None
+                castle.stop_production() # Zatrzymuje jeśli to była ta jednostka
             return
 
+        # Scroll i Lista
+        if self.scroll_up_button.collidepoint(mx, my):
+            self.recruitment_scroll = max(-2, self.recruitment_scroll - 1)
+            return
+        if self.scroll_down_button.collidepoint(mx, my):
+            self.recruitment_scroll = min(len(unit_types)-3, self.recruitment_scroll + 1)
+            return
+
+        # --- PANCERNE KLIKANIE W LISTĘ ---
+        start_x = 30
+        start_y = 80
+        box_w = 220
+        box_h = 30
+        gap = 2
+        visible_count = 5
+
+        # Sprawdzamy czy myszka jest w poziomie (X) w obrębie listy
+        if start_x <= mx <= start_x + box_w:
+            # Obliczamy, w który slot (0-4) kliknął użytkownik na podstawie Y
+            relative_y = my - start_y
+            slot_index = relative_y // (box_h + gap)
+
+            # Sprawdzamy czy kliknięcie mieści się w pionie (Y) widocznej listy
+            if 0 <= slot_index < visible_count:
+                # Obliczamy realny indeks jednostki w całej liście
+                clicked_unit_idx = self.recruitment_scroll + int(slot_index)
+
+                # Sprawdzamy czy pod tym indeksem faktycznie jest jednostka
+                if 0 <= clicked_unit_idx < len(unit_types):
+                    # Centrowanie: ustawiamy scroll tak, by kliknięta jednostka była w slocie nr 2
+                    self.recruitment_scroll = clicked_unit_idx - 2
+                    self.selected_unit_type = clicked_unit_idx
+                    self.selected_patent_index = None
+                    return
+
+        # Kliknięcie w patenty
+        for i, rect in enumerate(self.patent_rects):
+            if rect.collidepoint(mx, my):
+                if i < len(castle.patents) and castle.patents[i]:
+                    self.selected_patent_index = i
+                    self.selected_unit_type = None
+                return
    
     def handle_peasants_click(self, mx, my):
         if not self.selected_castle:
@@ -2164,24 +2153,31 @@ class World:
     
     def draw_unit_info(self, screen):
         screen.fill((20,20,20))
+        0
+        # Jeśli tekst jest pusty, zainicjuj go bezpiecznym komunikatem
+        if not hasattr(self, 'unit_info_text') or not self.unit_info_text:
+            self.unit_info_text = "Brak informacji\nNie wybrano jednostki."
 
         font_title = pygame.font.SysFont(None, 48)
         font_text = pygame.font.SysFont(None, 28)
 
         lines = self.unit_info_text.split("\n")
-
         y = 120
 
-        # nagłówek
-        screen.blit(font_title.render(lines[0], True, (255,255,255)), (120, y))
-        y += 80
+        # Nagłówek (pierwsza linia)
+        if lines:
+            screen.blit(font_title.render(lines[0], True, (255,255,0)), (120, y)) # Zmieniłem na żółty, żeby się wyróżniał
+            y += 80
 
-        # opis
+        # Opis (reszta linii)
         for line in lines[1:]:
-            screen.blit(font_text.render(line, True, (200,200,200)), (120, y))
+            # Proste zawijanie tekstu: jeśli linia jest za długa, można by ją dzielić, 
+            # ale na razie renderujemy linia po linii.
+            txt_surf = font_text.render(line, True, (200,200,200))
+            screen.blit(txt_surf, (120, y))
             y += 35
 
-        info = font_text.render("Kliknij aby wrócić", True, (120,120,120))
+        info = font_text.render("Kliknij dowolny klawisz lub przycisk myszy, aby wrócić", True, (120,120,120))
         screen.blit(info, (120, screen.get_height()-80))
 
         return None
