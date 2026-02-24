@@ -352,7 +352,7 @@ class Castle:
             return
 
         self.training[unit] = 2
-        print("Szkolenie rozpoczęte")
+        print("Szkolenie rozpoczęte2")
 
     def start_training_selected(self, units):
         for unit in units:
@@ -375,7 +375,7 @@ class Castle:
                 self.training[unit] = 2
                 trained += 1
 
-        print("Rozpoczęto szkolenie:", trained)
+        print("Rozpoczęto szkolenie1:", trained)
 
     def process_training(self):
         finished = []

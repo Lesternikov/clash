@@ -1,11 +1,4 @@
 UNIT_STATS = {
-<<<<<<< HEAD
-    "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"CHŁOPI\nZazwyczaj uprawiają rolę"},
-    "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2 },
-    "pikinier": {"hp": 60, "moves": 77, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2 },
-    "highlander": {"hp": 100, "moves": 6, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost": 8,"production_time":3 },
-    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3 },
-=======
     "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
         Chłopi zajmują się
         zwykle uprawą roli.
@@ -16,7 +9,7 @@ UNIT_STATS = {
         złożone z chłopstwa
         są jednymi z najsłab-
         szych na polu bitwy."""},
->>>>>>> 5f8187c55512f6b7c31ab8606ebf9f5e28bb523e
+
 
     "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2,"description":"""Lekka piechota\n
         Lekka piechota
