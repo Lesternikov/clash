@@ -412,7 +412,10 @@ class Unit:
     # -----------------------
     # BASIC
     # -----------------------
-
+    def draw(self, screen):
+        # DODAJ TO: Jeśli jednostka ma x = -1, przerywamy rysowanie
+        if self.x < 0:
+            return
     def position(self):
         return (self.x, self.y)
 
