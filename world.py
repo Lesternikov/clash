@@ -544,12 +544,9 @@ class World:
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                import sys
-                sys.exit()
+                pygame.quit(); import sys; sys.exit()
 
             elif event.type == pygame.KEYDOWN:
-                # --- SKRÓTY UNIWERSALNE ---
                 if event.key == pygame.K_ESCAPE:
                     if self.screen in ["recruitment", "garrison", "forge", "workshop", "hospital", "school", "peasants", "court"]:
                         self.screen = "castle"
@@ -557,7 +554,7 @@ class World:
                         self.screen = "map"
                     elif self.demolish_confirm:
                         self.demolish_confirm = False
-                
+                    pass
                 elif event.key == pygame.K_SPACE:
                     if self.selected_unit:
                         self.selected_unit = None
@@ -571,49 +568,20 @@ class World:
                 #   elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
                 #   elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
 
+        
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
-                
-                # 1. Obsługa kółka (Scroll) - WYŁĄCZNIE w ekranie rekrutacji
                 if self.screen == "recruitment" and event.button in [4, 5]:
                     self.handle_recruitment_scroll(event)
-                
-                # 2. Zamykanie okna info lewym kliknięciem
                 elif self.screen == "unit_info" and event.button == 1:
                     self.screen = "recruitment"
-
-                # 3. Wszystkie inne kliknięcia (Lewy i Prawy przycisk)
                 else: 
+                    # To wyśle współrzędne ekranowe (mx, my) do mapy
                     self.handle_mouse_click(mx, my, event.button)
 
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    mx, my = pygame.mouse.get_pos()
-                    tx, ty = mx // 32, my // 32
-
-                    if self.selected_unit:
-                        # PRZYPADEK A: Kliknięcie w już zaznaczony cel (POTWIERDZENIE)
-                        if (tx, ty) == (self.selected_unit.target_x, self.selected_unit.target_y):
-                            print("Ruch potwierdzony - jednostka rusza!")
-                            self.selected_unit.move_along_path() # Jednostka idzie o tyle pól, ile ma MP
-                            
-                        # PRZYPADEK B: Kliknięcie w samą jednostkę (POTWIERDZENIE marszu do starego celu)
-                        elif tx == self.selected_unit.x and ty == self.selected_unit.y and self.selected_unit.planned_path:
-                            print("Potwierdzono kontynuację marszu!")
-                            self.selected_unit.move_along_path()
-
-                        # PRZYPADEK C: Kliknięcie w nowe miejsce (NOWY PLAN / PODGLĄD)
-                        else:
-                            self.selected_unit.target_x = tx
-                            self.selected_unit.target_y = ty
-                            # Generujemy trasę, ale NIE wywołujemy move_along_path
-                            self.selected_unit.planned_path = self.find_path(self.selected_unit, tx, ty)
-                            print("Zaplanowano nową trasę (podgląd kropek)")
-
-            # DODAJ TO, aby statystyki znikały po puszczeniu przycisku
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 3: # Prawy przycisk
-                    self.inspected_unit = None
-
+                if event.button == 3: self.inspected_unit = None
+        
     def handle_mouse_click(self, mx, my, button):
             if button == 1:
                 # 1. OKNO POTWIERDZENIA DEMOLKI
@@ -977,6 +945,9 @@ class World:
             if count > 1:
                 txt = font.render(str(count), True, (0, 0, 0))
                 screen.blit(txt, (pos_x + 10, pos_y + 6))
+        # Rysowanie kropek drogi
+        if self.selected_unit and getattr(self.selected_unit, 'planned_path', None):
+            self.draw_path_dots(screen, self.selected_unit, self.selected_unit.planned_path)
 
     def draw_castle(self, screen):
         if self.demolish_confirm:
@@ -1756,7 +1727,6 @@ class World:
 
             if pygame.Rect(50, y+40, 200, 20).collidepoint(mx, my):
                 self.bribe_general(slot)
-
     def handle_map_click(self, mx, my):
         if mx > 800: 
             return
@@ -1765,23 +1735,19 @@ class World:
         tile_y = (my + self.camera_y) // 32
 
         # 1. NAJPIERW SPRAWDZAMY CZY KLIKNIĘTO W ZAMEK
-        # Robimy to najpierw, żeby kliknięcie w zamek zawsze go otwierało, 
-        # niezależnie od tego czy mamy zaznaczoną jednostkę czy nie.
         for castle in self.castles:
             if castle.x <= tile_x <= castle.x + 1 and castle.y <= tile_y <= castle.y + 1:
                 if castle.destroyed:
                     print("To są ruiny.")
                     return
 
-                # Jeśli mamy jednostkę i klikamy w zamek obok niej - najpierw ją przesuń
+                # Jeśli mamy jednostkę i klikamy w zamek obok niej - wykonaj ruch o 1 kafel
                 if self.selected_unit:
                     u = self.selected_unit
                     dx = tile_x - u.x
                     dy = tile_y - u.y
                     if max(abs(dx), abs(dy)) == 1:
                         self.move_unit(u, dx, dy)
-                        # Nie dajemy tu return! Pozwalamy kodowi przejść niżej, 
-                        # aby po ruchu od razu otworzył menu zamku.
 
                 self.selected_castle = castle
                 self.selected_unit = None 
@@ -1789,25 +1755,48 @@ class World:
                 print(f"Opened castle at {castle.x}, {castle.y}")
                 return 
 
-        # 2. KLIKNIĘCIE W JEDNOSTKĘ (Zaznaczanie)
+        # 2. KLIKNIĘCIE W JEDNOSTKĘ (Zaznaczanie / Kontynuacja marszu)
         for player in self.players:
             for unit in player.units:
                 if unit.x == tile_x and unit.y == tile_y:
                     if unit.owner == self.players[self.current_player]:
+                        # Jeśli klikamy w już zaznaczoną jednostkę, która ma trasę -> IDZIE
+                        if self.selected_unit == unit and getattr(unit, 'planned_path', None):
+                            print("Potwierdzono kontynuację marszu!")
+                            unit.move_along_path(self)
+                            return
+                        
+                        # Normalne zaznaczenie nowej jednostki
                         self.selected_unit = unit
                         self.selected_castle = None
+                        # Czyścimy stare dane nowo wybranej jednostki
+                        unit.target_x, unit.target_y = None, None
+                        unit.planned_path = []
+                        print("Zaznaczono jednostkę")
                         return
 
-        # 3. RUCH JEDNOSTKI (Tylko jeśli nie kliknięto w zamek ani inną jednostkę)
+        # 3. LOGIKA DALEKIEGO RUCHU (Kliknięcie w mapę przy wybranej jednostce)
         if self.selected_unit:
             u = self.selected_unit
-            dx = tile_x - u.x
-            dy = tile_y - u.y
-            if max(abs(dx), abs(dy)) == 1:
-                self.move_unit(u, dx, dy)
+            
+            # Pobieramy poprzedni cel (jeśli istnieje)
+            last_tx = getattr(u, 'target_x', None)
+            last_ty = getattr(u, 'target_y', None)
+
+            # Sprawdzamy czy to drugie kliknięcie w to samo miejsce (POTWIERDZENIE)
+            if tile_x == last_tx and tile_y == last_ty:
+                print("Ruch potwierdzony kliknięciem w cel!")
+                u.move_along_path(self)
+                return
+            else:
+                # Pierwsze kliknięcie w nowe miejsce -> WYZNACZANIE TRASY (PODGLĄD)
+                u.target_x = tile_x
+                u.target_y = tile_y
+                u.planned_path = self.find_path(u, tile_x, tile_y)
+                print(f"Zaplanowano trasę do {tile_x}, {tile_y} (podgląd kropek)")
                 return
 
-        # Puste pole
+        # 4. KLIKNIĘCIE W PUSTE POLE (Odznaczenie wszystkiego)
         self.selected_unit = None
         self.selected_castle = None
 
@@ -2486,38 +2475,58 @@ class World:
                 self.recruitment_scroll += 1
 
     def draw_path_dots(self, screen, unit, path):
+        """Rysuje czarne i czerwone kropki trasy z uwzględnieniem kamery."""
+        TILE_SIZE = 32
+        
         for i, (px, py) in enumerate(path):
-            dot_x = px * 32 + 16
-            dot_y = py * 32 + 16
+            # Obliczamy pozycję na ekranie (współrzędne siatki * rozmiar - kamera)
+            # Dodajemy połowę kafelka (+16), aby kropka była na środku
+            dot_x = (px * TILE_SIZE) + (TILE_SIZE // 2) - self.camera_x
+            dot_y = (py * TILE_SIZE) + (TILE_SIZE // 2) - self.camera_y
             
-            # Jeśli krok mieści się w obecnej turze
-            if i < unit.move_points:
-                color = (0, 0, 0) # Czarna kropka - zasięg teraz
-            else:
-                color = (255, 0, 0) # Czerwona kropka - przyszłe tury
+            # Sprawdzamy, czy kropka w ogóle znajduje się w widocznym obszarze ekranu
+            if -10 < dot_x < 810 and -10 < dot_y < 610: # Zakładając Twoje okno 800x600
                 
-            pygame.draw.circle(screen, color, (dot_x, dot_y), 4)
+                # Logika kolorów: czarny dla zasięgu w tej turze, czerwony dla dalszych
+                if i < unit.move_points:
+                    color = (0, 0, 0)       # Czarna kropka - zasięg teraz
+                else:
+                    color = (255, 0, 0)     # Czerwona kropka - przyszłe tury
+                    
+                # Rysowanie kropki (promień 4) z czarną obwódką dla lepszej widoczności
+                pygame.draw.circle(screen, (255, 255, 255), (dot_x, dot_y), 5) # Białe tło kropki
+                pygame.draw.circle(screen, color, (dot_x, dot_y), 4)
 
     def find_path(self, unit, dest_x, dest_y):
-        # Prosty BFS/A* sprawdzający przejezdność:
-        # Dozwolone pola: [".", "0", " ", "$"] - zgodnie z Twoim wymogiem
         queue = [(unit.x, unit.y, [])]
-        visited = set()
+        visited = {(unit.x, unit.y)}
         
         while queue:
             (cx, cy, path) = queue.pop(0)
             if (cx, cy) == (dest_x, dest_y):
-                return path
+                return path # Zwraca listę krotek (x, y)
                 
-            for dx, dy in [((0,1), (0,-1), (1,0), (-1,0))]: # Sąsiedzi
+            # Poprawna pętla sąsiadów:
+            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                 nx, ny = cx + dx, cy + dy
                 if (nx, ny) not in visited and self.is_walkable(nx, ny):
                     visited.add((nx, ny))
                     queue.append((nx, ny, path + [(nx, ny)]))
         return []
-
     def is_walkable(self, x, y):
+        if self.map is None:
+            return False
+        map_height = len(self.map)
+        map_width = len(self.map[0]) if map_height > 0 else 0
         if 0 <= x < map_width and 0 <= y < map_height:
             tile = self.map[y][x]
-            return tile in [".", "0", " ", "$"] # Dolar jest przejezdny
+            if tile in [".", "0", " ", "$"]:  # Dolar jest przejezdny
+                return True
+        for player in self.players:
+            for u in player.units:
+                if u.x == x and u.y == y:
+                    return False
+            return True
+        return False
+            
         return False

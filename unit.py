@@ -412,21 +412,30 @@ class Unit:
         self.target_y = None
         self.planned_path = []  # Lista kafelków (x, y) do celu
         
-    def move_along_path(self):
-        # Dopóki mamy punkty ruchu i zaplanowaną trasę
-        while self.move_points > 0 and self.planned_path:
-            next_step = self.planned_path.pop(0) # Pobierz pierwszy kafelek z trasy
-            self.x, self.y = next_step           # Przesuń jednostkę
-            self.move_points -= 1                # Zużyj punkt ruchu
+    def move_along_path(self, world):
+        # Dopóki jednostka ma punkty ruchu (MP) i zaplanowaną drogę
+        while self.move_points > 0 and getattr(self, 'planned_path', []):
+            next_step = self.planned_path[0]
+            dx = next_step[0] - self.x
+            dy = next_step[1] - self.y
             
-            # Opcjonalnie: zatrzymaj, jeśli wejdzie na coś specjalnego (np. walka)
-            print(f"Jednostka idzie na {self.x}, {self.y}. Zostało MP: {self.move_points}")
-
-        # Jeśli dotarła do celu, czyścimy target
+            # Zapamiętujemy starą pozycję, by sprawdzić czy ruch się udał
+            old_x, old_y = self.x, self.y
+            
+            # Wywołujemy ruch z World
+            world.move_unit(self, dx, dy)
+            
+            # Jeśli jednostka się przesunęła, usuwamy krok z trasy
+            if self.x != old_x or self.y != old_y:
+                self.planned_path.pop(0)
+            else:
+                # Jeśli się nie przesunęła (np. zablokowana), przerywamy
+                break
+                
+        # Po zakończeniu ruchu czyścimy cel, by kropki zniknęły
         if not self.planned_path:
             self.target_x = None
             self.target_y = None
-
     # -----------------------
     # BASIC
     # -----------------------
