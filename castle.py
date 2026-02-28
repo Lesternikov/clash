@@ -12,6 +12,33 @@ BUILDINGS = {
     "forge": {"cost": 190},
     "school": {"cost": 400},}
 
+# Słownik: "Nazwa Patentu": (Poziom Zamku, Wymagany Budynek lub None)
+UNIT_REQUIREMENTS = {
+    # POZIOM 1
+    "pospolite_ruszenie": (1, None),
+    "lekka_piechota":     (1, None),
+    "pikinier":           (1, None),
+    "góral":              (1, None),
+    "budowniczy":         (1, None),
+    "łucznik":            (1, "warsztat"),
+    "taran":              (1, "warsztat"),
+    "leśnik":             (1, "warsztat"),
+    "lekka jazda":        (1, "kuźnia"),
+
+    # POZIOM 2 (dodatkowe jednostki)
+    "czerw":              (2, None),
+    "słoń":               (2, None),
+    "skorpion":           (2, None),
+    "orzeł":              (2, None),
+    "katapulta":          (2, "warsztat"),
+    "dragon":             (2, "kuźnia"),
+
+    # POZIOM 3 (dodatkowe jednostki)
+    "szkielet":           (3, None),
+    "duch":               (3, None),
+    "pegaz":              (3, None),
+    "skrzydlak":          (3, None)}
+
 class Castle:
 
     def __init__(self, x, y, owner=None):
@@ -19,7 +46,9 @@ class Castle:
         self.y = y
         self.owner = owner
         self.gold = 0
-        self.garrison = []
+        self.garrison_limit = 12
+        # ZMIANA: Zamiast [], tworzymy listę 12 pustych miejsc
+        self.garrison = [None] * self.garrison_limit 
         self.plague_active = False
         self.plague_turns = 0
         self.peasants = 100
@@ -40,7 +69,10 @@ class Castle:
         self.production_unit = None
         self.max_patents = 12
         self.patents = [None] * self.max_patents       # wykupione patenty
-        
+        self.patents[0] = {
+        "unit_type": "pospolite_ruszenie",
+        "stats": UNIT_STATS["pospolite_ruszenie"]
+        }
         
 
     def collect_taxes(self):        
@@ -88,27 +120,31 @@ class Castle:
 
     
     def start_production(self, unit_type):
-
-        if not any(p is not None and p["unit_type"] == unit_type for p in self.patents):
-            print("Najpierw kup patent:", unit_type)
+        # POPRAWKA: Szukamy nazwy jednostki wewnątrz słowników w liście patentów
+        has_patent = any(p is not None and isinstance(p, dict) and p.get("unit_type") == unit_type for p in self.patents)
+        
+        if not has_patent:
+            print(f"Najpierw kup patent na: {unit_type}")
             return False
 
         stats = UNIT_STATS[unit_type]
         cost = stats["production_cost"]
 
         if self.gold < cost:
-            print("Za mało złota")
+            print("Za mało złota na produkcję")
             return False
 
         self.production_unit_type = unit_type
         self.production_turns_left = stats["production_time"]
         self.production_enabled = True
 
-        print("Produkcja ustawiona na:", unit_type)
+        print(f"Produkcja {unit_type} wystartowała!")
         return True
 
     def buy_patent(self, unit_type):
-        if any(p is not None and p["unit_type"] == unit_type for p in self.patents):
+        # W pliku castle.py, w metodzie buy_patent
+    # Zmieniony warunek any() – dodano isinstance(p, dict)
+        if any(p is not None and isinstance(p, dict) and p.get("unit_type") == unit_type for p in self.patents):
             print("Patent już kupiony")
             return False
 
@@ -155,13 +191,11 @@ class Castle:
 
 
     def process_production(self):
-        if not self.production_enabled:
+        if not self.production_enabled or self.production_unit_type is None:
             return
 
-        if self.production_unit_type is None:
-            return
-
-        if len(self.garrison) >= self.garrison_limit:
+        # ZMIANA: Sprawdzamy, czy jest jakiekolwiek wolne miejsce (None)
+        if None not in self.garrison:
             print("Garnizon pełny — produkcja zatrzymana")
             self.production_enabled = False
             return
@@ -178,21 +212,25 @@ class Castle:
                 self.production_enabled = False
                 return
 
-            self.gold -= cost
+            # SZUKAMY PIERWSZEGO WOLNEGO MIEJSCA
+            free_slot = -1
+            for i in range(len(self.garrison)):
+                if self.garrison[i] is None:
+                    free_slot = i
+                    break
 
-            unit = Unit(
-                self.production_unit_type,
-                self.x,
-                self.y,
-                self.owner
-            )
+            if free_slot != -1:
+                self.gold -= cost
+                # Tworzymy jednostkę
+                unit = Unit(self.production_unit_type, self.x, self.y, self.owner)
+                
+                # Wstawiamy w konkretny slot
+                self.garrison[free_slot] = unit 
 
-            self.garrison.append(unit)
-
-            print("Wyprodukowano:", self.production_unit_type)
-
-            # restart cyklu produkcji
-            self.production_turns_left = stats["production_time"]
+                print(f"Wyprodukowano {self.production_unit_type} i umieszczono w slocie {free_slot}")
+                
+                # Restart cyklu produkcji
+                self.production_turns_left = stats["production_time"]
 
 
     def start_healing_unit(self, unit):
@@ -437,7 +475,10 @@ class Castle:
                     self.owner
                 )
 
-                self.garrison.append(unit)
+                for i in range(len(self.garrison)):
+                    if self.garrison[i] is None:
+                        self.garrison[i] = unit
+                        break
                 print("Jednostka dodana do garnizonu")
 
                 self.production_enabled = False
@@ -448,6 +489,69 @@ class Castle:
         self.owner = None
         self.garrison.clear()
 
-
+    def is_patent_available(self, patent_name):
+        # Jeśli nie ma na liście, uznajemy że nie ma wymagań (lub to jednostka Twierdzy)
+        if patent_name not in UNIT_REQUIREMENTS:
+            return False 
+            
+        req_level, req_building = UNIT_REQUIREMENTS[patent_name]
+        
+        # Sprawdź poziom zamku
+        if self.level < req_level:
+            return False
+            
+        # Sprawdź budynek (jeśli wymagany)
+        if req_building and req_building not in self.buildings:
+            return False
+   
+        return True
     
+    def get_buyable_units(self, castle):
+        buyable = []
+        for unit_name in UNIT_REQUIREMENTS.keys():
+            # Sprawdzamy czy spełnia wymogi (poziom, budynek)
+            if castle.is_patent_available(unit_name):
+                # Sprawdzamy czy już tego nie kupił
+                if not any(p is not None and (p["unit_type"] if isinstance(p, dict) else p) == unit_name 
+                        for p in castle.patents):
+                    buyable.append(unit_name)
+        return buyable
+    def is_patent_available(self, patent_name):
+        # Dane o wymaganiach, które ustaliliśmy wcześniej
+        UNIT_REQUIREMENTS = {
+            "pospolite_ruszenie": (1, None),
+            "lekka_piechota": (1, None),
+            "pikinier": (1, None),
+            "góral": (1, None),
+            "budowniczy": (1, None),
+            "łucznik": (1, "warsztat"),
+            "taran": (1, "warsztat"),
+            "leśnik": (1, "warsztat"),
+            "lekka jazda": (1, "kuźnia"),
+            "czerw": (2, None),
+            "słoń": (2, None),
+            "skorpion": (2, None),
+            "orzeł": (2, None),
+            "katapulta": (2, "warsztat"),
+            "dragon": (2, "kuźnia"),
+            "szkielet": (3, None),
+            "duch": (3, None),
+            "pegaz": (3, None),
+            "skrzydlak": (3, None)
+        }
+
+        if patent_name not in UNIT_REQUIREMENTS:
+            return False # Jeśli nie ma na liście, to pewnie jednostka Twierdzy
+
+        req_level, req_building = UNIT_REQUIREMENTS[patent_name]
+
+        # Sprawdzenie poziomu
+        if self.level < req_level:
+            return False
+
+        # Sprawdzenie budynku
+        if req_building and req_building.lower() not in [b.lower() for b in self.buildings]:
+            return False
+
+        return True
         return True
