@@ -22,7 +22,7 @@ UNIT_STATS = {
         groźnym orężem w 
         Twoich rękach. """},
 
-    "pikinier": {"hp": 60, "moves": 7, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2,"description":"""Pikinierzy\n
+    "pikinier": {"hp": 60, "moves": 77, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2,"description":"""Pikinierzy\n
         Pikinierzy - piesze oddziały
         uzbrojone w długie piki. 
         Większość z żołnierzy służą- 
@@ -408,6 +408,24 @@ class Unit:
         # leczenie
         self.healing = False
         self.healing_turns_left = 0
+        self.target_x = None
+        self.target_y = None
+        self.planned_path = []  # Lista kafelków (x, y) do celu
+        
+    def move_along_path(self):
+        # Dopóki mamy punkty ruchu i zaplanowaną trasę
+        while self.move_points > 0 and self.planned_path:
+            next_step = self.planned_path.pop(0) # Pobierz pierwszy kafelek z trasy
+            self.x, self.y = next_step           # Przesuń jednostkę
+            self.move_points -= 1                # Zużyj punkt ruchu
+            
+            # Opcjonalnie: zatrzymaj, jeśli wejdzie na coś specjalnego (np. walka)
+            print(f"Jednostka idzie na {self.x}, {self.y}. Zostało MP: {self.move_points}")
+
+        # Jeśli dotarła do celu, czyścimy target
+        if not self.planned_path:
+            self.target_x = None
+            self.target_y = None
 
     # -----------------------
     # BASIC
@@ -534,3 +552,5 @@ class PeasantGroup:
 
     def __repr__(self):
         return f"Peasants({self.amount})"
+
+    
