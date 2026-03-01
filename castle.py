@@ -20,18 +20,18 @@ UNIT_REQUIREMENTS = {
     "pikinier":           (1, None),
     "góral":              (1, None),
     "budowniczy":         (1, None),
-    "łucznik":            (1, "warsztat"),
-    "taran":              (1, "warsztat"),
-    "leśnik":             (1, "warsztat"),
-    "lekka jazda":        (1, "kuźnia"),
+    "łucznik":            (1, "workshop"),
+    "taran":              (1, "workshop"),
+    "leśnik":             (1, "workshop"),
+    "lekka jazda":        (1, "forge"),
 
     # POZIOM 2 (dodatkowe jednostki)
     "czerw":              (2, None),
     "słoń":               (2, None),
     "skorpion":           (2, None),
     "orzeł":              (2, None),
-    "katapulta":          (2, "warsztat"),
-    "dragon":             (2, "kuźnia"),
+    "katapulta":          (2, "workshop"),
+    "dragon":             (2, "forge"),
 
     # POZIOM 3 (dodatkowe jednostki)
     "szkielet":           (3, None),
@@ -56,7 +56,9 @@ class Castle:
         self.happiness = 50.0     # 0–100
         self.buildings = set()
         self.level = 1
-        #burzenie zamku
+        # NOWA FLAGA
+        self.build_limit_reached = False       
+         #burzenie zamku
         self.destroyed = False
 
                 # PRODUKCJA
@@ -64,16 +66,15 @@ class Castle:
         self.production_turns_left = 0
         self.production_enabled = False
         self.training = {}        
-       
-        self.garrison_limit = 12
+
         self.production_unit = None
         self.max_patents = 12
         self.patents = [None] * self.max_patents       # wykupione patenty
         self.patents[0] = {
         "unit_type": "pospolite_ruszenie",
         "stats": UNIT_STATS["pospolite_ruszenie"]
-        }
-        
+        }    
+       
 
     def collect_taxes(self):        
         if self.plague_active:
@@ -252,17 +253,23 @@ class Castle:
         print("Rozpoczęto leczenie:", unit)
 
     def process_healing(self):
-        if "hospital" not in self.buildings:
+        if "hospital" not in [b.lower() for b in self.buildings]:
             return
 
         for unit in self.garrison:
-            if unit.healing:
-                unit.healing_turns_left -= 1
+            # 1. Najpierw sprawdzamy, czy slot nie jest pusty
+            if unit is not None: 
+                # 2. Sprawdzamy, czy jednostka w ogóle wymaga leczenia
+                if hasattr(unit, 'healing') and unit.healing:
+                    unit.healing_turns_left -= 1
+                    print(f"Leczenie {unit.type}... zostało tur: {unit.healing_turns_left}")
 
-                if unit.healing_turns_left <= 0:
-                    unit.hp = 100
-                    unit.healing = False
-                    print("Jednostka wyleczona:", unit)
+                    # 3. Jeśli czas leczenia minął
+                    if unit.healing_turns_left <= 0:
+                        unit.hp = 100
+                        unit.healing = False
+                        unit.healing_turns_left = 0
+                        print("Jednostka wyleczona:", unit.type)
 
     def cancel_garrison_healing(self):
         for unit in self.garrison:
@@ -273,6 +280,11 @@ class Castle:
         self.cancel_garrison_healing()
 
     def build(self, building_name):
+        # 1. Sprawdź, czy już coś wybudowano w tej turze
+        if self.build_limit_reached:
+            print("W tej turze już coś wybudowano!")
+            return False
+
         if building_name in self.buildings:
             print("Budynek już istnieje")
             return False
@@ -287,11 +299,15 @@ class Castle:
             print("Za mało złota")
             return False
 
+        # FAKTYCZNA BUDOWA
         self.gold -= cost
         self.buildings.add(building_name)
+        
+        # --- KLUCZOWA POPRAWKA: Ustawiamy limit na True ---
+        self.build_limit_reached = True 
+        # --------------------------------------------------
 
         self.update_level()
-
         print("Zbudowano:", building_name)
         return True
 
@@ -442,7 +458,8 @@ class Castle:
         self.process_production()
         self.process_healing()
         self.process_training()           
-   
+        self.build_limit_reached = False
+
     def finish_production(self):
         from unit import Unit
 
@@ -524,16 +541,16 @@ class Castle:
             "pikinier": (1, None),
             "góral": (1, None),
             "budowniczy": (1, None),
-            "łucznik": (1, "warsztat"),
-            "taran": (1, "warsztat"),
-            "leśnik": (1, "warsztat"),
-            "lekka jazda": (1, "kuźnia"),
+            "łucznik": (1, "workshop"),
+            "taran": (1, "workshop"),
+            "leśnik": (1, "workshop"),
+            "lekka jazda": (1, "forge"),
             "czerw": (2, None),
             "słoń": (2, None),
             "skorpion": (2, None),
             "orzeł": (2, None),
-            "katapulta": (2, "warsztat"),
-            "dragon": (2, "kuźnia"),
+            "katapulta": (2, "workshop"),
+            "dragon": (2, "forge"),
             "szkielet": (3, None),
             "duch": (3, None),
             "pegaz": (3, None),
@@ -554,4 +571,9 @@ class Castle:
             return False
 
         return True
-        return True
+    def add_to_garrison(self, unit):
+        for i in range(len(self.garrison)):
+            if self.garrison[i] is None:
+                self.garrison[i] = unit
+                return True # Udało się schować
+        return False # Brak miejsca
