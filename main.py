@@ -10,8 +10,8 @@ pygame.display.set_caption("Clash Reverse")
 clock = pygame.time.Clock()
 
 world = World()
-p1 = Player(1, "Gracz 1", "red")
-p2 = Player(2, "Gracz 2", "blue")
+p1 = Player(1, "Gracz 1", (255, 50, 50))   # Soczysty czerwony
+p2 = Player(2, "Gracz 2", (50, 150, 255))  # Jasny niebieski
 world.add_player(p1)
 world.add_player(p2)
 world.load("map.txt", "0.FAC")
