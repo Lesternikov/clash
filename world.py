@@ -643,7 +643,7 @@ class World:
                             if self.build_menu_open:
                                 self.execute_build_action(i)
                             else:
-                                if i == 4: self.build_menu_open = True
+                                if i == 8: self.build_menu_open = True
                                 elif i == 5 and self.selected_castle: self.screen = "recruitment"
                             return
 
@@ -811,7 +811,7 @@ class World:
                     pygame.draw.line(screen, (255,255,255), (x+72, y+28), (x+28, y+72), 2)
                     # Tekst typu
                     text = font.render(unit.type[:3], True, (255,255,255))
-                    screen.blit(text, (x + 25, y + 85))
+                    screen.blit(text, (x + 35, y + 85))
 
                     # 2. STATUS SZKOLENIA (Miecze i tury) - TERAZ W TEJ SAMEJ PĘTLI
                     if unit in castle.training:
@@ -2494,7 +2494,7 @@ class World:
                     color = (255, 0, 0)     # Czerwona kropka - przyszłe tury
                     
                 # Rysowanie kropki (promień 4) z czarną obwódką dla lepszej widoczności
-                pygame.draw.circle(screen, (255, 255, 255), (dot_x, dot_y), 5) # Białe tło kropki
+                pygame.draw.circle(screen, (2, 255, 255), (dot_x, dot_y), 5) # Białe tło kropki
                 pygame.draw.circle(screen, color, (dot_x, dot_y), 4)
 
     def find_path(self, unit, dest_x, dest_y):
@@ -2520,8 +2520,8 @@ class World:
         map_width = len(self.map[0]) if map_height > 0 else 0
         if 0 <= x < map_width and 0 <= y < map_height:
             tile = self.map[y][x]
-            if tile in [".", "0", " ", "$"]:  # Dolar jest przejezdny
-                return True
+            if tile in ["S", "#", "0"]:  # Dolar jest przejezdny
+                return False
         for player in self.players:
             for u in player.units:
                 if u.x == x and u.y == y:
