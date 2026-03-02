@@ -503,50 +503,45 @@ class World:
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                pygame.quit(); import sys; sys.exit()
 
-            # --- KLAWIATURA ---
             elif event.type == pygame.KEYDOWN:
+                # ... (Twój istniejący kod ESC i SPACE zostaje bez zmian) ...
                 if event.key == pygame.K_ESCAPE:
-                    if getattr(self, 'demolish_confirm', False):
-                        self.demolish_confirm = False
-                    elif self.screen in ["recruitment", "garrison", "forge", "workshop", "hospital", "school", "peasants", "court"]:
+                    if self.screen in ["recruitment", "garrison", "forge", "workshop", "hospital", "school", "peasants", "court"]:
                         self.screen = "castle"
                     elif self.screen == "castle":
                         self.screen = "map"
-                
+                    elif self.demolish_confirm:
+                        self.demolish_confirm = False
                 elif event.key == pygame.K_SPACE:
-                    if self.selected_unit: self.selected_unit = None
-                    else: self.next_turn()
+                    if self.selected_unit:
+                        self.selected_unit = None
+                    else:
+                        self.next_turn()
 
             # --- MYSZKA ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 
-                # 1. NAJWYŻSZY PRIORYTET: OKNO ZBURZENIA
-                if getattr(self, 'demolish_confirm', False):
-                    print(f"DEBUG: Klik w oknie confirm: {mx}, {my}")
+                # --- 1. OBSŁUGA POTWIERDZENIA BURZENIA (NAJWYŻSZY PRIORYTET) ---
+                if self.demolish_confirm:
                     if self.demolish_yes.collidepoint(mx, my):
-                        print("DEBUG: AKCJA - ZBURZ")
                         self.demolish_castle(self.selected_castle)
-                    elif self.demolish_no.collidepoint(mx, my):
-                        print("DEBUG: AKCJA - ANULUJ")
                         self.demolish_confirm = False
-                    return # Zawsze return, by nie klikać niczego pod oknem!
-
-                # 2. BLOKADA UI (Przyciski boczne, panele)
-                if self.handle_ui_click(mx, my):
-                    print("DEBUG: UI przechwyciło klik")
+                    elif self.demolish_no.collidepoint(mx, my):
+                        self.demolish_confirm = False
+                    return # Blokujemy resztę świata, póki wisi okno
+                if self.screen == "map":
+                    if self.handle_ui_click(mx, my):
+                        return # KOŃCZYMY FUNKCJĘ - nie pozwalamy przejść do handle_mouse_click
+                # --- 2. OBSŁUGA SPECJALNYCH EKRANÓW (REKRUTACJA ITP) ---
+                if self.screen == "recruitment" and event.button in [4, 5]:
+                    self.handle_recruitment_scroll(event)
                     continue
-
-                # 3. EKRANY SPECJALNE (Scrollowanie rekrutacji)
-                if self.screen == "recruitment":
-                    if event.button in [4, 5]:
-                        self.handle_recruitment_scroll(event)
-                        continue
-                    elif event.button == 1:
-                        # Jeśli klikniesz poza listą, obsłuż to w handle_mouse_click
-                        pass 
+                elif self.screen == "unit_info" and event.button == 1:
+                    self.screen = "recruitment"
+                    continue
                 # --- RUCH JEDNOSTKĄ ---
                 #if self.screen == "map" and self.selected_unit:
                 #   if event.key == pygame.K_UP:    self.move_unit(self.selected_unit, 0, -1)
@@ -554,13 +549,24 @@ class World:
                 #   elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
                 #   elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
 
-                # 4. STANDARDOWA OBSŁUGA (Zamek, Mapa, Jednostki)
-                # Przekazujemy mx, my i button do głównego handlera
-                self.handle_mouse_click(mx, my, event.button)
+                # --- 3. KLUCZOWA ZMIANA: NAJPIERW UI, POTEM MAPA ---
+                # Sprawdzamy, czy kliknięto w brązowe przyciski (np. TRYB MAPY)
+                if self.screen == "map":
+                    # Wywołujemy nową funkcję sprawdzającą przyciski
+                    if self.handle_ui_click(mx, my):
+                        print("DEBUG UI: Kliknięcie przechwycone przez przycisk.")
+                        continue # Jeśli kliknięto przycisk, NIE idziemy do handle_mouse_click
+                    
+                    # Jeśli NIE kliknięto przycisku, idziemy do mapy
+                    self.handle_mouse_click(mx, my, event.button)
+                else:
+                    # Jeśli nie jesteśmy na mapie (np. jesteśmy w zamku), 
+                    # obsłuż standardowe kliknięcia w menu
+                    self.handle_mouse_click(mx, my, event.button)
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 3: self.inspected_unit = None
-                
+            
     def handle_mouse_click(self, mx, my, button):
         # 1. EKRANY SPECJALNE (Garnizon i Rekrutacja - obsługa wielu przycisków)
         if self.screen == "garrison":
@@ -573,52 +579,48 @@ class World:
 
         # 2. EKRAN ZAMKU
         if self.screen == "castle":
+            # Obsługa PRAWY klik (Opisy budynków/Tłumaczenia)
+            if button == 3:
+                # Tu możesz w przyszłości dodać self.show_building_tooltip(mx, my)
+                return
+                
+            # Obsługa LEWY klik (Wchodzenie do budynków)
             if button == 1:
-                # A. NAJPIERW: Sprawdź okno potwierdzenia, jeśli jest otwarte
-                if getattr(self, 'demolish_confirm', False):
-                    win_w, win_h = 320, 160
-                    win_x = (1024 // 2) - (win_w // 2)
-                    win_y = (768 // 2) - (win_h // 2)
-                    
-                    btn_yes = pygame.Rect(win_x + 40, win_y + 85, 90, 45)
-                    btn_no = pygame.Rect(win_x + 190, win_y + 85, 90, 45)
-
-                    if btn_yes.collidepoint(mx, my):
-                        print("POTWIERDZONO ZBURZENIE")
-                        self.demolish_castle(self.selected_castle)
-                        return
-                    if btn_no.collidepoint(mx, my):
-                        print("ANULOWANO ZBURZENIE")
-                        self.demolish_confirm = False
-                        return
-                    
-                    # Jeśli okno jest otwarte, ale kliknąłeś obok przycisków TAK/NIE
-                    # to i tak blokujemy resztę zamku (return)
-                    return 
-
-                # B. POTEM: Sprawdź przycisk otwierający okno burzenia
-                if getattr(self, 'demolish_button', None) and self.demolish_button.collidepoint(mx, my):
-                    self.demolish_confirm = True
-                    print("DEBUG: Otwieram okno potwierdzenia burzenia")
-                    return
-
-                # C. NA KOŃCU: Reszta budynków zamku
                 if getattr(self, 'forge_button', None) and self.forge_button.collidepoint(mx, my):
                     self.screen = "forge"; return
-                if getattr(self, 'workshop_button', None) and self.workshop_button.collidepoint(mx, my):
+                if hasattr(self, 'workshop_button') and self.workshop_button and self.workshop_button.collidepoint(mx, my):
                     self.screen = "workshop"; return
-                if getattr(self, 'hospital_button', None) and self.hospital_button.collidepoint(mx, my):
+                if hasattr(self, 'hospital_button') and self.hospital_button and self.hospital_button.collidepoint(mx, my):
                     self.screen = "hospital"; return
-                if getattr(self, 'school_button', None) and self.school_button.collidepoint(mx, my):
+                if hasattr(self, 'school_button') and self.school_button and self.school_button.collidepoint(mx, my):
                     self.screen = "school"; return
-                if getattr(self, 'recruit_button', None) and self.recruit_button.collidepoint(mx, my):
+                if hasattr(self, 'recruit_button') and self.recruit_button.collidepoint(mx, my):
                     self.screen = "recruitment"; return
-                if getattr(self, 'back_button', None) and self.back_button.collidepoint(mx, my):
+                if getattr(self, 'demolish_confirm', False):
+                    if button == 1:
+                        # Musimy obliczyć rect okna dokładnie tak samo jak w draw_demolish_confirm
+                        # aby collidepoint trafił w przyciski
+                        win_w, win_h = 320, 160
+                        win_x = (self.screen_width // 2) - (win_w // 2) # screen_width to szerokość okna gry
+                        win_y = (self.screen_height // 2) - (win_h // 2)
+
+                        # Odtwarzamy pozycje przycisków z Twojego kodu draw:
+                        btn_yes = pygame.Rect(win_x + 40, win_y + 85, 90, 45)
+                        btn_no = pygame.Rect(win_x + 190, win_y + 85, 90, 45)
+
+                        if btn_yes.collidepoint(mx, my):
+                            self.demolish_castle(self.selected_castle)
+                            return
+                        if btn_no.collidepoint(mx, my):
+                            self.demolish_confirm = False
+                            return
+                    return # Blokada spodu zamku
+                if hasattr(self, 'back_button') and self.back_button.collidepoint(mx, my):
                     self.screen = "map"; self.selected_castle = None; return
 
-                # Jeśli nic nie trafiono, obsłuż ogólne kliknięcie w grafikę zamku
                 self.handle_castle_click(mx, my)
                 return
+
         # 3. EKRANY BUDYNKÓW (Forge, Workshop itp.)
         if self.screen in ["forge", "workshop", "hospital", "school", "peasants", "court"]:
             if button == 1:
@@ -1552,10 +1554,10 @@ class World:
             
         elif self.screen == "unit_info":
             self.draw_unit_info(screen)
-        # --- KLUCZOWY DODATEK NA SAMYM KOŃCU METODY DRAW ---
+
         if getattr(self, "demolish_confirm", False):
             self.draw_demolish_confirm(screen)
-            
+
     def draw_demolish_confirm(self, screen):
         # USUNIĘTO: overlay i przyciemnianie tła
         
@@ -2584,24 +2586,23 @@ class World:
         return False  
       
     def handle_ui_click(self, mx, my):
-        # Jeśli okno potwierdzenia jest otwarte, UI NIE POWINNO blokować kliknięć,
-        # bo musimy pozwolić kliknąć w TAK/NIE.
-        if getattr(self, 'demolish_confirm', False):
-            return False
-
-        # Sprawdzamy przyciski akcji
+        """Zwraca True, jeśli kliknięto w UI, co blokuje kliknięcie w mapę."""
+        # Sprawdzamy 6 przycisków akcji
         for i, rect in enumerate(self.action_buttons):
             if rect.collidepoint(mx, my):
-                if i == 0: 
+                if i == 0: # Pierwszy przycisk (indeks 0) to nasz "TRYB MAPY"
+                    print("DEBUG UI: Kliknięto TRYB MAPY (Odznaczanie)")
                     self.selected_unit = None
                     self.selected_castle = None
-                return True 
+                elif i == 1: # Drugi przycisk
+                    print("DEBUG UI: Kliknięto ATK (nieaktywne)")
+                # ... możesz dodać kolejne i == 2, 3 itd.
+                return True # Przycisk kliknięty, zablokuj mapę
 
-        # Blokada panelu bocznego - TYLKO jeśli jesteśmy na mapie
-        if self.screen == "map":
-            ui_area = pygame.Rect(720, 610, 300, 150) 
-            if ui_area.collidepoint(mx, my):
-                return True 
+        # Blokada całego obszaru panelu (opcjonalnie), żeby nie klikać mapy MIĘDZY przyciskami
+        ui_area = pygame.Rect(720, 610, 300, 150) 
+        if ui_area.collidepoint(mx, my):
+            return True 
 
         return False
        
