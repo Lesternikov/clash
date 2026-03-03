@@ -200,7 +200,7 @@ UNIT_STATS = {
         tempie pokonują 
         każdy łańcuch górski."""},
 
-    "budowniczy":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
+    "budowniczy":{"hp":80,"moves":36,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
         Budowniczy - formacje nie-
         zbędne przy konstruowaniu 
         zamków, dróg, mostów itd. 
