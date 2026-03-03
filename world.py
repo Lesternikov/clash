@@ -523,17 +523,27 @@ class World:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 
-                # --- 1. OBSŁUGA POTWIERDZENIA BURZENIA (NAJWYŻSZY PRIORYTET) ---
+                # --- 1. OBSŁUGA POTWIERDZENIA BURZENIA ---
                 if self.demolish_confirm:
                     if self.demolish_yes.collidepoint(mx, my):
                         self.demolish_castle(self.selected_castle)
-                        self.demolish_confirm = False
+                        return
                     elif self.demolish_no.collidepoint(mx, my):
                         self.demolish_confirm = False
-                    return # Blokujemy resztę świata, póki wisi okno
+                        return
+                    return # Blokada, póki okno jest otwarte
+
+                # --- OBSŁUGA KLIKNIĘĆ W ZALEŻNOŚCI OD EKRANU ---
                 if self.screen == "map":
                     if self.handle_ui_click(mx, my):
-                        return # KOŃCZYMY FUNKCJĘ - nie pozwalamy przejść do handle_mouse_click
+                        return
+                
+                # To musi być POZA blokiem "if map", na tym samym poziomie wcięcia!
+                elif self.screen == "castle":
+                    if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                        self.demolish_confirm = True
+                        print("Otwarto okno potwierdzenia zburzenia.")
+                        return
                 # --- 2. OBSŁUGA SPECJALNYCH EKRANÓW (REKRUTACJA ITP) ---
                 if self.screen == "recruitment" and event.button in [4, 5]:
                     self.handle_recruitment_scroll(event)
@@ -573,7 +583,7 @@ class World:
             return
             
         if self.screen == "recruitment":
-            self.handle_recruitment_click(mx, my,) 
+            self.handle_recruitment_click(mx, my) 
             return
 
         # 2. EKRAN ZAMKU
@@ -596,6 +606,7 @@ class World:
                 if hasattr(self, 'recruit_button') and self.recruit_button.collidepoint(mx, my):
                     self.screen = "recruitment"; return
                 if getattr(self, 'demolish_confirm', False):
+                    print(f"DEBUG: Kliknięto w trybie potwierdzenia! Mysz: {mx}, {my}") #
                     if button == 1:
                         # Musimy obliczyć rect okna dokładnie tak samo jak w draw_demolish_confirm
                         # aby collidepoint trafił w przyciski
@@ -607,7 +618,6 @@ class World:
                         btn_yes = pygame.Rect(win_x + 40, win_y + 85, 90, 45)
                         btn_no = pygame.Rect(win_x + 190, win_y + 85, 90, 45)
 
-<<<<<<< HEAD
                 # 3. MENU ZAMKU
                 if self.screen == "castle":
                     if hasattr(self, 'forge_button') and self.forge_button and self.forge_button.collidepoint(mx, my):
@@ -652,15 +662,12 @@ class World:
                             else:
                                 if i == 8: self.build_menu_open = True
                                 elif i == 5 and self.selected_castle: self.screen = "recruitment"
-=======
                         if btn_yes.collidepoint(mx, my):
                             self.demolish_castle(self.selected_castle)
->>>>>>> 8ecf25cad49e7278cf7bd8874419e2135b869312
                             return
                         if btn_no.collidepoint(mx, my):
                             self.demolish_confirm = False
                             return
-                    return # Blokada spodu zamku
                 if hasattr(self, 'back_button') and self.back_button.collidepoint(mx, my):
                     self.screen = "map"; self.selected_castle = None; return
 
@@ -870,7 +877,6 @@ class World:
                 color = (255, 255, 0) if unit and unit in self.selected_units else (200, 200, 200)
                 pygame.draw.rect(screen, color, rect, 2)
 
-<<<<<<< HEAD
                 if unit:
                     # Niebieski kwadrat jednostki
                     pygame.draw.rect(screen, (80, 120, 200), (x+20, y+20, 60, 60))
@@ -880,7 +886,6 @@ class World:
                     # Tekst typu
                     text = font.render(unit.type[:3], True, (255,255,255))
                     screen.blit(text, (x + 35, y + 85))
-=======
                 # 2. Rysujemy jednostkę TYLKO jeśli slot NIE JEST None
                 if unit is not None:
                     # Niebieski kwadrat pikiniera
@@ -889,7 +894,6 @@ class World:
                     # Tekst (np. PIK)
                     text = font.render(unit.type[:3].upper(), True, (255,255,255))
                     screen.blit(text, (x + 35, y + 90))
->>>>>>> 8ecf25cad49e7278cf7bd8874419e2135b869312
 
                     # 3. STATUS SZKOLENIA (Overlay)
                     if unit in castle.training:
@@ -2597,12 +2601,6 @@ class World:
             
         map_height = len(self.map)
         map_width = len(self.map[0]) if map_height > 0 else 0
-<<<<<<< HEAD
-        if 0 <= x < map_width and 0 <= y < map_height:
-            tile = self.map[y][x]
-            if tile in ["S", "#", "0"]:  # Dolar jest przejezdny
-                return False
-=======
         
         # 1. Sprawdzenie granic mapy i typu terenu
         if not (0 <= x < map_width and 0 <= y < map_height):
@@ -2613,7 +2611,6 @@ class World:
             return False
 
         # 2. Sprawdzenie, czy nie stoi tam jednostka (sprawdzamy WSZYSTKICH graczy)
->>>>>>> 8ecf25cad49e7278cf7bd8874419e2135b869312
         for player in self.players:
             for u in player.units:
                 if u.x == x and u.y == y:
