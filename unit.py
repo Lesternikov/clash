@@ -1,5 +1,5 @@
 UNIT_STATS = {
-    "pospolite_ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
+    "posp. ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
         Chłopi zajmują się
         zwykle uprawą roli.
         Używani do walki
@@ -10,7 +10,7 @@ UNIT_STATS = {
         są jednymi z najsłab-
         szych na polu bitwy."""},
 
-    "lekka_piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2,"description":"""Lekka piechota\n
+    "lekka piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2,"description":"""Lekka piechota\n
         Lekka piechota
         stanowi formację 
         stojącą dość nisko 

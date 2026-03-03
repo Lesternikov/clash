@@ -211,7 +211,7 @@ class World:
         # JEDNOSTKI STARTOWE (tylko przy prawdziwych zamkach)
         for c in self.castles:
             if c.owner:
-                self.add_unit(Unit("lekka_piechota", c.x, c.y + 2, c.owner))
+                self.add_unit(Unit("lekka piechota", c.x, c.y + 2, c.owner))
 
         print(f"Zbudowano zamków: {len(self.castles)}")
         print(f"Miejsc pod budowę: {len(self.castle_locations)}")
@@ -530,45 +530,49 @@ class World:
             # --- MYSZKA ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
-                
-                # --- 1. OBSŁUGA POTWIERDZENIA BURZENIA (NAJWYŻSZY PRIORYTET) ---
-                if self.demolish_confirm:
+
+                #--- 1. PRIORYTET: OKNO BURZENIA ---
+                if getattr(self, 'demolish_confirm', False):
                     if self.demolish_yes.collidepoint(mx, my):
                         self.demolish_castle(self.selected_castle)
-                        self.demolish_confirm = False
+                        return
                     elif self.demolish_no.collidepoint(mx, my):
                         self.demolish_confirm = False
-                    return # Blokujemy resztę świata, póki wisi okno
-                if self.screen == "map":
-                    if self.handle_ui_click(mx, my):
-                        return # KOŃCZYMY FUNKCJĘ - nie pozwalamy przejść do handle_mouse_click
-                # --- 2. OBSŁUGA SPECJALNYCH EKRANÓW (REKRUTACJA ITP) ---
-                if self.screen == "recruitment" and event.button in [4, 5]:
-                    self.handle_recruitment_scroll(event)
-                    continue
-                elif self.screen == "unit_info" and event.button == 1:
-                    self.screen = "recruitment"
-                    continue
-                # --- RUCH JEDNOSTKĄ ---
-                #if self.screen == "map" and self.selected_unit:
-                #   if event.key == pygame.K_UP:    self.move_unit(self.selected_unit, 0, -1)
-                #   elif event.key == pygame.K_DOWN:  self.move_unit(self.selected_unit, 0, 1)
-                #   elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
-                #   elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
+                        return
+                    return
 
-                # --- 3. KLUCZOWA ZMIANA: NAJPIERW UI, POTEM MAPA ---
-                # Sprawdzamy, czy kliknięto w brązowe przyciski (np. TRYB MAPY)
-                if self.screen == "map":
-                    # Wywołujemy nową funkcję sprawdzającą przyciski
-                    if self.handle_ui_click(mx, my):
-                        print("DEBUG UI: Kliknięcie przechwycone przez przycisk.")
-                        continue # Jeśli kliknięto przycisk, NIE idziemy do handle_mouse_click
-                    
-                    # Jeśli NIE kliknięto przycisku, idziemy do mapy
-                    self.handle_mouse_click(mx, my, event.button)
-                else:
-                    # Jeśli nie jesteśmy na mapie (np. jesteśmy w zamku), 
-                    # obsłuż standardowe kliknięcia w menu
+                # --- 2. PRIORYTET: INFO O JEDNOSTCE (Zamykanie) ---
+                if self.screen == "unit_info":
+                    self.screen = "map"
+                    return
+
+                # --- 3. OBSŁUGA PRAWY KLIK (INFO) ---
+                if event.button == 3: # Prawy przycisk myszy
+                    grid_x = (mx + self.camera_x) // TILE_SIZE
+                    grid_y = (my + self.camera_y) // TILE_SIZE
+                        
+                    #get_unit_at to Twoja funkcja zwracająca jednostkę na danej pozycji
+                    target_unit = self.get_unit_at(grid_x, grid_y)
+                    if target_unit:
+                        # Zapisujemy sformatowany tekst statystyk do zmiennej, którą narysujemy
+                        self.unit_info_text = f"Jednostka: {target_unit.name}\nAtak: {target_unit.attack}\n..." # itd.
+                        self.screen = "unit_info"
+                        print(f"Otwarto podgląd dla: {target_unit.name}")
+                    return
+                        
+                # --- 4. OBSŁUGA LEWY KLIK (ZAMEK / UI / MAPA) ---
+                if event.button == 1:
+                    if self.screen == "castle":
+                        if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                            self.demolish_confirm = True
+                            return                        
+
+                        # --- OBSŁUGA KLIKNIĘĆ W ZALEŻNOŚCI OD EKRANU ---
+                        if self.screen == "map":
+                            if self.handle_ui_click(mx, my):
+                                return
+
+                        # Przekazujemy resztę do handle_mouse_click
                     self.handle_mouse_click(mx, my, event.button)
                 for i, rect in enumerate(self.action_buttons):
                     if rect.collidepoint(mx, my):
@@ -576,6 +580,8 @@ class World:
                         return True # Przechwycono kliknięcie, nie rób nic na mapie
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 3: self.inspected_unit = None
+
+
             
                 
     def handle_mouse_click(self, mx, my, button):
@@ -1271,24 +1277,45 @@ class World:
         if 0 <= idx_on_center < len(unit_types):
             unit_to_show = unit_types[idx_on_center]
 
+        # Rysowanie kwadratu pod opis jednostki
+            # Parametry: (ekran, kolor, (x, y, szerokość, wysokość), grubość_linii)
+            square_color = (50, 40, 30) # Ciemny brąz
+            info_rect = pygame.Rect(20, 265, 380, 200)
+                
+            # Wypełniony kwadrat
+            pygame.draw.rect(screen, square_color, info_rect)
+                
+            # Ramka wokół kwadratu (np. złota)
+            pygame.draw.rect(screen, (200, 180, 100), info_rect, 4)
+
+        # Rysowanie prostokąta pod opis czasu
+            # Parametry: (ekran, kolor, (x, y, szerokość, wysokość), grubość_linii)
+            square_color = (70, 40, 30) # Ciemny brąz
+            info_rect = pygame.Rect(20, 490, 400, 40)
+                
+            # Wypełniony kwadrat
+            pygame.draw.rect(screen, square_color, info_rect)
+                
+            # Ramka wokół kwadratu (np. złota)
+            pygame.draw.rect(screen, (200, 180, 100), info_rect, 4)
+
         # RYSOWANIE STATYSTYK - wszystko musi być w tym jednym IFie
         if unit_to_show:
             stats = UNIT_STATS.get(unit_to_show, {})
             if stats:
-                screen.blit(font.render(f"Jednostka: {unit_to_show}", True, (255, 255, 255)), (280, 250))
+                screen.blit(font.render(f"Jednostka: {unit_to_show}", True, (255, 255, 255)), (120, 270))
                 # 1. ATK
-                screen.blit(font.render(f"ATK: {stats.get('attack', 0)}", True, (255, 255, 255)), (280, 290))
+                screen.blit(font.render(f"ATK: {stats.get('attack', 0)}", True, (255, 255, 255)), (140, 310))
                 # 2. DEF
-                screen.blit(font.render(f"DEF: {stats.get('defense', 0)}", True, (255, 255, 255)), (280, 320))
+                screen.blit(font.render(f"DEF: {stats.get('defense', 0)}", True, (255, 255, 255)), (140, 390))
                 # 3. HP
-                screen.blit(font.render(f"HP: {stats.get('hp', '??')}", True, (255, 255, 255)), (280, 350))
+                screen.blit(font.render(f"HP: {stats.get('hp', 0)}", True, (255, 255, 255)), (220, 310))
                 # 4. MORALE
-                screen.blit(font.render(f"MOR: {stats.get('morale', 0)}", True, (255, 255, 255)), (400, 290))
+                screen.blit(font.render(f"MOR: {stats.get('morale', 0)}", True, (255, 255, 255)), (220, 390))
                 # 5. MOVES
-                screen.blit(font.render(f"MOV: {stats.get('moves', 0)}", True, (255, 255, 255)), (400, 320))
-                # 6. DMG
-                dmg = stats.get('damage', '??')
-                screen.blit(font.render(f"DMG: {dmg}", True, (255, 255, 255)), (400, 350))
+                screen.blit(font.render(f"MOV: {stats.get('moves', 0)}", True, (255, 255, 255)), (300, 310))
+                # 6. ATTACK
+                screen.blit(font.render(f"ATC: {stats.get('attack', 0)}", True, (255, 255, 255)), (300, 390))
 
                 # Koszty (dalej wewnątrz if unit_to_show)
                 screen.blit(font.render(f"Patent: {stats.get('patent_cost', 0)}", True, (255, 255, 0)), (40, 500))
@@ -1853,7 +1880,20 @@ class World:
                         unit.planned_path = []
                         print("DEBUG: Zaznaczono jednostkę")
                         return
-       
+        # Przeliczamy współrzędne myszy na kratki (uwzględniając kamerę)
+        grid_x = (mx + self.camera_x) // TILE_SIZE
+        grid_y = (my + self.camera_y) // TILE_SIZE
+
+        # --- PRAWY PRZYCISK: Statystyki jednostki ---
+        if button == 3:
+            target_unit = self.get_unit_at(grid_x, grid_y)
+            if target_unit:
+                self.inspected_unit = target_unit
+                self.screen = "unit_info"
+                print(f"Podgląd jednostki: {target_unit.name}")
+                return
+
+
     def handle_castle_click(self, mx, my):
 
         if not self.selected_castle:

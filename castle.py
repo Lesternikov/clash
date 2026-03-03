@@ -15,8 +15,8 @@ BUILDINGS = {
 # Słownik: "Nazwa Patentu": (Poziom Zamku, Wymagany Budynek lub None)
 UNIT_REQUIREMENTS = {
     # POZIOM 1
-    "pospolite_ruszenie": (1, None),
-    "lekka_piechota":     (1, None),
+    "posp. ruszenie": (1, None),
+    "lekka piechota":     (1, None),
     "pikinier":           (1, None),
     "góral":              (1, None),
     "budowniczy":         (1, None),
@@ -71,8 +71,8 @@ class Castle:
         self.max_patents = 12
         self.patents = [None] * self.max_patents       # wykupione patenty
         self.patents[0] = {
-        "unit_type": "pospolite_ruszenie",
-        "stats": UNIT_STATS["pospolite_ruszenie"]
+        "unit_type": "posp. ruszenie",
+        "stats": UNIT_STATS["posp. ruszenie"]
         }    
        
 
@@ -565,8 +565,8 @@ class Castle:
     def is_patent_available(self, patent_name):
         # Dane o wymaganiach, które ustaliliśmy wcześniej
         UNIT_REQUIREMENTS = {
-            "pospolite_ruszenie": (1, None),
-            "lekka_piechota": (1, None),
+            "posp. ruszenie": (1, None),
+            "lekka piechota": (1, None),
             "pikinier": (1, None),
             "góral": (1, None),
             "budowniczy": (1, None),
