@@ -169,6 +169,8 @@ class World:
         # DODAJ TO:
         self.spawn_test_builder()
         self.constructions = [] # Lista słowników: {"x": x, "y": y, "progress": 0, "owner": owner}
+
+
     def load_map(self, filename):
             game_map = []
             try:
@@ -563,8 +565,9 @@ class World:
                 # --- 4. OBSŁUGA LEWY KLIK (ZAMEK / UI / MAPA) ---
                 if event.button == 1:
                     if self.screen == "castle":
-                        if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                        if getattr(self, 'demolish_button', None) is not None and self.demolish_button.collidepoint(mx, my):
                             self.demolish_confirm = True
+                            print("DEBUG: Otwieram okno potwierdzenia burzenia")
                             return                        
 
                         # --- OBSŁUGA KLIKNIĘĆ W ZALEŻNOŚCI OD EKRANU ---
@@ -1001,17 +1004,16 @@ class World:
             pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
             
             # 2. WYRÓŻNIENIE DLA BUDOWNICZEGO (Napis BU)
-            if u.type == "Budowniczy":
-                label = "BU"
-            elif u.type == "Katapulta":
-                label = "KA"
-            elif u.type == "Jazda":
-                label = "JA"
-            else:
-                label = "??" # Dla nieznanych jednostek
+            # 1. NAJPIERW: Definiujemy, co ma być napisane (label)
+            # Możesz użyć automatu (dwie pierwsze litery typu jednostki)
+            label = u.type[:2].upper() 
 
+            # 2. POTEM: Tworzymy powierzchnię tekstu (tutaj miałeś błąd)
             txt_surface = unit_font.render(label, True, (255, 255, 255))
+
+            # 3. NA KOŃCU: Rysujemy na ekranie
             text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
+            screen.blit(txt_surface, text_rect)
                 
                 # Małe czarne tło pod literami, żeby były czytelne
             pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
@@ -2855,21 +2857,3 @@ class World:
         new_unit = Unit(unit_type, x, y, owner)
         self.add_unit_to_game(new_unit)
         print(f"Zrekrutowano: {unit_type} na pozycji {x}, {y}")
-
-      
-        koniec
-          koniec
-            koniec
-              koniec
-                koniec
-                  koniec
-                    koniec
-                      koniec
-                        koniec
-                          koniec
-                            koniec
-                              koniec
-                                koniec
-                                  koniec
-                                    koniec
-                                    
