@@ -55,7 +55,7 @@ class World:
         # 2. DOPIERO TERAZ ładuj dane z plików (Nie zostaną nadpisane!)
         self.map = self.load_map("map.txt")
         self.load_castles_from_fac("0.FAC")
-        
+
         # 3. Reszta Twoich przycisków...
         self.garrison_button = pygame.Rect(40, 140, 160, 40)# na podstawie danych z FAC
         self.koszary_button = None
@@ -555,7 +555,7 @@ class World:
                 # --- 4. OBSŁUGA LEWY KLIK (ZAMEK / UI / MAPA) ---
                 if event.button == 1:
                     if self.screen == "castle":
-                        if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                        if getattr(self, 'demolish_button', None) is not None and self.demolish_button.collidepoint(mx, my):
                             self.demolish_confirm = True
                             return                        
 
@@ -564,11 +564,7 @@ class World:
                             if self.handle_ui_click(mx, my):
                                 return
 
-                        # Przekazujemy resztę do handle_mouse_click
-                    self.handle_mouse_click(mx, my, event.button)
-
-            elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 3: self.inspected_unit = None
+              
 
                         # --- NOWOŚĆ: Obsługa ekranu informacji o jednostce (ZAMYKANIE) ---
                         elif self.screen == "unit_info":
@@ -618,7 +614,13 @@ class World:
 
                     elif event.type == pygame.MOUSEBUTTONUP:
                         if event.button == 3: self.inspected_unit = None
-            
+
+                      # Przekazujemy resztę do handle_mouse_click
+                    self.handle_mouse_click(mx, my, event.button)
+
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 3: self.inspected_unit = None
+
     def handle_mouse_click(self, mx, my, button):
         # 1. EKRANY SPECJALNE (Garnizon i Rekrutacja - obsługa wielu przycisków)
         if self.screen == "garrison":
@@ -2741,3 +2743,111 @@ class World:
                 
         print("DEBUG: Brak wolnych slotów!")
         return False
+    
+    def handle_action_button_click(self, button_index):
+        """button_index: od 0 do 5 (odpowiada self.action_buttons)"""
+        u = self.selected_unit
+        if not u: return
+
+        if self.build_menu_open:
+            # MENU BUDOWANIA: ["DROGA", "PUŁAPKA", "SKARB", "WIEŻA", "TWIERDZA", "ZAMEK"]
+            self.execute_build_action(button_index, u)
+        else:
+            # MENU GŁÓWNE: ["TRYB MAPY", "ATK", "SPL", "WAIT", "BUILD", "REC"]
+            if button_index == 0:
+                self.handle_tryb_mapy_button()
+            elif button_index == 4: # Przycisk BUILD
+                if u.type == "Budowniczy":
+                    self.build_menu_open = True
+                    print("Otwarto menu budowania.")
+
+    def execute_build_action(self, index, u):
+        if not u or u.type != "Budowniczy": return
+        pos = (u.x, u.y)
+
+        if index == 0: # DROGA (6 pkt ruchu)
+            if u.moves >= 6:
+                u.moves -= 6
+                self.map[u.y][u.x] = "R" # "R" jak Road
+                print("Wybudowano drogę! Pozostałe MP:", u.moves)
+            else:
+                print("Za mało punktów ruchu (wymagane 6)!")
+
+        elif index == 1: # PUŁAPKA (Śmierć budowniczego)
+            self.traps.append({"x": u.x, "y": u.y, "owner": u.owner})
+            if u in self.units: self.units.remove(u)
+            if u in u.owner.units: u.owner.units.remove(u)
+            self.selected_unit = None
+            self.build_menu_open = False
+            print("Zastawiono pułapkę. Budowniczy poświęcony.")
+
+        elif index == 2: # SKARB (0 pkt ruchu)
+            if self.map[u.y][u.x] == "$":
+                u.owner.gold += 500
+                self.map[u.y][u.x] = "." # Zmieniamy na zwykłą ziemię
+                print("Skarb wykopany!")
+            else:
+                print("Tu nie ma skarbu.")
+
+        elif index in [3, 4, 5]: # WIEŻA (4j), TWIERDZA (12j), ZAMEK (24j)
+            # Rejestrujemy budowę czasową
+            data = {3: ("Wieża", 4), 4: ("Twierdza", 12), 5: ("Zamek", 24)}
+            name, work = data[index]
+            
+            if pos not in self.active_projects:
+                self.active_projects[pos] = {
+                    "type": name, 
+                    "remaining_work": work, 
+                    "owner": u.owner
+                }
+                print(f"Rozpoczęto budowę: {name} ({work} tury pracy).")
+                self.build_menu_open = False # Zamykamy menu po zleceniu
+            else:
+                print("To pole jest już zajęte przez inną budowę!")
+    
+    def spawn_test_builder(self):
+        if not self.castles: return
+        castle = self.castles[0]
+        from unit import Unit
+        
+        # Tworzymy obiekt
+        new_builder = Unit("Budowniczy", int(castle.x + 2), int(castle.y), castle.owner)
+        
+        # Rejestrujemy go w systemie
+        self.add_unit_to_game(new_builder)
+
+    def start_castle_construction(self, unit):
+        # Sprawdź czy na tym polu już coś się buduje
+        for c in self.constructions:
+            if c["x"] == unit.x and c["y"] == unit.y:
+                print("Tu już trwa budowa!")
+                return
+
+        # Dodaj nową budowę (24 punkty pracy do wykonania)
+        self.constructions.append({
+            "x": unit.x,
+            "y": unit.y,
+            "progress": 0,
+            "target": 24,
+            "owner": unit.owner
+        })
+        print("Rozpoczęto budowę zamku! Potrzeba 24 punktów pracy.")
+
+    def add_unit_to_game(self, unit):
+        """Dodaje jednostkę do świata i do listy jej właściciela."""
+        # 1. Dodaj do głównej listy (do rysowania)
+        if unit not in self.units:
+            self.units.append(unit)
+        
+        # 2. Dodaj do listy gracza (do zaznaczania i sterowania)
+        if unit.owner and unit not in unit.owner.units:
+            unit.owner.units.append(unit)
+            print(f"DEBUG: Jednostka {unit.type} przypisana do gracza {unit.owner.name}")
+
+    def spawn_unit(self, unit_type, x, y, owner):
+        from unit import Unit
+        new_unit = Unit(unit_type, x, y, owner)
+        self.add_unit_to_game(new_unit)
+        print(f"Zrekrutowano: {unit_type} na pozycji {x}, {y}")
+
+                                    
