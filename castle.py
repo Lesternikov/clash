@@ -15,8 +15,8 @@ BUILDINGS = {
 # Słownik: "Nazwa Patentu": (Poziom Zamku, Wymagany Budynek lub None)
 UNIT_REQUIREMENTS = {
     # POZIOM 1
-    "pospolite_ruszenie": (1, None),
-    "lekka_piechota":     (1, None),
+    "posp. ruszenie": (1, None),
+    "lekka piechota":     (1, None),
     "pikinier":           (1, None),
     "góral":              (1, None),
     "budowniczy":         (1, None),
@@ -71,8 +71,8 @@ class Castle:
         self.max_patents = 12
         self.patents = [None] * self.max_patents       # wykupione patenty
         self.patents[0] = {
-        "unit_type": "pospolite_ruszenie",
-        "stats": UNIT_STATS["pospolite_ruszenie"]
+        "unit_type": "posp. ruszenie",
+        "stats": UNIT_STATS["posp. ruszenie"]
         }    
        
 
@@ -121,27 +121,56 @@ class Castle:
 
     
     def start_production(self, unit_type):
-        # POPRAWKA: Szukamy nazwy jednostki wewnątrz słowników w liście patentów
+        if not unit_type:
+            return False
+
+        # USUNĘLIŚMY BLOKADĘ "if self.production_enabled"
+        # Teraz każde wywołanie tej funkcji po prostu nadpisuje cel
+
         has_patent = any(p is not None and isinstance(p, dict) and p.get("unit_type") == unit_type for p in self.patents)
-        
         if not has_patent:
-            print(f"Najpierw kup patent na: {unit_type}")
             return False
 
         stats = UNIT_STATS[unit_type]
-        cost = stats["production_cost"]
-
-        if self.gold < cost:
-            print("Za mało złota na produkcję")
-            return False
-
+        
+        # Ustawiamy nowe parametry (nawet jeśli stara produkcja trwała)
         self.production_unit_type = unit_type
         self.production_turns_left = stats["production_time"]
         self.production_enabled = True
 
-        print(f"Produkcja {unit_type} wystartowała!")
+        print(f"Produkcja zmieniona/uruchomiona: {unit_type}!")
         return True
 
+    def process_production(self):
+        if not self.production_enabled or not self.production_unit_type:
+            return
+
+        if None not in self.garrison:
+            print("Garnizon pełny — wstrzymano")
+            return
+
+        self.production_turns_left -= 1
+
+        if self.production_turns_left <= 0:
+            stats = UNIT_STATS[self.production_unit_type]
+            
+            # Sprawdź koszt przed finalizacją
+            if self.gold < stats["production_cost"]:
+                print("Brak złota — koniec pętli produkcji")
+                self.production_enabled = False
+                return
+
+            # Dodaj jednostkę do garnizonu
+            for i in range(len(self.garrison)):
+                if self.garrison[i] is None:
+                    self.gold -= stats["production_cost"]
+                    unit = Unit(self.production_unit_type, self.x, self.y, self.owner)
+                    self.garrison[i] = unit
+                    break
+            
+            # RESTART CYKLU (Dla produkcji ciągłej)
+            self.production_turns_left = stats["production_time"]
+            
     def buy_patent(self, unit_type):
         # W pliku castle.py, w metodzie buy_patent
     # Zmieniony warunek any() – dodano isinstance(p, dict)
@@ -536,8 +565,8 @@ class Castle:
     def is_patent_available(self, patent_name):
         # Dane o wymaganiach, które ustaliliśmy wcześniej
         UNIT_REQUIREMENTS = {
-            "pospolite_ruszenie": (1, None),
-            "lekka_piechota": (1, None),
+            "posp. ruszenie": (1, None),
+            "lekka piechota": (1, None),
             "pikinier": (1, None),
             "góral": (1, None),
             "budowniczy": (1, None),
