@@ -2849,3 +2849,27 @@ class World:
         if unit.owner and unit not in unit.owner.units:
             unit.owner.units.append(unit)
             print(f"DEBUG: Jednostka {unit.type} przypisana do gracza {unit.owner.name}")
+
+    def spawn_unit(self, unit_type, x, y, owner):
+        from unit import Unit
+        new_unit = Unit(unit_type, x, y, owner)
+        self.add_unit_to_game(new_unit)
+        print(f"Zrekrutowano: {unit_type} na pozycji {x}, {y}")
+
+      
+        koniec
+          koniec
+            koniec
+              koniec
+                koniec
+                  koniec
+                    koniec
+                      koniec
+                        koniec
+                          koniec
+                            koniec
+                              koniec
+                                koniec
+                                  koniec
+                                    koniec
+                                    
