@@ -52,14 +52,10 @@ class World:
         self.selected_unit = None
         self.destroyed = False
         self.owner = None
-        # System Budowania
-        self.active_projects = {}  # Klucz: (x, y), Wartość: {type, remaining_work, owner}
-        self.traps = []            # Lista pułapek na mapie
-        self.build_menu_open = False
         # 2. DOPIERO TERAZ ładuj dane z plików (Nie zostaną nadpisane!)
         self.map = self.load_map("map.txt")
         self.load_castles_from_fac("0.FAC")
-        
+
         # 3. Reszta Twoich przycisków...
         self.garrison_button = pygame.Rect(40, 140, 160, 40)# na podstawie danych z FAC
         self.koszary_button = None
@@ -87,7 +83,7 @@ class World:
         self.peasant_button = pygame.Rect(0, 0, 180, 45)
         self.send_peasants_amount = 0
         self.send_gold_amount = 0
-        # 4 PEASANTS + -
+        # PEASANTS + -
         self.peasants_plus_button = pygame.Rect(0, 0, 40, 40)
         self.peasants_minus_button = pygame.Rect(0, 0, 40, 40)
        # TAX + -
@@ -101,7 +97,7 @@ class World:
         self.gold_minus_button = pygame.Rect(0, 0, 40, 40)
         # SEND
         self.send_button = pygame.Rect(0, 0, 160, 45)
-        # 5 BACK działa
+        # BACK działa
         self.back_button = pygame.Rect(90, 600, 100, 40)
         self.selected_patent_index = None
         self.castle_list_offset = 0
@@ -130,7 +126,7 @@ class World:
         self.camera_y = 0
         
 
-            # 6 Definiujemy 3 przyciski na górze
+            # Definiujemy 3 przyciski na górze
         self.btn_system = pygame.Rect(10, 0, 100, 40)
         self.btn_mapa = pygame.Rect(115, 0, 100, 40)
         # Twój zwój z "koniec tury" - dopasuj X do szerokości ekranu
@@ -158,7 +154,7 @@ class World:
         panel_x = 730
         panel_y = 620
         self.action_buttons = []
-        # 7 Tworzymy 6 przycisków w siatce 2x3
+        # Tworzymy 6 przycisków w siatce 2x3
         for row in range(2):
             for col in range(3):
                 rect = pygame.Rect(panel_x + col * 65, panel_y + row * 55, 60, 50)
@@ -334,13 +330,11 @@ class World:
 
         # 4. ===== NORMALNY RUCH (tylko na kafelku ".") =====
         # Sprawdzamy czy teren pozwala na przejście
-                # Dodaj "R" (Road) do listy dozwolonych znaków
-        if self.map[ny][nx] in [".", "0", " ", "$", "R"]: 
+        if self.map[ny][nx] in [".", "0", " ", "$"]:
             unit.x = nx
             unit.y = ny
             unit.move_points -= 1
         else:
-            # To powie Ci dokładnie, co blokuje Budowniczego
             print(f"BLOKADA! Na polu ({nx}, {ny}) jest znak: '{self.map[ny][nx]}'")
     def reset_units(self):
         for u in self.units:
@@ -591,17 +585,76 @@ class World:
                                 self.handle_action_button_click(i)
                                 return # Przechwycono kliknięcie - nie ruszaj mapy!
 
+<<<<<<< HEAD
                         # POTEM: Interfejs górny (Top UI)
                         if self.handle_ui_click(mx, my):
                             return
 
                     # Na końcu: Kliknięcie w świat (zaznaczanie, ruch, wchodzenie do zamku)
+=======
+              
+
+                        # --- NOWOŚĆ: Obsługa ekranu informacji o jednostce (ZAMYKANIE) ---
+                        elif self.screen == "unit_info":
+                            # Kliknięcie myszką LUB naciśnięcie ESC/SPACE zamyka podgląd
+                            if event.type == pygame.MOUSEBUTTONDOWN or (
+                                event.type == pygame.KEYDOWN and event.key in [pygame.K_ESCAPE, pygame.K_SPACE]
+                            ):
+                                self.screen = "map"
+                                return # Wychodzimy, żeby gra nie zarejestrowała kliknięcia pod podglądem
+                    
+                        
+                        
+                        # To musi być POZA blokiem "if map", na tym samym poziomie wcięcia!
+                        elif self.screen == "castle":
+                            if getattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                                self.demolish_confirm = True
+                                print("Otwarto okno potwierdzenia zburzenia.")
+                                return
+                        # --- 2. OBSŁUGA SPECJALNYCH EKRANÓW (REKRUTACJA ITP) ---
+                        if self.screen == "recruitment" and event.button in [4, 5]:
+                            self.handle_recruitment_scroll(event)
+                            continue
+                        elif self.screen == "unit_info" and event.button == 1:
+                            self.screen = "recruitment"
+                            continue
+                        # --- RUCH JEDNOSTKĄ ---
+                        #if self.screen == "map" and self.selected_unit:
+                        #   if event.key == pygame.K_UP:    self.move_unit(self.selected_unit, 0, -1)
+                        #   elif event.key == pygame.K_DOWN:  self.move_unit(self.selected_unit, 0, 1)
+                        #   elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
+                        #   elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
+
+                        # --- 3. KLUCZOWA ZMIANA: NAJPIERW UI, POTEM MAPA ---
+                        # Sprawdzamy, czy kliknięto w brązowe przyciski (np. TRYB MAPY)
+                        if self.screen == "map":
+                            # Wywołujemy nową funkcję sprawdzającą przyciski
+                            if self.handle_ui_click(mx, my):
+                                print("DEBUG UI: Kliknięcie przechwycone przez przycisk.")
+                                continue # Jeśli kliknięto przycisk, NIE idziemy do handle_mouse_click
+                            
+                            # Jeśli NIE kliknięto przycisku, idziemy do mapy
+                            self.handle_mouse_click(mx, my, event.button)
+                        else:
+                            # Jeśli nie jesteśmy na mapie (np. jesteśmy w zamku), 
+                            # obsłuż standardowe kliknięcia w menu
+                            self.handle_mouse_click(mx, my, event.button)
+
+                    elif event.type == pygame.MOUSEBUTTONUP:
+                        if event.button == 3: self.inspected_unit = None
+
+                      # Przekazujemy resztę do handle_mouse_click
+>>>>>>> bbe2d99e5f3455bf3f70b3f248d35e2619ec304e
                     self.handle_mouse_click(mx, my, event.button)
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 3: self.inspected_unit = None
+<<<<<<< HEAD
             
                 
+=======
+
+>>>>>>> bbe2d99e5f3455bf3f70b3f248d35e2619ec304e
     def handle_mouse_click(self, mx, my, button):
         # 1. EKRANY SPECJALNE (Garnizon i Rekrutacja - obsługa wielu przycisków)
         if self.screen == "garrison":
@@ -1025,8 +1078,15 @@ class World:
                 
                 # Opcjonalnie: Dodaj mały jasny "daszek", żeby zamek wyglądał jak budynek, a nie tylko kwadrat
                 pygame.draw.rect(screen, (255, 255, 255), (rect.x + 10, rect.y + 10, 44, 5), 0)
-       # --- 5. RYSOWANIE JEDNOSTEK ---
-        unit_font = pygame.font.SysFont("Arial", 16, bold=True)
+        # --- 5. RYSOWANIE JEDNOSTEK (Tile-based counts) ---
+        tile_units = {}
+        for player in self.players:
+            for u in player.units:
+                if u.x >= 0 and u.y >= 0:
+                    key = (u.x, u.y)
+                    tile_units[key] = tile_units.get(key, 0) + 1
+
+        unit_font = pygame.font.SysFont(None, 24)
 
         for u in self.units:
             # Oblicz pozycję na ekranie
@@ -1059,8 +1119,10 @@ class World:
 
             # 3. OZNACZENIE ZAZNACZENIA (Biała ramka DOOKOŁA)
             if u == self.selected_unit:
+
                 # Rysujemy tylko ramkę (ostatni parametr '2' to grubość linii)
-                pygame.draw.rect(screen, (255, 255, 255), (px + 2, py + 2, 28, 28), 2)
+                pygame.draw.rect(screen, (255, 255, 255), (px + 2, py + 2, 28, 28), 2)     
+
         # --- 6. KROPKI DROGI ---
         if self.selected_unit and getattr(self.selected_unit, 'planned_path', None):
             self.draw_path_dots(screen, self.selected_unit, self.selected_unit.planned_path)
@@ -1342,27 +1404,10 @@ class World:
         if 0 <= idx_on_center < len(unit_types):
             unit_to_show = unit_types[idx_on_center]
 
-        # Rysowanie kwadratu pod opis jednostki
-            # Parametry: (ekran, kolor, (x, y, szerokość, wysokość), grubość_linii)
-            square_color = (50, 40, 30) # Ciemny brąz
-            info_rect = pygame.Rect(20, 265, 380, 200)
-                
-            # Wypełniony kwadrat
-            pygame.draw.rect(screen, square_color, info_rect)
-                
-            # Ramka wokół kwadratu (np. złota)
-            pygame.draw.rect(screen, (200, 180, 100), info_rect, 4)
-
-        # Rysowanie prostokąta pod opis czasu
-            # Parametry: (ekran, kolor, (x, y, szerokość, wysokość), grubość_linii)
-            square_color = (70, 40, 30) # Ciemny brąz
-            info_rect = pygame.Rect(20, 490, 400, 40)
-                
-            # Wypełniony kwadrat
-            pygame.draw.rect(screen, square_color, info_rect)
-                
-            # Ramka wokół kwadratu (np. złota)
-            pygame.draw.rect(screen, (200, 180, 100), info_rect, 4)
+        # Panel tła dla statystyk
+        panel_rect = pygame.Rect(20, 250, 420, 220)
+        pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
+        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3) # Złota ramka
 
         # RYSOWANIE STATYSTYK - wszystko musi być w tym jednym IFie
         if unit_to_show:
@@ -2754,30 +2799,19 @@ class World:
       
     def handle_ui_click(self, mx, my):
         """Zwraca True, jeśli kliknięto w UI, co blokuje kliknięcie w mapę."""
-        u = self.selected_unit
-
         # Sprawdzamy 6 przycisków akcji
         for i, rect in enumerate(self.action_buttons):
             if rect.collidepoint(mx, my):
-                if self.build_menu_open:
-                    # --- LOGIKA MENU BUDOWANIA ---
-                    # labels = ["DROGA", "PUŁAPKA", "SKARB", "WIEŻA", "TWIERDZA", "ZAMEK"]
-                    self.execute_build_action(i, u)
-                else:
-                    # --- LOGIKA MENU GŁÓWNEGO ---
-                    # labels = ["TRYB MAPY", "ATK", "SPL", "WAIT", "BUILD", "REC"]
-                    if i == 0: # TRYB MAPY
-                        self.selected_unit = None
-                        self.selected_castle = None
-                    elif i == 4: # BUILD (Otwiera podmenu)
-                        if u and u.type == "Budowniczy":
-                            self.build_menu_open = True
-                            print("Menu budowania otwarte.")
-                    # ... reszta przycisków (ATK, SPL itd.)
-                
-                return True # UI kliknięte, blokujemy mapę
+                if i == 0: # Pierwszy przycisk (indeks 0) to nasz "TRYB MAPY"
+                    print("DEBUG UI: Kliknięto TRYB MAPY (Odznaczanie)")
+                    self.selected_unit = None
+                    self.selected_castle = None
+                elif i == 1: # Drugi przycisk
+                    print("DEBUG UI: Kliknięto ATK (nieaktywne)")
+                # ... możesz dodać kolejne i == 2, 3 itd.
+                return True # Przycisk kliknięty, zablokuj mapę
 
-        # Blokada tła panelu
+        # Blokada całego obszaru panelu (opcjonalnie), żeby nie klikać mapy MIĘDZY przyciskami
         ui_area = pygame.Rect(720, 610, 300, 150) 
         if ui_area.collidepoint(mx, my):
             return True 
@@ -2947,6 +2981,7 @@ class World:
         new_unit = Unit(unit_type, x, y, owner)
         self.add_unit_to_game(new_unit)
         print(f"Zrekrutowano: {unit_type} na pozycji {x}, {y}")
+<<<<<<< HEAD
 
          # Sterowanie jednostką przyciskami 
         # --- RUCH JEDNOSTKĄ ---
@@ -2955,3 +2990,5 @@ class World:
             #   elif event.key == pygame.K_DOWN:  self.move_unit(self.selected_unit, 0, 1)
             #   elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
             #   elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
+=======
+>>>>>>> bbe2d99e5f3455bf3f70b3f248d35e2619ec304e
