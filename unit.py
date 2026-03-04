@@ -411,6 +411,13 @@ class Unit:
         self.target_x = None
         self.target_y = None
         self.planned_path = []  # Lista kafelków (x, y) do celu
+            # Pobierasz dane ze słownika, który już masz gotowy
+        stats = UNIT_STATS.get(unit_type, {})
+        self.hp = stats.get("hp", 100)
+        self.move_points = stats.get("moves", 5)
+        self.attack = stats.get("attack", 10)
+        # Automatyczny skrót:
+        self.short_name = unit_type[:2].upper()
         
     def move_along_path(self, world):
         # Dopóki jednostka ma punkty ruchu (MP) i zaplanowaną drogę

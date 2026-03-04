@@ -162,7 +162,11 @@ class World:
         self.build_menu_open = False  # Flaga: czy menu budowania jest otwarte?
         #dolny prawy panel na mapie 
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158) # Przykładowy panel
-    
+        # DODAJ TO:
+        self.spawn_test_builder()
+        self.constructions = [] # Lista słowników: {"x": x, "y": y, "progress": 0, "owner": owner}
+
+
     def load_map(self, filename):
             game_map = []
             try:
@@ -557,6 +561,7 @@ class World:
                     if self.screen == "castle":
                         if getattr(self, 'demolish_button', None) is not None and self.demolish_button.collidepoint(mx, my):
                             self.demolish_confirm = True
+                            print("DEBUG: Otwieram okno potwierdzenia burzenia")
                             return                        
 
                         # --- OBSŁUGA KLIKNIĘĆ W ZALEŻNOŚCI OD EKRANU ---
@@ -579,7 +584,7 @@ class World:
                         
                         # To musi być POZA blokiem "if map", na tym samym poziomie wcięcia!
                         elif self.screen == "castle":
-                            if hasattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
+                            if getattr(self, 'demolish_button') and self.demolish_button.collidepoint(mx, my):
                                 self.demolish_confirm = True
                                 print("Otwarto okno potwierdzenia zburzenia.")
                                 return
@@ -1032,21 +1037,39 @@ class World:
         unit_font = pygame.font.SysFont(None, 24)
 
         for u in self.units:
-                # Oblicz pozycję na ekranie
-                px = u.x * TILE_SIZE - self.camera_x
-                py = u.y * TILE_SIZE - self.camera_y
-                
-                # POBIERZ KOLOR OD WŁAŚCICIELA
-                # Jeśli jednostka ma właściciela, bierzemy jego kolor. Jeśli nie (neutralna) - szary.
-                color = u.owner.color if u.owner else (200, 200, 200)
-                
-                pygame.draw.rect(screen, color, (px + 4, py + 4, 24, 24))
-                
-                # Opcjonalnie: biała obwódka dla zaznaczonej jednostki
-                if u == self.selected_unit:
-                    pygame.draw.rect(screen, (255, 255, 255), (px + 4, py + 4, 24, 24), 2)
+            # Oblicz pozycję na ekranie
+            px = int(u.x) * TILE_SIZE - self.camera_x
+            py = int(u.y) * TILE_SIZE - self.camera_y
+            
+            # 1. KOLOR PODSTAWOWY (Zawsze od właściciela)
+            # Jeśli to budowniczy, możemy mu dać specyficzny kolor tła, 
+            # ale lepiej zostawić kolor gracza, żeby było wiadomo czyj on jest.
+            owner_color = u.owner.color if u.owner else (200, 200, 200)
+            
+            # Rysujemy kwadracik jednostki
+            pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
+            
+            # 2. WYRÓŻNIENIE DLA BUDOWNICZEGO (Napis BU)
+            # 1. NAJPIERW: Definiujemy, co ma być napisane (label)
+            # Możesz użyć automatu (dwie pierwsze litery typu jednostki)
+            label = u.type[:2].upper() 
 
-                    
+            # 2. POTEM: Tworzymy powierzchnię tekstu (tutaj miałeś błąd)
+            txt_surface = unit_font.render(label, True, (255, 255, 255))
+
+            # 3. NA KOŃCU: Rysujemy na ekranie
+            text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
+            screen.blit(txt_surface, text_rect)
+                
+                # Małe czarne tło pod literami, żeby były czytelne
+            pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
+            screen.blit(txt_surface, text_rect)
+
+            # 3. OZNACZENIE ZAZNACZENIA (Biała ramka DOOKOŁA)
+            if u == self.selected_unit:
+
+                # Rysujemy tylko ramkę (ostatni parametr '2' to grubość linii)
+                pygame.draw.rect(screen, (255, 255, 255), (px + 2, py + 2, 28, 28), 2)     
 
         # --- 6. KROPKI DROGI ---
         if self.selected_unit and getattr(self.selected_unit, 'planned_path', None):
@@ -1303,6 +1326,11 @@ class World:
         # Zawsze bierzemy to, co jest na środku widocznej listy
         if 0 <= idx_on_center < len(unit_types):
             unit_to_show = unit_types[idx_on_center]
+
+        # Panel tła dla statystyk
+        panel_rect = pygame.Rect(20, 250, 420, 220)
+        pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
+        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3) # Złota ramka
 
         # RYSOWANIE STATYSTYK - wszystko musi być w tym jednym IFie
         if unit_to_show:
@@ -2849,5 +2877,3 @@ class World:
         new_unit = Unit(unit_type, x, y, owner)
         self.add_unit_to_game(new_unit)
         print(f"Zrekrutowano: {unit_type} na pozycji {x}, {y}")
-
-                                    
