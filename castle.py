@@ -41,18 +41,19 @@ UNIT_REQUIREMENTS = {
 
 class Castle:
 
-    def __init__(self, x, y, owner=None):
+    def __init__(self, x, y, owner=None, building_type="Zamek"):
         self.x = x
         self.y = y
         self.owner = owner
+        self.building_type = building_type # Tutaj przechowamy: "Wieża", "Twierdza" lub "Zamek"
         self.gold = 0
-        self.garrison_limit = 12
+        self.garrison_limit = 10 if building_type == "Wieża" else 12
         # ZMIANA: Zamiast [], tworzymy listę 12 pustych miejsc
-        self.garrison = [None] * self.garrison_limit 
+        self.garrison = [] * self.garrison_limit 
         self.plague_active = False
         self.plague_turns = 0
         self.peasants = 100
-        self.tax_rate = 1.0        # 0.0–4.0
+        self.tax_rate = 0.0        # 0.0–4.0
         self.happiness = 50.0     # 0–100
         self.buildings = set()
         self.level = 1
@@ -73,8 +74,13 @@ class Castle:
         self.patents[0] = {
         "unit_type": "posp. ruszenie",
         "stats": UNIT_STATS["posp. ruszenie"]
-        }    
-       
+        } 
+
+    def release_unit(self):
+        """Zabiera pierwszą jednostkę z garnizonu i zwraca ją."""
+        if self.garrison:
+            return self.garrison.pop(0) # Wyciąga pierwszą osobę z listy
+        return None 
 
     def collect_taxes(self):        
         if self.plague_active:
