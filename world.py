@@ -14,6 +14,22 @@ SCREEN_HEIGHT = 800
 MAP_WIDTH = 100 
 MAP_HEIGHT = 100
 
+TERRAIN_TYPES = {
+    "#": {"name": "kult", "color": (139, 69, 19), "walkable": False, "cost": 999},
+    "S": {"name": "świątynia","color": (255, 255, 255), "walkable": False, "cost": 999},
+    "$": {"name": "złoto", "color": (255, 215, 0), "walkable": True, "cost": 1},
+    "_": {"name": "droga","color": (255, 255, 255), "walkable": True, "cost": 0.5},
+    "x": {"name": "pułapka","color": (255, 255, 255), "walkable": False, "cost": 999},
+    ".": {"name": "trawa", "color": (34, 139, 34), "walkable": True, "cost": 1},
+    "l": {"name": "las", "color": (0, 100, 0), "walkable": True, "cost": 2},
+    "P": {"name": "pustynia","color": (255, 255, 255), "walkable": True, "cost": 2},
+    "w": {"name": "woda", "color": (0, 0, 255), "walkable": False, "cost": 999},
+    "B": {"name": "bagno","color": (255, 25, 25), "walkable": False, "cost": 999},
+    "b": {"name": "bagno płytkie","color": (255, 255, 255), "walkable": True, "cost": 7},
+    "G": {"name": "góry","color": (255, 255, 255), "walkable": False, "cost": 999},
+    "g": {"name": "góry niskie","color": (255, 255, 255), "walkable": True, "cost": 3},
+}
+
 def draw_text(screen, text, x, y, color=(0, 0, 0)):
     font = pygame.font.SysFont(None, 24)
     img = font.render(str(text), True, color)
@@ -37,6 +53,9 @@ class World:
         self.font = pygame.font.SysFont("Arial", 24)
         self.modal_font = pygame.font.SysFont(None, 32)
         self.btn_font = pygame.font.SysFont(None, 28, bold=True)
+        # ... Twoje istniejące zmienne (map, units itp.) ...
+        self.camera_x = 0
+        self.camera_y = 0
 
         # 1. NAJPIERW przygotuj wszystkie puste zmienne
         self.map = []
@@ -174,12 +193,37 @@ class World:
         #dolny prawy panel na mapie 
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158) # Przykładowy panel
         # DODAJ TO:
+        self.constructions = [] # Lista słowników: {"x": x, "y": y, "progress": 0, "owner": owner}
+        self.show_grid = False  # Domyślnie siatka jest wyłączona
         self.traps = []
         self.active_projects = {} # Słownik: {(x, y): dane_budowy}
         self.tower_release_button = pygame.Rect(320, 430, 120, 40) # Dopasuj wymiary
         self.tower_back_button = pygame.Rect(560, 430, 120, 40)
         
 
+    def update(self):
+            keys = pygame.key.get_pressed()
+            moving = False
+            speed = 8  # Prędkość przesuwu (musi być dzielnikiem TILE_SIZE, np. 32/8=4)
+
+            # Obsługa płynnego ruchu
+            if keys[pygame.K_LEFT]:
+                self.camera_x -= speed
+                moving = True
+            if keys[pygame.K_RIGHT]:
+                self.camera_x += speed
+                moving = True
+            if keys[pygame.K_UP]:
+                self.camera_y -= speed
+                moving = True
+            if keys[pygame.K_DOWN]:
+                self.camera_y += speed
+                moving = True
+
+    # DOCIĄGANIE (Snapping): Jeśli nie trzymasz klawiszy, wyrównaj do TILE_SIZE
+            if not moving:
+                self.camera_x = round(self.camera_x / 32) * 32 # Zakładając TILE_SIZE = 32
+                self.camera_y = round(self.camera_y / 32) * 32
     def load_map(self, filename):
             game_map = []
             try:
@@ -548,9 +592,16 @@ class World:
                         self.screen = "map"
                     elif getattr(self, 'demolish_confirm', False):
                         self.demolish_confirm = False
+            
                 elif event.key == pygame.K_SPACE:
-                    if self.selected_unit: self.selected_unit = None
-                    else: self.next_turn()
+                    if self.selected_unit:
+                        self.selected_unit = None
+                    else:
+                        self.next_turn()
+                elif event.key == pygame.K_g:
+                    if self.screen == "map":
+                        self.show_grid = not self.show_grid  # Odwraca wartość (True -> False, False -> True)
+                        print(f"Siatka: {self.show_grid}")
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
@@ -698,7 +749,7 @@ class World:
                             self.map[grid_y][grid_x] = "S"
                             
                             # 2. Tworzymy obiekt Strażnicy (jeśli chcesz mieć tam menu)
-                            from world_objects import Castle # upewnij się skąd importujesz
+                            from castle import BUILDING_TYPES # upewnij się skąd importujesz
                             new_tower = Castle(grid_x, grid_y, self.current_player)
                             new_tower.building_type = "Wieża"
                             self.castles.append(new_tower)
@@ -845,8 +896,6 @@ class World:
     def calculate_gold(self, player):
         return sum(castle.gold for castle in player.castles)
 
-    
-        
     def draw_garrison(self, screen):
         castle = self.selected_castle 
         if not castle: 
@@ -967,7 +1016,7 @@ class World:
         tiles_on_screen_y = SCREEN_HEIGHT // TILE_SIZE + 1
         start_x = self.camera_x // TILE_SIZE
         start_y = self.camera_y // TILE_SIZE
-
+           
                 # --- 2. RYSOWANIE TERENU (TŁA) ---
         # Używamy len(self.map) zamiast MAP_HEIGHT
         for y in range(max(0, start_y), min(len(self.map), start_y + tiles_on_screen_y)):
@@ -975,21 +1024,22 @@ class World:
             for x in range(max(0, start_x), min(len(self.map[0]), start_x + tiles_on_screen_x)):
                 pos_x = (x * TILE_SIZE) - self.camera_x
                 pos_y = (y * TILE_SIZE) - self.camera_y
-                tile_type = self.map[y][x]
+                tile_char = self.map[y][x] 
 
-                # Wybór koloru tła
-                if tile_type == "#":
-                    color = (139, 69, 19)   # Brąz
-                elif tile_type == "$":
-                    color = (255, 215, 0)   # Złoto
-                elif tile_type == "S":
-                    color = (255, 255, 255) # Świątynia
-                else:
-                    color = (34, 139, 34)   # Trawa
-                
-                # Rysujemy kafel tła
-                pygame.draw.rect(screen, color, (pos_x, pos_y, TILE_SIZE - 1, TILE_SIZE - 1))
+                # Pobieramy dane terenu, jeśli znaku nie ma w słowniku - dajemy domyślną trawę
+                terrain = TERRAIN_TYPES.get(tile_char, TERRAIN_TYPES["."])
 
+                pos_x = (x * TILE_SIZE) - self.camera_x
+                pos_y = (y * TILE_SIZE) - self.camera_y
+
+                pygame.draw.rect(screen, terrain["color"], (pos_x, pos_y, TILE_SIZE - 0, TILE_SIZE - 0))
+
+        if self.show_grid:
+                for x in range(0, screen.get_width(), TILE_SIZE):
+                    pygame.draw.line(screen, (50, 50, 50), (x, 0), (x, screen.get_height()))
+                for y in range(0, screen.get_height(), TILE_SIZE):
+                    pygame.draw.line(screen, (50, 50, 50), (0, y), (screen.get_width(), y))
+                    
                 # --- DODATEK: RYSOWANIE KRZYŻYKA PUŁAPKI ---
                 if tile_type == "X":
                     # Rysujemy czerwony krzyżyk na tym kafelku
@@ -1364,29 +1414,73 @@ class World:
         pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
         pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3) # Złota ramka
 
+        # 2. Obliczamy szerokość jednej sekcji (300 / 3 = 100)
+        section_w = panel_rect.width // 3 - 50 
+        section_h = panel_rect.height // 3 - 40
+
+        # 3. Wyznaczamy punkty X dla linii pionowych
+        line1_x = panel_rect.x + section_w
+        line0_x = panel_rect.x + section_w - 20
+        line2_x = panel_rect.x + 2 * section_w + 15
+        line3_x = panel_rect.x + 3 * section_w + 30
+        line1_y = panel_rect.y + section_h
+        line2_y = panel_rect.y + 2 * section_h + 55
+        line3_y = panel_rect.y + 4 * section_h + 30
+        # 4. Rysujemy linie pionowe (od góry do dołu panelu)
+        # pygame.draw.line(ekran, kolor, start_pos, end_pos, grubość)
+        pygame.draw.line(screen, (200, 180, 100), (line1_x, panel_rect.y), (line1_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, (200, 180, 100), (line0_x, panel_rect.y), (line0_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, (200, 180, 100), (line2_x, panel_rect.y + 33), (line2_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, (200, 180, 100), (line3_x, panel_rect.y + 33), (line3_x, panel_rect.bottom), 2)
+        
+
+        pygame.draw.line(screen, (200, 180, 100), (panel_rect.x + 93, line1_y), (panel_rect.right, line1_y), 2)
+        pygame.draw.line(screen, (200, 180, 100), (panel_rect.x + 93, line2_y), (panel_rect.right, line2_y), 2)
+        pygame.draw.line(screen, (200, 180, 100), (panel_rect.x , line3_y), (panel_rect.right - 350, line3_y), 2)
+
+        # Panel tła dla czasu produkcji
+        panel_rect = pygame.Rect(20, 480, 450, 50)
+        pygame.draw.rect(screen, (0, 30, 0), panel_rect) # Brązowe wypełnienie
+        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 5) # Złota ramka
+
+        # 2. Obliczamy szerokość jednej sekcji (300 / 3 = 100)
+        section_w = panel_rect.width // 3
+
+        # 3. Wyznaczamy punkty X dla linii pionowych
+        line1_x = panel_rect.x + section_w
+        line2_x = panel_rect.x + 2 * section_w
+
+        # 4. Rysujemy linie pionowe (od góry do dołu panelu)
+        # pygame.draw.line(ekran, kolor, start_pos, end_pos, grubość)
+        pygame.draw.line(screen, (200, 180, 100), (line1_x, panel_rect.y), (line1_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, (200, 180, 100), (line2_x, panel_rect.y), (line2_x, panel_rect.bottom), 2)
+
         # RYSOWANIE STATYSTYK - wszystko musi być w tym jednym IFie
         if unit_to_show:
             stats = UNIT_STATS.get(unit_to_show, {})
             if stats:
-                screen.blit(font.render(f"Jednostka: {unit_to_show}", True, (255, 255, 255)), (120, 270))
+                screen.blit(font.render(f"Jednostka: {unit_to_show}", True, (255, 255, 255)), (150, 260))
                 # 1. ATK
-                screen.blit(font.render(f"ATK: {stats.get('attack', 0)}", True, (255, 255, 255)), (140, 310))
+                screen.blit(font.render(f"ATK: {stats.get('attack', 0)}", True, (255, 255, 255)), (110, 310))
                 # 2. DEF
-                screen.blit(font.render(f"DEF: {stats.get('defense', 0)}", True, (255, 255, 255)), (140, 390))
+                screen.blit(font.render(f"DEF: {stats.get('defense', 0)}", True, (255, 255, 255)), (110, 390))
                 # 3. HP
                 screen.blit(font.render(f"HP: {stats.get('hp', 0)}", True, (255, 255, 255)), (220, 310))
                 # 4. MORALE
                 screen.blit(font.render(f"MOR: {stats.get('morale', 0)}", True, (255, 255, 255)), (220, 390))
                 # 5. MOVES
-                screen.blit(font.render(f"MOV: {stats.get('moves', 0)}", True, (255, 255, 255)), (300, 310))
+                screen.blit(font.render(f"MOV: {stats.get('moves', 0)}", True, (255, 255, 255)), (330, 310))
                 # 6. ATTACK
-                screen.blit(font.render(f"ATC: {stats.get('attack', 0)}", True, (255, 255, 255)), (300, 390))
+                screen.blit(font.render(f"ATC: {stats.get('attack', 0)}", True, (255, 255, 255)), (330, 390))
 
                 # Koszty (dalej wewnątrz if unit_to_show)
                 screen.blit(font.render(f"Patent: {stats.get('patent_cost', 0)}", True, (255, 255, 0)), (40, 500))
                 screen.blit(font.render(f"Prod: {stats.get('production_cost', 0)}", True, (255, 255, 0)), (200, 500))
                 screen.blit(font.render(f"Tury: {stats.get('production_time', 0)}", True, (255, 255, 0)), (360, 500))
 
+        panel_rect = pygame.Rect(480, 650, 70, 50)
+        pygame.draw.rect(screen, (40, +30, 25), panel_rect) # Brązowe wypełnienie
+        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3)
         # 6. RESZTA (Poza ifem statystyk - rzeczy stałe)
         screen.blit(font.render(f"Gold: {castle.gold}", True, (255, 215, 0)), (w // 2 - 30, 640))
         
@@ -1649,7 +1743,6 @@ class World:
         print("Generał zmienił stronę")
 
     def draw(self, screen):
-        mx, my = pygame.mouse.get_pos()
         # Zawsze czyścimy tło na początku klatki
         screen.fill((30, 30, 30))
         # 1. LOGIKA EKRANU MAPY ORAZ PUŁAPKI
@@ -3079,6 +3172,14 @@ class World:
 
         print(f"!!! BUDOWA UKOŃCZONA: {b_type} na pozycji {x},{y} !!!")
     
+
+
+    #def draw_map
+    #jeśli chce aby kratki były tak jak w oryginale
+        #keys = pygame.key.get_pressed()
+        #if keys[pygame.K_g]:
+            #for x range ...
+
 
          # Sterowanie jednostką przyciskami 
         # --- RUCH JEDNOSTKĄ ---
