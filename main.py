@@ -22,6 +22,7 @@ p1.units.append(start_unit)
 
 running = True
 while running:
+    world.update()
     # 1. OBSŁUGA ZDARZEŃ - Delegujemy WSZYSTKO do World
     # To pozwoli działać Twoim returnom i zmianom stanów
     world.handle_events() 
