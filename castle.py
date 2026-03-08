@@ -5,6 +5,21 @@ from unit import GoldTransport
 # castle.py
 from unit import UNIT_STATS, Unit
 
+BUILDING_TYPES = {
+    "Zamek": {
+        "size": 2, "turns": 24, "garrison_limit": 12, "foundation_required": True,
+        "modules": ["szkoła", "warsztat", "koszary", "szpital", "kuźnia", "chłopi"]
+    },
+    "Twierdza": {
+        "size": 2, "turns": 12, "garrison_limit": 12, "foundation_required": True,
+        "modules": ["szkoła", "warsztat", "koszary", "szpital", "kuźnia"]
+    },
+    "Strażnica": {
+        "size": 1, "turns": 4, "garrison_limit": 10, "foundation_required": False,
+        "modules": [] 
+    }
+}
+
 BUILDINGS = {
     "hospital": {"cost": 200},
     "Koszary": {"cost": 200},
@@ -45,11 +60,11 @@ class Castle:
         self.x = x
         self.y = y
         self.owner = owner
-        self.building_type = building_type # Tutaj przechowamy: "Wieża", "Twierdza" lub "Zamek"
+        self.building_type = building_type # Tutaj przechowamy: "Strażnica", "Twierdza" lub "Zamek"
         self.gold = 0
-        self.garrison_limit = 10 if building_type == "Wieża" else 12
+        self.garrison_limit = 10 if building_type == "Strażnica" else 12
         # ZMIANA: Zamiast [], tworzymy listę 12 pustych miejsc
-        self.garrison = [] * self.garrison_limit 
+        self.garrison = [None] * self.garrison_limit 
         self.plague_active = False
         self.plague_turns = 0
         self.peasants = 100

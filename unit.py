@@ -414,7 +414,7 @@ class Unit:
             # Pobierasz dane ze słownika, który już masz gotowy
         stats = UNIT_STATS.get(unit_type, {})
         self.hp = stats.get("hp", 100)
-        self.move_points = stats.get("moves", 5)
+        self.move_points = stats.get("moves", 50)
         self.attack = stats.get("attack", 10)
         # Automatyczny skrót:
         self.short_name = unit_type[:2].upper()
