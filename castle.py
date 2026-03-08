@@ -60,9 +60,9 @@ class Castle:
         self.x = x
         self.y = y
         self.owner = owner
-        self.building_type = building_type # Tutaj przechowamy: "Wieża", "Twierdza" lub "Zamek"
+        self.building_type = building_type # Tutaj przechowamy: "Strażnica", "Twierdza" lub "Zamek"
         self.gold = 0
-        self.garrison_limit = 10 if building_type == "Wieża" else 12
+        self.garrison_limit = 10 if building_type == "Strażnica" else 12
         # ZMIANA: Zamiast [], tworzymy listę 12 pustych miejsc
         self.garrison = [None] * self.garrison_limit 
         self.plague_active = False
