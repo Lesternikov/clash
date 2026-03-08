@@ -1,0 +1,91 @@
+class world
+def _init_(self): absolutnie konieczne
+#    wszystkie self'y i ich opisy
+def update(self):
+#    obsługa kamery i poruszania się po mapie
+#    obsługa częściowa lirery G
+def load_map(self, filename):
+#   wczytanie map.txt 
+#   jeśli niema mapy tworzy pustą 100x100
+def load(self, map_file, fac_file):
+#
+def add_player(self, player):
+#   tworzy graczy
+def add_unit(self, unit):
+#   dodaje jednostki
+def next_turn(self):
+#
+def move_unit(self, unit, dx, dy):
+#
+def reset_unit(self): #możliwe że niepotrzebne
+#   resetuje jadnoostki do pięciu moves
+def select_unit(self, x, y):
+#   wybieranie swojej jednostki 
+#   i blokowanie czego kolwiek innego
+def move_select(self, dx, dy):
+#
+#
+def spawn_unit_ner_castle(self, unit, castle):
+#   bydownie zmku na czterech polach
+def recruit_unit(self):
+#
+#
+def get_castle(self, x, y):
+#   
+def select_garrison_unit(self, unit): można wpakować gdzie indziej
+#   limit zaznaczenia
+def cler_selection(self):
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#       
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#       
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#       
+#   
+#   
+#   
