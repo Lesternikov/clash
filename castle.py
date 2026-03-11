@@ -30,29 +30,29 @@ BUILDINGS = {
 # Słownik: "Nazwa Patentu": (Poziom Zamku, Wymagany Budynek lub None)
 UNIT_REQUIREMENTS = {
     # POZIOM 1
-    "posp. ruszenie": (1, None),
-    "lekka piechota":     (1, None),
-    "pikinier":           (1, None),
-    "góral":              (1, None),
-    "budowniczy":         (1, None),
-    "łucznik":            (1, "workshop"),
-    "taran":              (1, "workshop"),
-    "leśnik":             (1, "workshop"),
-    "lekka jazda":        (1, "forge"),
+    "Posp. ruszenie": (1, None),
+    "Lekka piechota":     (1, None),
+    "Pikinier":           (1, None),
+    "Góral":              (1, None),
+    "Budowniczy":         (1, None),
+    "Łucznik":            (1, "workshop"),
+    "Taran":              (1, "workshop"),
+    "Leśnik":             (1, "workshop"),
+    "Lekka jazda":        (1, "forge"),
 
     # POZIOM 2 (dodatkowe jednostki)
-    "czerw":              (2, None),
-    "słoń":               (2, None),
-    "skorpion":           (2, None),
-    "orzeł":              (2, None),
-    "katapulta":          (2, "workshop"),
-    "dragon":             (2, "forge"),
+    "Czerw":              (2, None),
+    "Słoń":               (2, None),
+    "Skorpion":           (2, None),
+    "Orzeł":              (2, None),
+    "Katapulta":          (2, "workshop"),
+    "Dragon":             (2, "forge"),
 
     # POZIOM 3 (dodatkowe jednostki)
-    "szkielet":           (3, None),
-    "duch":               (3, None),
-    "pegaz":              (3, None),
-    "skrzydlak":          (3, None)}
+    "Szkielet":           (3, None),
+    "Duch":               (3, None),
+    "Pegaz":              (3, None),
+    "Skrzydlak":          (3, None)}
 
 class Castle:
 
@@ -87,15 +87,9 @@ class Castle:
         self.max_patents = 12
         self.patents = [None] * self.max_patents       # wykupione patenty
         self.patents[0] = {
-        "unit_type": "posp. ruszenie",
-        "stats": UNIT_STATS["posp. ruszenie"]
+        "unit_type": "Posp. ruszenie",
+        "stats": UNIT_STATS["Posp. ruszenie"]
         } 
-
-    def release_unit(self):
-        """Zabiera pierwszą jednostkę z garnizonu i zwraca ją."""
-        if self.garrison:
-            return self.garrison.pop(0) # Wyciąga pierwszą osobę z listy
-        return None 
 
     def collect_taxes(self):        
         if self.plague_active:
@@ -586,25 +580,25 @@ class Castle:
     def is_patent_available(self, patent_name):
         # Dane o wymaganiach, które ustaliliśmy wcześniej
         UNIT_REQUIREMENTS = {
-            "posp. ruszenie": (1, None),
-            "lekka piechota": (1, None),
-            "pikinier": (1, None),
-            "góral": (1, None),
-            "budowniczy": (1, None),
-            "łucznik": (1, "workshop"),
-            "taran": (1, "workshop"),
-            "leśnik": (1, "workshop"),
-            "lekka jazda": (1, "forge"),
-            "czerw": (2, None),
-            "słoń": (2, None),
-            "skorpion": (2, None),
-            "orzeł": (2, None),
-            "katapulta": (2, "workshop"),
-            "dragon": (2, "forge"),
-            "szkielet": (3, None),
-            "duch": (3, None),
-            "pegaz": (3, None),
-            "skrzydlak": (3, None)
+            "Posp. ruszenie": (1, None),
+            "Lekka piechota": (1, None),
+            "Pikinier": (1, None),
+            "Góral": (1, None),
+            "Budowniczy": (1, None),
+            "Łucznik": (1, "workshop"),
+            "Taran": (1, "workshop"),
+            "Leśnik": (1, "workshop"),
+            "Lekka jazda": (1, "forge"),
+            "Czerw": (2, None),
+            "Słoń": (2, None),
+            "Skorpion": (2, None),
+            "Orzeł": (2, None),
+            "Katapulta": (2, "workshop"),
+            "Dragon": (2, "forge"),
+            "Szkielet": (3, None),
+            "Duch": (3, None),
+            "Pegaz": (3, None),
+            "Skrzydlak": (3, None)
         }
 
         if patent_name not in UNIT_REQUIREMENTS:
