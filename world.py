@@ -1630,20 +1630,6 @@ class World:
                 # Zakładam, że draw_text to Twoja pomocnicza funkcja lub używasz font.render
                 draw_text(screen, p.name, rect.x + 10, rect.y + 5)
 
-    def draw_court(self, screen):
-        screen.fill((30, 30, 30)) # Tło
-
-        # Rysowanie wszystkich paneli
-        self.draw_court_players_header(screen)
-        self.draw_court_stats(screen)
-        self.draw_queen_panel(screen)
-        self.draw_prison_sections(screen)
-
-        self.back_button = pygame.Rect(10, 130, 100, 40) # Dopasowałem rozmiar do screena
-        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
-        # Tekst "BACK" wyśrodkowany w tym prostokącie
-        draw_text(screen, "BACK", self.back_button.x + 25, self.back_button.y + 12)
-
     def draw_queen_panel(self, screen):
         w = screen.get_width()
 

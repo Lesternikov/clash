@@ -232,3 +232,109 @@ def execute_universal_release(self):
 def draw_building_footer(self, screen):
 #    
 #notatki 
+class Castle
+def __init__(self, x, y, owner=None, building_type="Zamek"):
+#
+#
+def release_unit(self):
+#
+def collect_taxes(self):
+#
+#
+def update_happiness(self):
+#
+#
+def grow_population(self):
+#
+def tile_position(self):
+#
+def __repr__(self):
+#
+def recruit(self, player, unit_type):
+#
+#
+def start_production(self, unit_type):
+#
+def process_production(self):
+#
+def buy_patent(self, unit_type):
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
