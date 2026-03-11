@@ -550,23 +550,6 @@ class Castle:
         self.owner = None
         self.garrison.clear()
 
-    def is_patent_available(self, patent_name):
-        # Jeśli nie ma na liście, uznajemy że nie ma wymagań (lub to jednostka Twierdzy)
-        if patent_name not in UNIT_REQUIREMENTS:
-            return False 
-            
-        req_level, req_building = UNIT_REQUIREMENTS[patent_name]
-        
-        # Sprawdź poziom zamku
-        if self.level < req_level:
-            return False
-            
-        # Sprawdź budynek (jeśli wymagany)
-        if req_building and req_building not in self.buildings:
-            return False
-   
-        return True
-    
     def get_buyable_units(self, castle):
         buyable = []
         for unit_name in UNIT_REQUIREMENTS.keys():
