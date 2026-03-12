@@ -56,4 +56,4 @@ def generate_full_map(fac_path, output_path):
         print(f"Wystąpił błąd: {e}")
 
 if __name__ == "__main__":
-    generate_full_map("0.FAC", "map.txt")
+    generate_full_map("0.FAC", "map1.txt")

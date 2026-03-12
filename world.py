@@ -15,19 +15,19 @@ MAP_WIDTH = 100
 MAP_HEIGHT = 100
 
 TERRAIN_TYPES = {
-    "#": {"name": "kult", "color": (139, 69, 19), "walkable": False, "cost": 999},
-    "S": {"name": "świątynia","color": (255, 255, 255), "walkable": False, "cost": 999},
-    "$": {"name": "złoto", "color": (255, 215, 0), "walkable": True, "cost": 1},
-    "_": {"name": "droga","color": (255, 255, 255), "walkable": True, "cost": 0.5},
-    "x": {"name": "pułapka","color": (255, 255, 255), "walkable": False, "cost": 999},
-    ".": {"name": "trawa", "color": (34, 139, 34), "walkable": True, "cost": 1},
-    "l": {"name": "las", "color": (0, 100, 0), "walkable": True, "cost": 2},
-    "P": {"name": "pustynia","color": (255, 255, 255), "walkable": True, "cost": 2},
-    "w": {"name": "woda", "color": (0, 0, 255), "walkable": False, "cost": 999},
-    "B": {"name": "bagno","color": (255, 25, 25), "walkable": False, "cost": 999},
-    "b": {"name": "bagno płytkie","color": (255, 255, 255), "walkable": True, "cost": 7},
-    "G": {"name": "góry","color": (255, 255, 255), "walkable": False, "cost": 999},
-    "g": {"name": "góry niskie","color": (255, 255, 255), "walkable": True, "cost": 3},
+    "#": {"name": "kult", "color": (139, 69, 19)},
+    "S": {"name": "świątynia","color": (255, 255, 255)},
+    "$": {"name": "złoto", "color": (255, 215, 0),"cost": 4},
+    "_": {"name": "droga","color": (185, 185, 185),"cost": 3},
+    "x": {"name": "pułapka","color": (25, 25, 25)},
+    ".": {"name": "trawa", "color": (34, 139, 34),"cost": 4},
+    "l": {"name": "las", "color": (0, 100, 0),"cost": 6},
+    "p": {"name": "pustynia","color": (210, 105, 30),"cost": 5},
+    "W": {"name": "woda", "color": (0, 199, 255)},
+    "B": {"name": "bagno","color": (255, 0, 0)},
+    "b": {"name": "bagno płytkie","color": (169, 169, 169),"cost": 7},
+    "G": {"name": "góry","color": (85, 85, 85)},
+    "g": {"name": "góry niskie","color":(119, 119, 119),"cost": 8},
 }
 
 def draw_text(screen, text, x, y, color=(0, 0, 0)):
@@ -72,7 +72,7 @@ class World:
         self.destroyed = False
         self.owner = None
         # 2. DOPIERO TERAZ ładuj dane z plików (Nie zostaną nadpisane!)
-        self.map = self.load_map("map.txt")
+        self.map = self.load_map("final_map.txt")
         self.load_castles_from_fac("0.FAC")
 
         # 3. Reszta Twoich przycisków...
@@ -224,14 +224,14 @@ class World:
             game_map = []
             try:
                 with open(filename, 'r') as f:
-                    # Czytamy każdą linię z map.txt i usuwamy znaki nowej linii
+                    # Czytamy każdą linię z final_map.txt i usuwamy znaki nowej linii
                     for line in f:
                         game_map.append(list(line.strip()))
                 print(f"Mapa wczytana: {len(game_map)}x{len(game_map[0])}")
             except FileNotFoundError:
                 # Jeśli pliku nie ma, tworzymy awaryjną trawę 100x100
-                print("Błąd: Nie znaleziono map.txt! Tworzę pustą mapę.")
-                game_map = [["." for _ in range(100)] for _ in range(100)]
+                print("Błąd: Nie znaleziono final_map.txt! Tworzę pustą mapę.")
+                game_map = [["l" for _ in range(100)] for _ in range(100)]
         
             return game_map
 
@@ -293,9 +293,9 @@ class World:
         # Odnowienie punktów ruchu jednostek
         for unit in self.units:
             if unit.type in UNIT_STATS:
-                unit.move_points = UNIT_STATS[unit.type].get("moves", 50) 
+                unit.move_points = UNIT_STATS[unit.type].get("moves", 5) 
             else:
-                unit.move_points = 50 
+                unit.move_points = 5
 
         # --- LOGIKA BUDOWANIA (TUTAJ BYŁY BŁĘDY) ---
         finished = []
@@ -401,9 +401,9 @@ class World:
 
                     return # Znaleźliśmy zamek, wychodzimy z pętli
 
-        # 4. ===== NORMALNY RUCH (tylko na kafelku ".") =====
+        # 4. ===== NORMALNY RUCH =====
         # Sprawdzamy czy teren pozwala na przejście
-        if self.map[ny][nx] in [".", "0", " ", "$"]:
+        if self.map[ny][nx] in [".", "l", "p", "$","_","g"]:
             unit.x = nx
             unit.y = ny
             unit.move_points -= 1
@@ -413,7 +413,7 @@ class World:
         for u in self.units:
             if u.x < 0:
                 continue
-            u.move_points = 50
+            u.move_points = 5
 
     def select_unit(self, x, y):
         for u in self.units:
@@ -1762,18 +1762,24 @@ class World:
         # Zawsze czyścimy tło na początku klatki
         screen.fill((30, 30, 30))
         # 1. LOGIKA EKRANU MAPY ORAZ PUŁAPKI
-        # Dodajemy "or self.screen == 'trap_info'", żeby mapa nie znikała!
         if self.screen == "map" or self.screen == "trap_info":
+            # Najpierw rysujemy podkład: teren, budynki i place budowy (litery P)
             self.draw_map(screen)
+
+            # --- TUTAJ WPISZ PĘTLĘ DLA JEDNOSTEK ---
+            for unit in self.units:
+                # Sprawdzamy, czy jednostka nie jest ukryta (np. przez start_building)
+                if getattr(unit, 'visible', True):
+                    unit.draw(screen)
+            # --------------------------------------
+
+            # Na samym końcu rysujemy interfejs, aby zawsze był na wierzchu
             self.draw_top_bar(screen)
-            # ZAMIAST draw_bottom_bar, wywołaj draw_ui, 
-            # bo to ona rysuje cały dolny panel ze slotami!
             self.draw_ui(screen)
 
-            # JEŚLI to pułapka, dorysuj okienko NA narysowanej już mapie
             if self.screen == "trap_info":
                 self.draw_trap_popup(screen)
-
+                
         # 2. EKRAN ZAMKU (Główny)
         elif self.screen == "castle":
             self.draw_castle(screen)
@@ -2781,7 +2787,7 @@ class World:
         # 1. Sprawdzenie granic i terenu
         if not (0 <= x < map_width and 0 <= y < map_height):
             return False
-        if self.map[y][x] not in [".", "0", " ", "$"]:
+        if self.map[y][x] not in [".", "_", "p", "$", "l","g"]:
             return False
 
         # 2. Sprawdzenie jednostek
@@ -3141,22 +3147,15 @@ class World:
         if b_type not in BUILDING_TYPES: return
         config = BUILDING_TYPES[b_type]
         
-        # WYMUSZAMY LICZBY CAŁKOWITE (kluczowe!)
         ix, iy = int(x), int(y)
         current_tile = self.map[iy][ix]
-        
         anchor_x, anchor_y = ix, iy
         found_foundation = False
-        # TEST: Szukamy najbliższego '#' w promieniu 5 kafelków
-        for ty in range(iy - 5, iy + 6):
-            for tx in range(ix - 5, ix + 6):
-                if 0 <= tx < len(self.map[0]) and 0 <= ty < len(self.map):
-                    if self.map[ty][tx] == "#":
-                        print(f"TEST: Znalazłem '#' na pozycji X:{tx}, Y:{ty}!")
+
+        # 1. LOGIKA SZUKANIA FUNDAMENTU / MIEJSCA
         if config.get("size") == 2:
-            # Sprawdzamy kwadrat wokół gracza. 
-            # Szukamy JEDYNEGO '#' który ma być lewym górnym rogiem.
-            # Sprawdzamy pozycje: samą w sobie, jedną w lewo, jedną w górę, jedną w skos.
+            # Dla Zamku: sprawdzamy tylko pod nogami i 1 kafelek wokół, 
+            # aby znaleźć lewy górny róg '#'
             for dx in [0, -1]:
                 for dy in [0, -1]:
                     nx, ny = ix + dx, iy + dy
@@ -3168,23 +3167,28 @@ class World:
                 if found_foundation: break
 
             if not found_foundation:
-                # DEBUG: Pokaż co widzi budowniczy pod nogami
-                print(f"DEBUG: Brak fundamentu w pobliżu {ix},{iy}. Kaflek pod nogami: {current_tile}")
+                print(f"Błąd: Zamek wymaga fundamentu (#). Pod nogami: {current_tile}")
                 return
         else:
-            # Strażnica 1x1
-            if current_tile != ".":
-                # Strażnica na # to błąd, musi być kropka
-                print(f"Błąd: Strażnicę budujemy na '.', a tu jest '{current_tile}'")
+            # Dla Strażnicy (1x1): budujemy na trawie (.) lub pustyni (p)
+            if current_tile in [".", "p"]:
+                found_foundation = True
+            else:
+                print(f"Błąd: Tu nie można budować strażnicy (teren: {current_tile})")
                 return
-            found_foundation = True
 
-        # 4. Sprawdź czy miejsce zakotwiczone jest wolne od innych projektów
+        # 2. SPRAWDZENIE CZY MIEJSCE WOLNE
         if (anchor_x, anchor_y) in self.active_projects:
             print("Tu już trwa budowa!")
             return
 
-        # 5. Tworzymy projekt (ZAWSZE przypięty do lewego górnego rogu #)
+        # 3. UKRYWANIE BUDOWNICZEGO
+        # Budowniczy "znika" z mapy na czas budowy
+        if builder_unit:
+            builder_unit.visible = False
+            builder_unit.is_building = True
+
+        # 4. TWORZENIE PROJEKTU
         self.active_projects[(anchor_x, anchor_y)] = {
             "type": b_type,
             "remaining": config["turns"],
@@ -3193,17 +3197,17 @@ class World:
             "builder": builder_unit
         }
         
-        # 6. Zmieniamy kafelki na Placu Budowy 'P'
+        # 5. ZMIANA MAPY NA SYMBOLE 'P' (Plac budowy)
         if config.get("size") == 2:
-            # Zmieniamy kwadrat 2x2 zaczynając od '#'
+            # Zmieniamy kwadrat 2x2 na 'P', żeby budowniczy nie był widoczny,
+            # a gracz widział, że coś powstaje.
             for i in range(2):
                 for j in range(2):
-                    if anchor_y+i < len(self.map) and anchor_x+j < len(self.map[0]):
-                        self.map[anchor_y+i][anchor_x+j] = "P"
+                    self.map[anchor_y + i][anchor_x + j] = "P"
         else:
             self.map[anchor_y][anchor_x] = "P"
 
-        print(f"Rozpoczęto budowę {b_type} w punkcie {anchor_x}, {anchor_y}")
+        print(f"Rozpoczęto budowę {b_type} na pozycji {anchor_x}, {anchor_y}. Budowniczy ukryty.")
 
     def process_construction(self):
         # Lista do usunięcia skończonych projektów
@@ -3269,7 +3273,7 @@ class World:
         if builder_to_save and new_building:
             new_building.add_to_garrison(builder_to_save)
             print(f"Budowniczy wszedł do garnizonu {b_type}")
-
+    
     def handle_building_logic(self, mx, my, gx, gy):
         tile = self.map[gy][gx]
         builder = self.selected_unit
@@ -3571,7 +3575,7 @@ class World:
             for dx, dy in directions:
                 nx, ny = castle.x + dx, castle.y + dy
                 if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
-                    if (nx, ny) not in occupied and self.map[ny][nx] in [".", "0", " ", "$"]:
+                    if (nx, ny) not in occupied and self.map[ny][nx] in [".", "_", "p", "$","l","g"]:
                         results.append((nx, ny))
                         occupied.add((nx, ny)) # Rezerwujemy to miejsce dla kolejnej grupy
                         found = True

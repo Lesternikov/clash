@@ -14,7 +14,7 @@ p1 = Player(1, "Gracz 1", (255, 50, 50))   # Soczysty czerwony
 p2 = Player(2, "Gracz 2", (50, 150, 255))  # Jasny niebieski
 world.add_player(p1)
 world.add_player(p2)
-world.load("map.txt", "0.FAC")
+world.load("final_map.txt", "0.FAC")
 
 # --- TUTAJ SPAWNUJEMY BUDOWNICZEGO ---
 # Teraz world.players[0] już istnieje i jest to p1!

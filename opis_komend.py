@@ -1,3 +1,33 @@
+jest tu:
+class PrisonSlot,
+class World,
+class Castle,
+class Unit,
+class GoldTransport,
+class PeasantGroup,
+class Player,
+class General,
+class ArmyGroup,
+
+
+TILE_SIZE = 32
+#
+SCREEN_WIDTH = 1280
+#
+SCREEN_HEIGHT = 800
+#
+MAP_WIDTH = 100 
+#
+MAP_HEIGHT = 100
+#
+TERRAIN_TYPES = {}
+#
+
+def draw_text(screen, text, x, y, color=(0, 0, 0)):
+
+class PrisonSlot
+def __init__(self, general=None):
+
 class world
 def _init_(self): absolutnie konieczne
 #    wszystkie self'y i ich opisy
@@ -9,6 +39,7 @@ def load_map(self, filename):
 #   jeśli niema mapy tworzy pustą 100x100
 def load(self, map_file, fac_file):
 #
+#wybiera kolory zamków
 def add_player(self, player):
 #   tworzy graczy
 def add_unit(self, unit):
@@ -234,6 +265,16 @@ def draw_building_footer(self, screen):
 def can_build_castle_at(self, gx, gy, b_type):
 # zasady budowania zamków 
 #notatki 
+
+
+
+BUILDING_TYPES = {}
+#
+BUILDINGS ={}
+#
+UNIT_REQUIREMENTS = {}
+#
+
 class Castle
 def __init__(self, x, y, owner=None, building_type="Zamek"):
 #
@@ -262,81 +303,131 @@ def process_production(self):
 def buy_patent(self, unit_type):
 #
 #
+def remove_patent(self, unit_type):
 #
+def stop_production(self):
 #
+def process_production(self):
 #
 #
+def start_healing_unit(self, unit):
 #
+def process_healing(self):
 #
+def cancel_garrison_healing(self):
 #
+def under_attack(self):
 #
+def build(self, building_name):
 #
 #
+def update_level(self):
 #
+def has_building(self, name):
 #
+def check_plague_start(self):
 #
+def process_plague(self):
 #
+def send_peasants(self, world, amount):
 #
+def send_gold(self, world, amount):
 #
+def start_training(self, unit):
 #
+def start_training_selected(self, units):
 #
+def start_training_group(self, units):
 #
+def process_training(self):
 #
 #
+def next_turn(self):
 #
+def finish_production(self):
 #
+def update_production(self, world):
 #
+def demolish(self):
 #
+def get_buyable_units(self, castle):
 #
+def is_patent_available(self, patent_name):
 #
 #
+def add_to_garrison(self, unit):
 #
+
+
+UNIT_STATS = {}
 #
+
+class Unit
+def __init__(self, unit_type, x, y, owner):
 #
 #
+def move_along_path(self, world):
 #
 #
+def draw(self, screen):
 #
+def position(self):
 #
+def __repr__(self):
 #
+def veterancy_level(self):
 #
+def gain_training_exp(self):
 #
+def gain_battle_exp(self):
 #
+def take_damage(self, dmg):
 #
+def is_alive(self):
 #
+def morale_modifier(self):
 #
+def exp_modifier(self):
 #
+def attack_unit(self, target, log):
 #
 #
+def can_enter(self, tile):
 #
+
+
+class GoldTransport
+def __init__(self, x, y, owner, gold):
 #
+def position(self):
 #
+def __repr__(self):
 #
+
+
+class PeasantGroup
+def __init__(self, x, y, owner, amount):
 #
+def position(self):
 #
+def __repr__(self):
 #
+
+
+class Player
+def __init__(self, player_id, name, color):
 #
+def try_spawn_general(self):
 #
+
+
+class General
+def __init__(self, owner):
 #
+def apply_bonus(self, unit):
 #
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
+
+
+class ArmyGroup
+def __init__(self):
 #
