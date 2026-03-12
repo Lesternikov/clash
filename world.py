@@ -15,19 +15,19 @@ MAP_WIDTH = 100
 MAP_HEIGHT = 100
 
 TERRAIN_TYPES = {
-    "#": {"name": "kult", "color": (139, 69, 19), "walkable": False, "cost": 999},
-    "S": {"name": "świątynia","color": (255, 255, 255), "walkable": False, "cost": 999},
-    "$": {"name": "złoto", "color": (255, 215, 0), "walkable": True, "cost": 1},
-    "_": {"name": "droga","color": (255, 255, 255), "walkable": True, "cost": 0.5},
-    "x": {"name": "pułapka","color": (255, 255, 255), "walkable": False, "cost": 999},
-    ".": {"name": "trawa", "color": (34, 139, 34), "walkable": True, "cost": 1},
-    "l": {"name": "las", "color": (0, 100, 0), "walkable": True, "cost": 2},
-    "P": {"name": "pustynia","color": (255, 255, 255), "walkable": True, "cost": 2},
-    "w": {"name": "woda", "color": (0, 0, 255), "walkable": False, "cost": 999},
-    "B": {"name": "bagno","color": (255, 25, 25), "walkable": False, "cost": 999},
-    "b": {"name": "bagno płytkie","color": (255, 255, 255), "walkable": True, "cost": 7},
-    "G": {"name": "góry","color": (255, 255, 255), "walkable": False, "cost": 999},
-    "g": {"name": "góry niskie","color": (255, 255, 255), "walkable": True, "cost": 3},
+    "#": {"name": "kult", "color": (139, 69, 19)},
+    "S": {"name": "świątynia","color": (255, 255, 255)},
+    "$": {"name": "złoto", "color": (255, 215, 0),"cost": 4},
+    "_": {"name": "droga","color": (185, 185, 185),"cost": 3},
+    "x": {"name": "pułapka","color": (25, 25, 25)},
+    ".": {"name": "trawa", "color": (34, 139, 34),"cost": 4},
+    "l": {"name": "las", "color": (0, 100, 0),"cost": 6},
+    "p": {"name": "pustynia","color": (210, 105, 30),"cost": 5},
+    "W": {"name": "woda", "color": (0, 199, 255)},
+    "B": {"name": "bagno","color": (255, 0, 0)},
+    "b": {"name": "bagno płytkie","color": (169, 169, 169),"cost": 7},
+    "G": {"name": "góry","color": (85, 85, 85)},
+    "g": {"name": "góry niskie","color":(119, 119, 119),"cost": 8},
 }
 
 def draw_text(screen, text, x, y, color=(0, 0, 0)):
@@ -231,7 +231,7 @@ class World:
             except FileNotFoundError:
                 # Jeśli pliku nie ma, tworzymy awaryjną trawę 100x100
                 print("Błąd: Nie znaleziono map.txt! Tworzę pustą mapę.")
-                game_map = [["." for _ in range(100)] for _ in range(100)]
+                game_map = [["l" for _ in range(100)] for _ in range(100)]
         
             return game_map
 
@@ -293,9 +293,9 @@ class World:
         # Odnowienie punktów ruchu jednostek
         for unit in self.units:
             if unit.type in UNIT_STATS:
-                unit.move_points = UNIT_STATS[unit.type].get("moves", 50) 
+                unit.move_points = UNIT_STATS[unit.type].get("moves", 5) 
             else:
-                unit.move_points = 50 
+                unit.move_points = 5
 
         # --- LOGIKA BUDOWANIA (TUTAJ BYŁY BŁĘDY) ---
         finished = []
@@ -401,9 +401,9 @@ class World:
 
                     return # Znaleźliśmy zamek, wychodzimy z pętli
 
-        # 4. ===== NORMALNY RUCH (tylko na kafelku ".") =====
+        # 4. ===== NORMALNY RUCH =====
         # Sprawdzamy czy teren pozwala na przejście
-        if self.map[ny][nx] in [".", "0", " ", "$"]:
+        if self.map[ny][nx] in [".", "l", "p", "$","_","g"]:
             unit.x = nx
             unit.y = ny
             unit.move_points -= 1
@@ -413,7 +413,7 @@ class World:
         for u in self.units:
             if u.x < 0:
                 continue
-            u.move_points = 50
+            u.move_points = 5
 
     def select_unit(self, x, y):
         for u in self.units:
@@ -2727,7 +2727,7 @@ class World:
         # 1. Sprawdzenie granic i terenu
         if not (0 <= x < map_width and 0 <= y < map_height):
             return False
-        if self.map[y][x] not in [".", "0", " ", "$"]:
+        if self.map[y][x] not in [".", "_", "p", "$", "l","g"]:
             return False
 
         # 2. Sprawdzenie jednostek
@@ -3099,7 +3099,7 @@ class World:
             print("Błąd: Zamek i Twierdza wymagają fundamentów (#)!")
             return
         
-        if not config["foundation_required"] and tile != ".":
+        if not config["foundation_required"] and tile not in ["p","."]:
             print("Błąd: Strażnicę budujemy tylko na wolnym terenie (.)!")
             return
 
@@ -3182,7 +3182,7 @@ class World:
         """Obsługuje stawianie placu budowy. Zwraca True jeśli rozpoczęto budowę."""
         if getattr(self, "building_mode", None) == "Tower":
             if 0 <= gy < len(self.map) and 0 <= gx < len(self.map[0]):
-                if self.map[gy][gx] == ".":
+                if self.map[gy][gx] in ["p","."]:
                     builder = self.selected_unit
                     if builder:
                         self.map[gy][gx] = "P"
@@ -3448,7 +3448,7 @@ class World:
             for dx, dy in directions:
                 nx, ny = castle.x + dx, castle.y + dy
                 if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
-                    if (nx, ny) not in occupied and self.map[ny][nx] in [".", "0", " ", "$"]:
+                    if (nx, ny) not in occupied and self.map[ny][nx] in [".", "_", "p", "$","l","g"]:
                         results.append((nx, ny))
                         occupied.add((nx, ny)) # Rezerwujemy to miejsce dla kolejnej grupy
                         found = True

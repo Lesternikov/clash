@@ -39,6 +39,7 @@ def load_map(self, filename):
 #   jeśli niema mapy tworzy pustą 100x100
 def load(self, map_file, fac_file):
 #
+#wybiera kolory zamków
 def add_player(self, player):
 #   tworzy graczy
 def add_unit(self, unit):
