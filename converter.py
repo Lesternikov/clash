@@ -14,7 +14,7 @@ def convert_with_strict_palette(image_path, output_path):
         (155, 145, 140): '_', # Drogi (Jasnoszary)
         (115, 110, 110): 'g', # Skały (Średni szary)
         (80, 75, 75):    'G', # Góry (Ciemnoszary)
-        (95, 35, 10):    'B', # Bagna / Ciemny brąz
+        (110, 104, 200): 'B', # Bagna / Ciemny brąz
         (255, 255, 0):   'S', # Żółty (Jednostka)
         (255, 255, 255): 'U', # Biały (Zamek/Wróg)
         (255, 0, 0):     '$', # Czerwony (Skarb)
@@ -52,4 +52,7 @@ def convert_with_strict_palette(image_path, output_path):
     print(f"Konwersja zakończona. Sprawdź plik {output_path}")
 
 # Uruchom na pliku ho.png lub image_9cbdf4.png
-convert_with_strict_palette('ho.png', 'map.txt')
+convert_with_strict_palette('2darg nest.png', 'map.txt')
+
+
+import main

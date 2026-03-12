@@ -1,3 +1,4 @@
+import main
 from unit import Unit, UNIT_STATS
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player

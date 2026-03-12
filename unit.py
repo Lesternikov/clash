@@ -1,3 +1,4 @@
+import main
 UNIT_STATS = {
     "Posp. ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
         Chłopi zajmują się
