@@ -231,6 +231,8 @@ def execute_universal_release(self):
 #   
 def draw_building_footer(self, screen):
 #    
+def can_build_castle_at(self, gx, gy, b_type):
+# zasady budowania zamków 
 #notatki 
 class Castle
 def __init__(self, x, y, owner=None, building_type="Zamek"):
