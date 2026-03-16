@@ -262,6 +262,8 @@ def execute_universal_release(self):
 #   
 def draw_building_footer(self, screen):
 #    
+def can_build_castle_at(self, gx, gy, b_type):
+# zasady budowania zamków 
 #notatki 
 
 

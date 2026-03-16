@@ -73,7 +73,7 @@ class World:
         self.destroyed = False
         self.owner = None
         # 2. DOPIERO TERAZ ładuj dane z plików (Nie zostaną nadpisane!)
-        self.map = self.load_map("map.txt")
+        self.map = self.load_map("final_map1.txt")
         self.load_castles_from_fac("0.FAC")
 
         # 3. Reszta Twoich przycisków...
@@ -196,7 +196,7 @@ class World:
         self.active_projects = {} # Słownik: {(x, y): dane_budowy}
         self.tower_release_button = pygame.Rect(320, 430, 120, 40) # Dopasuj wymiary
         self.tower_back_button = pygame.Rect(560, 430, 120, 40)
-        
+        self.inspected_unit = None  # To naprawi AttributeError
 
     def update(self):
             keys = pygame.key.get_pressed()
@@ -225,13 +225,13 @@ class World:
             game_map = []
             try:
                 with open(filename, 'r') as f:
-                    # Czytamy każdą linię z map.txt i usuwamy znaki nowej linii
+                    # Czytamy każdą linię z final_map.txt i usuwamy znaki nowej linii
                     for line in f:
                         game_map.append(list(line.strip()))
                 print(f"Mapa wczytana: {len(game_map)}x{len(game_map[0])}")
             except FileNotFoundError:
                 # Jeśli pliku nie ma, tworzymy awaryjną trawę 100x100
-                print("Błąd: Nie znaleziono map.txt! Tworzę pustą mapę.")
+                print("Błąd: Nie znaleziono final_map.txt! Tworzę pustą mapę.")
                 game_map = [["l" for _ in range(100)] for _ in range(100)]
         
             return game_map
@@ -609,40 +609,52 @@ class World:
             if event.type == pygame.QUIT:
                 pygame.quit(); import sys; sys.exit()
 
+            # --- 1. KLAWIATURA ---
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     # SZYBKI POWRÓT (ESC)
                     if self.screen in ["recruitment", "garrison", "forge", "workshop", "hospital", "school", "peasants", "court"]:
                         self.screen = "castle"
+                        self.inspected_unit = None # Czyścimy podgląd przy wyjściu
                     elif self.screen == "castle":
                         self.screen = "map"
                     elif getattr(self, 'demolish_confirm', False):
                         self.demolish_confirm = False
-            
+
                 elif event.key == pygame.K_SPACE:
                     if self.selected_unit:
                         self.selected_unit = None
                     else:
                         self.next_turn()
+
                 elif event.key == pygame.K_g:
                     if self.screen == "map":
-                        self.show_grid = not self.show_grid  # Odwraca wartość (True -> False, False -> True)
+                        self.show_grid = not self.show_grid
                         print(f"Siatka: {self.show_grid}")
 
+            # --- 3. WCIŚNIĘCIE MYSZY (CLICK / HOLD START) ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 
-                # 1. Obsługa scrollowania (tylko systemowe)
+                # A. Scrollowanie w rekrutacji (button 4 i 5)
                 if event.button in [4, 5] and self.screen == "recruitment":
                     self.handle_recruitment_scroll(event)
                     continue
 
-                # 2. CAŁA RESZTA KLIKNIĘĆ LEWYM/PRAWYM
-                # Wysyłamy to do handle_mouse_click, które już ma Twoje poprawki z elif/return
+                # B. Lewy przycisk - INSPEKCJA (Trzymanie)
+                if event.button == 3: # Prawy przycisk
+                    if self.screen == "garrison":
+                        # Ta funkcja (którą już masz) ustawi self.inspected_unit
+                        self.check_unit_info(mx, my)
+
+                # C. Wykonanie standardowego kliknięcia (Zaznaczanie itp.)
                 self.handle_mouse_click(mx, my, event.button)
 
+            # --- 4. PUSZCZENIE MYSZY (HOLD END) ---
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 3: self.inspected_unit = None
+                if event.button == 3:
+                    # Puszczasz przycisk - statystyki znikają
+                    self.inspected_unit = None
                 
     def handle_mouse_click(self, mx, my, button):
         if button != 1: return
@@ -953,34 +965,18 @@ class World:
         pygame.draw.rect(screen, (160,120,60), self.button_send_army)
         screen.blit(font.render("RELEASE", True, (255,255,255)), (890,610))
 
-        # --- OKNO STATYSTYK (TOOLTIP) ---
-        if hasattr(self, 'inspected_unit') and self.inspected_unit:
-            # Pobieramy aktualną pozycję myszy, żeby okno "chodziło" za kursorem
-            cur_x, cur_y = pygame.mouse.get_pos()
-            
-            # Tworzymy tło okienka
-            info_rect = pygame.Rect(cur_x + 20, cur_y, 200, 180)
-            
-            # Rysowanie tła (czarny z obramowaniem)
-            pygame.draw.rect(screen, (20, 20, 20), info_rect)
-            pygame.draw.rect(screen, (255, 255, 255), info_rect, 2)
-            
-            u = self.inspected_unit
-            # Przygotowanie tekstu (używamy czcionki, którą już masz w draw_garrison)
-            lines = [
-                f"TYP: {u.type.upper()}",
-                f"EXP: {u.experience}",
-                f"ATK: {u.attack}",
-                f"DEF: {u.defense}",
-                f"MORALE: {u.morale}",
-                f"ZMECZ: {u.fatigue}",
-                f"RUCH: {u.move_points}"
-            ]
+       # --- OKNO STATYSTYK (TWOJA TABELKA) ---
+        if self.inspected_unit:
+            # Rysujemy ją w stałym miejscu, np. po prawej stronie (x=550, y=250)
+            # aby nie zasłaniała slotów garnizonu
+            self.draw_unit_stats_table(
+                screen, 
+                550, 
+                250, 
+                self.inspected_unit.type, 
+                self.inspected_unit
+            )
 
-            for i, line in enumerate(lines):
-                line_surf = font.render(line, True, (255, 255, 0) if i == 0 else (255, 255, 255))
-                screen.blit(line_surf, (info_rect.x + 10, info_rect.y + 10 + i * 22))
-    
     def draw_map(self, screen):
         # --- 1. USTAWIENIA I KAMERA ---
         tiles_on_screen_x = SCREEN_WIDTH // TILE_SIZE + 1
@@ -999,6 +995,18 @@ class World:
                 # A. Rysowanie koloru podłoża
                 terrain = TERRAIN_TYPES.get(tile_type, TERRAIN_TYPES["."])
                 pygame.draw.rect(screen, terrain["color"], (pos_x, pos_y, TILE_SIZE, TILE_SIZE))
+                # W pętli rysującej teren:
+                if tile_type == "#":
+                    # FUNDAMENTY POD ZAMEK - Ramka 2x2 (szara/biała)
+                    pygame.draw.rect(screen, (255, 255, 255), (pos_x, pos_y, TILE_SIZE, TILE_SIZE), 2)
+                    label = self.font.render("Z", True, (255, 255, 255))
+                    screen.blit(label, (pos_x + 5, pos_y + 2))
+
+                elif tile_type == "&":
+                    # ŚWIĄTYNIA - Inny kolor (np. żółty lub niebieski)
+                    pygame.draw.rect(screen, (255, 215, 0), (pos_x, pos_y, TILE_SIZE, TILE_SIZE), 2)
+                    label = self.font.render("†", True, (255, 215, 0))
+                    screen.blit(label, (pos_x + 8, pos_y + 2))
 
                 # B. RYSOWANIE KRZYŻYKA PUŁAPKI (Musi być wewnątrz tej pętli!)
                 if tile_type == "X":
@@ -1373,88 +1381,42 @@ class World:
                 pygame.draw.rect(screen, (30, 30, 30), rect)
                 screen.blit(font.render(unit_name, True, t_col), (rect.x + 10, rect.y + 8))
 
-                # 5. STATYSTYKI (Zawsze podążają za scrollem po lewej)
+                # 5. STATYSTYKI (Wewnątrz draw_recruitment)
         center_index = 2
         idx_on_center = self.recruitment_scroll + center_index
 
-        unit_to_show = None
-        # Zawsze bierzemy to, co jest na środku widocznej listy
         if 0 <= idx_on_center < len(unit_types):
             unit_to_show = unit_types[idx_on_center]
+            stats = UNIT_STATS.get(unit_to_show, {}) # Pobieramy słownik danych
+            
+            # A. Rysujemy główną tabelkę (Uniwersalna funkcja)
+            self.draw_unit_stats_table(screen, 20, 250, unit_to_show, stats)
 
-        # Panel tła dla statystyk
-        panel_rect = pygame.Rect(20, 250, 420, 220)
-        pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
-        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3) # Złota ramka
-
-        # 2. Obliczamy szerokość jednej sekcji (300 / 3 = 100)
-        section_w = panel_rect.width // 3 - 50 
-        section_h = panel_rect.height // 3 - 40
-
-        # 3. Wyznaczamy punkty X dla linii pionowych
-        line1_x = panel_rect.x + section_w
-        line0_x = panel_rect.x + section_w - 20
-        line2_x = panel_rect.x + 2 * section_w + 15
-        line3_x = panel_rect.x + 3 * section_w + 30
-        line1_y = panel_rect.y + section_h
-        line2_y = panel_rect.y + 2 * section_h + 55
-        line3_y = panel_rect.y + 4 * section_h + 30
-        # 4. Rysujemy linie pionowe (od góry do dołu panelu)
-        # pygame.draw.line(ekran, kolor, start_pos, end_pos, grubość)
-        pygame.draw.line(screen, (200, 180, 100), (line1_x, panel_rect.y), (line1_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, (200, 180, 100), (line0_x, panel_rect.y), (line0_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, (200, 180, 100), (line2_x, panel_rect.y + 33), (line2_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, (200, 180, 100), (line3_x, panel_rect.y + 33), (line3_x, panel_rect.bottom), 2)
-        
-
-        pygame.draw.line(screen, (200, 180, 100), (panel_rect.x + 93, line1_y), (panel_rect.right, line1_y), 2)
-        pygame.draw.line(screen, (200, 180, 100), (panel_rect.x + 93, line2_y), (panel_rect.right, line2_y), 2)
-        pygame.draw.line(screen, (200, 180, 100), (panel_rect.x , line3_y), (panel_rect.right - 350, line3_y), 2)
-
-        # Panel tła dla czasu produkcji
-        panel_rect = pygame.Rect(20, 480, 450, 50)
-        pygame.draw.rect(screen, (0, 30, 0), panel_rect) # Brązowe wypełnienie
-        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 5) # Złota ramka
-
-        # 2. Obliczamy szerokość jednej sekcji (300 / 3 = 100)
-        section_w = panel_rect.width // 3
-
-        # 3. Wyznaczamy punkty X dla linii pionowych
-        line1_x = panel_rect.x + section_w
-        line2_x = panel_rect.x + 2 * section_w
-
-        # 4. Rysujemy linie pionowe (od góry do dołu panelu)
-        # pygame.draw.line(ekran, kolor, start_pos, end_pos, grubość)
-        pygame.draw.line(screen, (200, 180, 100), (line1_x, panel_rect.y), (line1_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, (200, 180, 100), (line2_x, panel_rect.y), (line2_x, panel_rect.bottom), 2)
-
-        # RYSOWANIE STATYSTYK - wszystko musi być w tym jednym IFie
-        if unit_to_show:
-            stats = UNIT_STATS.get(unit_to_show, {})
+            # B. Rysujemy koszty (TYLKO TUTAJ - pod tabelką)
             if stats:
-                screen.blit(font.render(f"Jednostka: {unit_to_show}", True, (255, 255, 255)), (150, 260))
-                # 1. ATK
-                screen.blit(font.render(f"ATK: {stats.get('attack', 0)}", True, (255, 255, 255)), (110, 310))
-                # 2. DEF
-                screen.blit(font.render(f"DEF: {stats.get('defense', 0)}", True, (255, 255, 255)), (110, 390))
-                # 3. HP
-                screen.blit(font.render(f"HP: {stats.get('hp', 0)}", True, (255, 255, 255)), (220, 310))
-                # 4. MORALE
-                screen.blit(font.render(f"MOR: {stats.get('morale', 0)}", True, (255, 255, 255)), (220, 390))
-                # 5. MOVES
-                screen.blit(font.render(f"MOV: {stats.get('moves', 0)}", True, (255, 255, 255)), (330, 310))
-                # 6. ATTACK
-                screen.blit(font.render(f"ATC: {stats.get('attack', 0)}", True, (255, 255, 255)), (330, 390))
+                # Panel tła dla kosztów (Twoja zielona ramka)
+                cost_rect = pygame.Rect(20, 480, 450, 50)
+                pygame.draw.rect(screen, (0, 30, 0), cost_rect) 
+                pygame.draw.rect(screen, (200, 180, 100), cost_rect, 5)
 
-                # Koszty (dalej wewnątrz if unit_to_show)
-                screen.blit(font.render(f"Patent: {stats.get('patent_cost', 0)}", True, (255, 255, 0)), (40, 500))
-                screen.blit(font.render(f"Prod: {stats.get('production_cost', 0)}", True, (255, 255, 0)), (200, 500))
-                screen.blit(font.render(f"Tury: {stats.get('production_time', 0)}", True, (255, 255, 0)), (360, 500))
+                # Linie pionowe wewnątrz kosztów
+                pygame.draw.line(screen, (200, 180, 100), (cost_rect.x + 150, cost_rect.y), (cost_rect.x + 150, cost_rect.bottom), 2)
+                pygame.draw.line(screen, (200, 180, 100), (cost_rect.x + 300, cost_rect.y), (cost_rect.x + 300, cost_rect.bottom), 2)
 
-        panel_rect = pygame.Rect(470, 620, 120, 60)
-        pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
-        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3)
-        # 6. RESZTA (Poza ifem statystyk - rzeczy stałe)
+                # Pobieranie wartości bezpośrednio ze słownika stats
+                p_cost = stats.get('patent_cost', 0)
+                m_cost = stats.get('production_cost', 0)
+                time = stats.get('production_time', 0)
+
+                # Renderowanie (używamy czcionki, która jest dostępna w Twoim draw_recruitment)
+                screen.blit(font.render(f"Patent: {p_cost}", True, (255, 255, 0)), (cost_rect.x + 10, cost_rect.y + 15))
+                screen.blit(font.render(f"Prod: {m_cost}", True, (255, 255, 0)), (cost_rect.x + 160, cost_rect.y + 15))
+                screen.blit(font.render(f"Tury: {time}", True, (255, 255, 0)), (cost_rect.x + 310, cost_rect.y + 15))
+                
+                panel_rect = pygame.Rect(470, 620, 120, 60)
+                pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
+                pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3)
+                # 6. RESZTA (Poza ifem statystyk - rzeczy stałe)
         screen.blit(font.render(f"Gold: {castle.gold}", True, (255, 215, 0)), (w // 2 - 30, 640))
         
         pygame.draw.rect(screen, (100, 100, 100), self.scroll_up_button)
@@ -1462,6 +1424,77 @@ class World:
         screen.blit(font.render("▲", True, (255, 255, 255)), (self.scroll_up_button.x + 12, self.scroll_up_button.y + 8))
         screen.blit(font.render("▼", True, (255, 255, 255)), (self.scroll_down_button.x + 12, self.scroll_down_button.y + 8))
         
+    def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
+        # Statystyki jednostki
+        """
+        Rysuje tabelkę statystyk. 
+        unit_name: str (nazwa do wyświetlenia)
+        stats_source: słownik (z UNIT_STATS) LUB obiekt klasy Unit
+        """
+        if not stats_source:
+            return
+
+        # Panel tła
+        panel_rect = pygame.Rect(x, y, 420, 220)
+        pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
+        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3) # Złota ramka
+
+        # Pomocnicza funkcja do pobierania danych (obsługuje słownik i obiekt)
+        def get_v(key, attr_name=None):
+            if isinstance(stats_source, dict):
+                return stats_source.get(key, 0)
+            return getattr(stats_source, attr_name if attr_name else key, 0)
+
+        # --- GEOMETRIA LINII (Twoja oryginalna) ---
+        section_w = panel_rect.width // 3 - 50 
+        section_h = panel_rect.height // 3 - 40
+
+        line1_x = panel_rect.x + section_w
+        line0_x = panel_rect.x + section_w - 20
+        line2_x = panel_rect.x + 2 * section_w + 15
+        line3_x = panel_rect.x + 3 * section_w + 30
+        line1_y = panel_rect.y + section_h
+        line2_y = panel_rect.y + 2 * section_h + 55
+        line3_y = panel_rect.y + 4 * section_h + 30
+
+        # Rysowanie Twoich linii
+        color = (200, 180, 100)
+        pygame.draw.line(screen, color, (line1_x, panel_rect.y), (line1_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, color, (line0_x, panel_rect.y), (line0_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, color, (line2_x, panel_rect.y + 33), (line2_x, panel_rect.bottom), 2)
+        pygame.draw.line(screen, color, (line3_x, panel_rect.y + 33), (line3_x, panel_rect.bottom), 2)
+        
+        pygame.draw.line(screen, color, (panel_rect.x + 93, line1_y), (panel_rect.right, line1_y), 2)
+        pygame.draw.line(screen, color, (panel_rect.x + 93, line2_y), (panel_rect.right, line2_y), 2)
+        pygame.draw.line(screen, color, (panel_rect.x, line3_y), (panel_rect.right - 350, line3_y), 2)
+
+        # --- WYŚWIETLANIE DANYCH ---
+        # Używamy czcionki, którą masz w klasie (np. self.font)
+        font = pygame.font.SysFont("Arial", 20, bold=True)
+        
+        # Nagłówek
+        screen.blit(font.render(f"Jednostka: {unit_name}", True, (255, 255, 255)), (panel_rect.x + 130, panel_rect.y + 10))
+        
+        # Statystyki - używamy get_v, żeby brało dane niezależnie od źródła
+        # 1. ATK i DEF
+        screen.blit(font.render(f"ATK: {get_v('attack')}", True, (255, 255, 255)), (panel_rect.x + 90, panel_rect.y + 60))
+        screen.blit(font.render(f"DEF: {get_v('defense')}", True, (255, 255, 255)), (panel_rect.x + 90, panel_rect.y + 140))
+        
+        # 2. HP i MORALE
+        screen.blit(font.render(f"HP: {get_v('hp')}", True, (255, 255, 255)), (panel_rect.x + 200, panel_rect.y + 60))
+        screen.blit(font.render(f"MOR: {get_v('morale')}", True, (255, 255, 255)), (panel_rect.x + 200, panel_rect.y + 140))
+        
+        # 3. MOVES i DODATKOWE (np. EXP dla jednostek lub ATC dla rekrutacji)
+        moves_val = get_v('moves', 'move_points') # Sprawdza 'moves' w słowniku lub 'move_points' w obiekcie
+        screen.blit(font.render(f"MOV: {moves_val}", True, (255, 255, 255)), (panel_rect.x + 310, panel_rect.y + 60))
+        
+        if not isinstance(stats_source, dict):
+            # Jeśli to obiekt Unit (np. w garnizonie), pokazujemy EXP
+            screen.blit(font.render(f"EXP: {get_v('experience')}", True, (255, 255, 0)), (panel_rect.x + 310, panel_rect.y + 140))
+        else:
+            # Jeśli to rekrutacja, powtarzamy ATK jako ATC wg Twojego kodu
+            screen.blit(font.render(f"ATC: {get_v('attack')}", True, (255, 255, 255)), (panel_rect.x + 310, panel_rect.y + 140))
+            
     def draw_peasants(self, screen):
         font = pygame.font.SysFont(None, 24)
 
@@ -1616,6 +1649,20 @@ class World:
                 # Zakładam, że draw_text to Twoja pomocnicza funkcja lub używasz font.render
                 draw_text(screen, p.name, rect.x + 10, rect.y + 5)
 
+    def draw_court(self, screen):
+        screen.fill((30, 30, 30)) # Tło
+
+        # Rysowanie wszystkich paneli
+        self.draw_court_players_header(screen)
+        self.draw_court_stats(screen)
+        self.draw_queen_panel(screen)
+        self.draw_prison_sections(screen)
+
+        self.back_button = pygame.Rect(10, 130, 100, 40) # Dopasowałem rozmiar do screena
+        pygame.draw.rect(screen, (120, 80, 80), self.back_button)
+        # Tekst "BACK" wyśrodkowany w tym prostokącie
+        draw_text(screen, "BACK", self.back_button.x + 25, self.back_button.y + 12)
+
     def draw_queen_panel(self, screen):
         w = screen.get_width()
 
@@ -1716,18 +1763,24 @@ class World:
         # Zawsze czyścimy tło na początku klatki
         screen.fill((30, 30, 30))
         # 1. LOGIKA EKRANU MAPY ORAZ PUŁAPKI
-        # Dodajemy "or self.screen == 'trap_info'", żeby mapa nie znikała!
         if self.screen == "map" or self.screen == "trap_info":
+            # Najpierw rysujemy podkład: teren, budynki i place budowy (litery P)
             self.draw_map(screen)
+
+            # --- TUTAJ WPISZ PĘTLĘ DLA JEDNOSTEK ---
+            for unit in self.units:
+                # Sprawdzamy, czy jednostka nie jest ukryta (np. przez start_building)
+                if getattr(unit, 'visible', True):
+                    unit.draw(screen)
+            # --------------------------------------
+
+            # Na samym końcu rysujemy interfejs, aby zawsze był na wierzchu
             self.draw_top_bar(screen)
-            # ZAMIAST draw_bottom_bar, wywołaj draw_ui, 
-            # bo to ona rysuje cały dolny panel ze slotami!
             self.draw_ui(screen)
 
-            # JEŚLI to pułapka, dorysuj okienko NA narysowanej już mapie
             if self.screen == "trap_info":
                 self.draw_trap_popup(screen)
-
+                
         # 2. EKRAN ZAMKU (Główny)
         elif self.screen == "castle":
             self.draw_castle(screen)
@@ -2458,6 +2511,7 @@ class World:
         return None
 
     def draw_unit_info(self, screen):
+        # Historyczne informacje o jednostce w koszarach.
         screen.fill((20,20,20))
         0
         # Jeśli tekst jest pusty, zainicjuj go bezpiecznym komunikatem
@@ -2648,13 +2702,19 @@ class World:
         if 0 <= col < cols and 0 <= row < 2:
             index = row * cols + col
             if index < len(castle.garrison):
+                # Przypisujemy jednostkę (może to być obiekt Unit ALBO None)
                 self.inspected_unit = castle.garrison[index]
-                print(f"DEBUG: Znaleziono jednostkę: {self.inspected_unit.type}") # <-- SPRAWDŹ TO W KONSOLI
+                
+                # POPRAWKA: Sprawdzamy, czy slot nie jest pusty zanim zrobimy print
+                if self.inspected_unit is not None:
+                    print(f"DEBUG: Znaleziono jednostkę: {self.inspected_unit.type}")
+                else:
+                    print("DEBUG: Kliknięto pusty slot")
             else:
                 self.inspected_unit = None
         else:
             self.inspected_unit = None
-        
+            
     def handle_recruitment_scroll(self, event):
         # Pobieramy aktualną listę dostępnych jednostek dla wybranego zamku
         castle = self.selected_castle
@@ -3085,54 +3145,84 @@ class World:
         screen.blit(dalej_txt, (self.btn_trap_dalej.centerx - dalej_txt.get_width()//2, self.btn_trap_dalej.centery - dalej_txt.get_height()//2))
     
     def start_building(self, x, y, b_type, builder_unit=None):
-        # 1. Pobierz dane o budynku
         if b_type not in BUILDING_TYPES: return
         config = BUILDING_TYPES[b_type]
-        tile = self.map[y][x]
+        
+        ix, iy = int(x), int(y)
+        current_tile = self.map[iy][ix]
+        anchor_x, anchor_y = ix, iy
+        found_foundation = False
 
-        # 2. Sprawdź czy miejsce jest wolne w sensie projektów
-        if (x, y) in self.active_projects:
+        # 1. LOGIKA SZUKANIA FUNDAMENTU / MIEJSCA
+        if config.get("size") == 2:
+            # Dla Zamku: sprawdzamy tylko pod nogami i 1 kafelek wokół, 
+            # aby znaleźć lewy górny róg '#'
+            for dx in [0, -1]:
+                for dy in [0, -1]:
+                    nx, ny = ix + dx, iy + dy
+                    if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
+                        if self.map[ny][nx] == "#":
+                            anchor_x, anchor_y = nx, ny
+                            found_foundation = True
+                            break
+                if found_foundation: break
+
+            if not found_foundation:
+                print(f"Błąd: Zamek wymaga fundamentu (#). Pod nogami: {current_tile}")
+                return
+        else:
+            # Dla Strażnicy (1x1): budujemy na trawie (.) lub pustyni (p)
+            if current_tile in [".", "p"]:
+                found_foundation = True
+            else:
+                print(f"Błąd: Tu nie można budować strażnicy (teren: {current_tile})")
+                return
+
+        # 2. SPRAWDZENIE CZY MIEJSCE WOLNE
+        if (anchor_x, anchor_y) in self.active_projects:
             print("Tu już trwa budowa!")
             return
 
-        # 3. Sprawdź fundamenty (zgodnie z mapą używamy '#')
-        if config["foundation_required"] and tile != "#":
-            print("Błąd: Zamek i Twierdza wymagają fundamentów (#)!")
-            return
-        
-        if not config["foundation_required"] and tile not in ["p","."]:
-            print("Błąd: Strażnicę budujemy tylko na wolnym terenie (.)!")
-            return
+        # 3. UKRYWANIE BUDOWNICZEGO
+        # Budowniczy "znika" z mapy na czas budowy
+        if builder_unit:
+            builder_unit.visible = False
+            builder_unit.is_building = True
 
-        # 4. Tworzymy projekt jako słownik w słowniku (kluczem są współrzędne)
-        self.active_projects[(x, y)] = {
+        # 4. TWORZENIE PROJEKTU
+        self.active_projects[(anchor_x, anchor_y)] = {
             "type": b_type,
             "remaining": config["turns"],
             "owner": self.current_player,
-            "pos": (x, y), # trzymamy też tutaj dla wygody
-            "builder": builder_unit  # TUTAJ dodajemy brakujący klucz!
+            "pos": (anchor_x, anchor_y),
+            "builder": builder_unit
         }
         
-        # Zmieniamy kafel na mapie na 'P' (Plac budowy)
-        self.map[y][x] = "P"
-        print(f"Rozpoczęto budowę: {b_type}")
+        # 5. ZMIANA MAPY NA SYMBOLE 'P' (Plac budowy)
+        if config.get("size") == 2:
+            # Zmieniamy kwadrat 2x2 na 'P', żeby budowniczy nie był widoczny,
+            # a gracz widział, że coś powstaje.
+            for i in range(2):
+                for j in range(2):
+                    self.map[anchor_y + i][anchor_x + j] = "P"
+        else:
+            self.map[anchor_y][anchor_x] = "P"
+
+        print(f"Rozpoczęto budowę {b_type} na pozycji {anchor_x}, {anchor_y}. Budowniczy ukryty.")
 
     def process_construction(self):
         # Lista do usunięcia skończonych projektów
         finished = []
-
         for pos, project in self.active_projects.items():
-            # Liczymy budowniczych na polu (pos to krotka x, y)
-            count = self.count_builders_near(pos)
-            effective_builders = min(count, 10)
-
-            if effective_builders > 0:
-                project["remaining"] -= effective_builders
-                print(f"Postęp {project['type']} na {pos}: -{effective_builders}")
-
+            # Zamiast szukać na mapie, sprawdzamy czy projekt ma przypisanego budowniczego
+            if project.get("builder") is not None:
+                # Budowniczy jest "w środku", więc zawsze daje 1 punkt postępu
+                project["remaining"] -= 1 
+                print(f"Postęp {project['type']} na {pos}: -1 (Budowniczy w środku)")
+            
             if project["remaining"] <= 0:
                 finished.append(pos)
-
+                
         # Finalizujemy i usuwamy
         for pos in finished:
             project = self.active_projects[pos]
@@ -3179,26 +3269,63 @@ class World:
 
         print(f"!!! BUDOWA UKOŃCZONA: {b_type} na pozycji {x},{y} !!!")
 
+        # 3. Wrzucenie budowniczego do garnizonu po zakończeniu
+        builder_to_save = project.get("builder")
+        if builder_to_save and new_building:
+            new_building.add_to_garrison(builder_to_save)
+            print(f"Budowniczy wszedł do garnizonu {b_type}")
+    
     def handle_building_logic(self, mx, my, gx, gy):
-        """Obsługuje stawianie placu budowy. Zwraca True jeśli rozpoczęto budowę."""
-        if getattr(self, "building_mode", None) == "Tower":
-            if 0 <= gy < len(self.map) and 0 <= gx < len(self.map[0]):
-                if self.map[gy][gx] in ["p","."]:
-                    builder = self.selected_unit
-                    if builder:
-                        self.map[gy][gx] = "P"
-                        self.active_constructions[(gx, gy)] = {
-                            "builders": [builder],
-                            "total_work_needed": BUILDING_TYPES["Strażnica"]["build_time"],
-                            "work_done": 0,
-                            "type": "Strażnica"
-                        }
-                        if builder in self.units: self.units.remove(builder)
-                        self.selected_unit = None
-                        self.building_mode = None
-                        return True
-        return False
+        tile = self.map[gy][gx]
+        builder = self.selected_unit
 
+        if not builder or builder.type != "Budowniczy":
+            return False
+
+        # --- PRZYPADEK 1: Klikamy na FUNDAMENTY (#) ---
+        if tile == "#":
+            # Blokada: Nie pozwól budować Strażnicy na fundamentach
+            if getattr(self, "building_mode", None) == "Tower":
+                print("Błąd: Na fundamentach budujemy tylko Zamek lub Twierdzę!")
+                return False
+                
+            # Jeśli jesteśmy na #, otwórz menu rozbudowy (Punkt 3 Twoich wymagań)
+            print("Budowniczy na fundamentach - otwieram menu Zamku/Twierdzy.")
+            self.show_foundation_menu(gx, gy) 
+            self.building_mode = None 
+            return True
+
+        # --- PRZYPADEK 2: Klikamy na TRAWĘ (.) ---
+        elif tile == ".":
+            mode = getattr(self, "building_mode", None)
+            
+            # Pozwól tylko na Strażnicę
+            if mode == "Tower":
+                self.start_building(gx, gy, "Strażnica", builder)
+                
+                # Punkt 1: Budowniczy znika (wchodzi do środka)
+                if builder in self.units: 
+                    self.units.remove(builder)
+                
+                self.selected_unit = None
+                self.building_mode = None
+                return True
+            
+            # Blokada: Zamek/Twierdza wymagają # (to już masz w start_building, ale warto tu też mieć)
+            elif mode in ["Zamek", "Twierdza"]:
+                print("Błąd: Zamek i Twierdza wymagają fundamentów (#)!")
+                return False
+                    
+        return False
+            
+        #elif mode == "Foundation":
+            # Stawiamy fundamenty pod Zamek/Twierdzę
+            #self.map[gy][gx] = "#"
+            #print("Postawiono fundamenty (#)")
+           # self.building_mode = None
+            # Tutaj budowniczy NIE musi znikać, bo to postawienie kafelka, a nie budowa czasowa
+            #return True
+                
     def handle_castle_entry(self, mx, my):
         """Sprawdza kliknięcie w budynki na mapie. Zwraca True, jeśli wejdzie do środka."""
         for castle in self.castles:
@@ -3458,6 +3585,32 @@ class World:
                 results.append(None) # Brak miejsca dla tej konkretnej grupy
                 
         return results
+    def handle_mouse_motion(self, mx, my):
+        # Resetujemy podgląd, jeśli nie znajdziemy jednostki
+        self.inspected_unit = None
+
+        if self.screen == "garrison":
+            start_x, start_y = 100, 120
+            offset_x, offset_y = 130, 210
+            slot_w, slot_h = 100, 180
+            cols = 6
+
+            # Sprawdzamy, czy mysz jest nad którymś ze slotów
+            for i in range(len(self.selected_castle.garrison)):
+                row = i // cols
+                col = i % cols
+                x = start_x + col * offset_x
+                y = start_y + row * offset_y
+                rect = pygame.Rect(x, y, slot_w, slot_h)
+
+                if rect.collidepoint(mx, my):
+                    unit = self.selected_castle.garrison[i]
+                    if unit:
+                        self.inspected_unit = unit
+                        break
+    def show_foundation_menu(self, gx, gy):
+        self.screen = "foundation_selection"
+        self.construction_target = (gx, gy) # Zapamiętujemy, gdzie budujemy
     #def draw_map
     #jeśli chce aby kratki były tak jak w oryginale
         #keys = pygame.key.get_pressed()
@@ -3472,3 +3625,10 @@ class World:
             #   elif event.key == pygame.K_DOWN:  self.move_unit(self.selected_unit, 0, 1)
             #   elif event.key == pygame.K_LEFT:  self.move_unit(self.selected_unit, -1, 0)
             #   elif event.key == pygame.K_RIGHT: self.move_unit(self.selected_unit, 1, 0)
+
+ # --- 2. RUCH MYSZY (HOVER) wyświetlanie krótkiej informacji gdy się najedzie myszką na jednostkę
+           # elif event.type == pygame.MOUSEMOTION:
+              #  mx, my = event.pos
+               # if self.screen == "garrison":
+                    # Tutaj tylko podświetlamy ramkę (jeśli masz taką logikę)
+                    #self.handle_mouse_hover(mx, my)

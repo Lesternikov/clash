@@ -14,13 +14,13 @@ p1 = Player(1, "Gracz 1", (255, 50, 50))   # Soczysty czerwony
 p2 = Player(2, "Gracz 2", (50, 150, 255))  # Jasny niebieski
 world.add_player(p1)
 world.add_player(p2)
-world.load("map.txt", "0.FAC")
+world.load("final_map1.txt", "1.FAC")
 
 # --- TUTAJ SPAWNUJEMY BUDOWNICZEGO ---
 # Teraz world.players[0] już istnieje i jest to p1!
 world.spawn_test_builder()
 
-start_unit = Unit("Pikinier", 10, 10, p1) 
+start_unit = Unit("Pikinier", 10, 10, 1,p1) 
 world.units.append(start_unit)
 p1.units.append(start_unit)
 
