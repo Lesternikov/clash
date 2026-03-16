@@ -59,7 +59,7 @@ class Castle:
     def __init__(self, x, y, owner=None, building_type="Zamek"):
         self.x = x
         self.y = y
-        self.owner = owner
+        self._owner_data = owner        
         self.building_type = building_type # Tutaj przechowamy: "Strażnica", "Twierdza" lub "Zamek"
         self.gold = 0
         self.garrison_limit = 10 if building_type == "Strażnica" else 12
@@ -90,7 +90,32 @@ class Castle:
         "unit_type": "Posp. ruszenie",
         "stats": UNIT_STATS["Posp. ruszenie"]
         } 
+    @property
+    def owner(self):
+        # Jeśli _owner_data to liczba (ID), spróbujmy znaleźć gracza w świecie gry
+        # Uwaga: to zadziała, jeśli Twoja klasa Castle ma dostęp do listy graczy 
+        # lub jeśli zawsze podajesz obiekt gracza.
+        return self._owner_data
 
+    @owner.setter
+    def owner(self, value):
+        self._owner_data = value
+
+    # Dodajemy bezpieczną metodę na kolor
+    def get_color(self, players_list):
+        if self._owner_data is None:
+            return (100, 100, 100)
+        
+        # Jeśli to obiekt gracza
+        if hasattr(self._owner_data, 'color'):
+            return self._owner_data.color
+            
+        # Jeśli to tylko ID gracza
+        if isinstance(self._owner_data, int) and 0 <= self._owner_data < len(players_list):
+            return players_list[self._owner_data].color
+            
+        return (100, 100, 100)
+    
     def collect_taxes(self):        
         if self.plague_active:
             return
@@ -599,8 +624,7 @@ class Castle:
 
         return True
     def add_to_garrison(self, unit):
-        for i in range(len(self.garrison)):
-            if self.garrison[i] is None:
-                self.garrison[i] = unit
-                return True # Udało się schować
-        return False # Brak miejsca
+        if len(self.garrison) < self.garrison_limit:
+            self.garrison.append(unit)
+            return True
+        return False

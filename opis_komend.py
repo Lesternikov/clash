@@ -53,9 +53,6 @@ def reset_unit(self): #możliwe że niepotrzebne
 def select_unit(self, x, y):
 #   wybieranie swojej jednostki 
 #   i blokowanie czego kolwiek innego
-def move_select(self, dx, dy):
-#
-#
 def spawn_unit_ner_castle(self, unit, castle):
 #   bydownie zmku na czterech polach
 def recruit_unit(self):
@@ -145,8 +142,6 @@ def draw_demolish_confirm(self, screen):
 #   potwierdzienie demolowania zamku
 def select_castle(self, x, y):
 #   wybierane zamku
-def create_unit(self, unit_type, x, y, owner): chyba niepotrzebne
-#  
 #  
 def click_on_recruitment(self, mx, my):
 #   sprawdzanie w rekrutacji
@@ -230,8 +225,6 @@ def execute_build_action(self, index, u):
 #   
 def spawn_test_builder(self): chyba niepotrzebne
 #   
-def add_unit_to_game(self, unit):
-#   Dodaje jednostkę do świata i do listy jej właściciela
 def spawn_unit(self, unit_type, x, y, owner):
 #   
 def draw_trap_popup(self, screen):
