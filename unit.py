@@ -1,3 +1,4 @@
+
 UNIT_STATS = {
     "Posp. ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
         Chłopi zajmują się
@@ -372,7 +373,16 @@ UNIT_STATS = {
    }
 
 class Unit:
-    def __init__(self, unit_type, x, y, owner):
+    def __init__(self, unit_type, x, y, name, owner, level=1 ):
+        self.name = name
+        self.x = x
+        self.y = y
+        self.level = level
+        self.move_points = 5
+        self.is_camouflaged = False
+        self.has_general = False
+        self.army_list = [name] # Lista jednostek w armii (max 10)
+        self.power = level * 10 # Uproszczona siła do testów wykrywania
         self.type = unit_type
         self.x = x
         self.y = y
@@ -418,7 +428,8 @@ class Unit:
         self.attack = stats.get("attack", 10)
         # Automatyczny skrót:
         self.short_name = unit_type[:2].upper()
-        
+        #sprawdzanie czy jednostka jest zakamuflowana
+        self.is_camouflaged = False
     def move_along_path(self, world):
         # Dopóki jednostka ma punkty ruchu (MP) i zaplanowaną drogę
         while self.move_points > 0 and getattr(self, 'planned_path', []):
@@ -539,6 +550,16 @@ class Unit:
         if tile == "#":
             return self.type == "highlander"
         return tile == "."
+
+def toggle_camouflage(self, unit):
+    # Generał daje lvl 12, więc sprawdzamy realny lvl lub obecność generała
+    effective_lvl = 12 if unit.has_general else unit.level
+    
+    if effective_lvl >= 9:
+        unit.is_camouflaged = not unit.is_camouflaged
+        unit.move_points -= 2 # Kamuflaż może kosztować punkty ruchu
+    else:
+        print("Zbyt niskie doświadczenie na kamuflaż!")
 
 class GoldTransport:
     def __init__(self, x, y, owner, gold):

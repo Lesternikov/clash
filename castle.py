@@ -1,3 +1,4 @@
+
 HOSPITAL = "hospital"
 import random 
 from unit import PeasantGroup

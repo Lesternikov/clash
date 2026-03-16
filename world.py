@@ -1,3 +1,4 @@
+import main
 from unit import Unit, UNIT_STATS
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player
@@ -66,12 +67,20 @@ class World:
         self.selected_unit = None
         self.turn = 1
         self.current_player = 0
+<<<<<<< HEAD
         self.camera_x = 0
         self.camera_y = 0
         self.inspected_unit = None  # Dodaj to w sekcji zmiennych logicznych
 
         # Ładowanie danych
         self.map = self.load_map("final_map.txt")
+=======
+        self.selected_unit = None
+        self.destroyed = False
+        self.owner = None
+        # 2. DOPIERO TERAZ ładuj dane z plików (Nie zostaną nadpisane!)
+        self.map = self.load_map("final_map1.txt")
+>>>>>>> 6a30cfd56104932763d7decad99cce962220cbeb
         self.load_castles_from_fac("0.FAC")
 
         # =====================================================

@@ -82,7 +82,9 @@ def super_map_generator(image_path, fac_path, final_output_path):
 
 if __name__ == "__main__":
     plik_fac = input("Podaj nazwę pliku FAC (np. 0.FAC): ")
-    if not plik_fac.endswith(".FAC"):
-        plik_fac += ".FAC"
+    if not plik_fac.endswith("0.FAC"):
+        plik_fac += "0.FAC"
         
-    super_map_generator('2.png', plik_fac, 'final_map1.txt')
+    super_map_generator('!Karkhan.png', plik_fac, 'final_map1.txt')
+
+import main

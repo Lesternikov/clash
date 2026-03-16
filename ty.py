@@ -23,9 +23,8 @@ for _ in range(4):
     turtle.left(90)
     turtle.forward(50)
     turtle.pendown()
-turtle.clear()
 turtle.pensize(3)
-turtle.circle(500)
+turtle.circle(50)
 
 
 
