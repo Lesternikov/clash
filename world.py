@@ -1739,54 +1739,31 @@ class World:
         print("Generał zmienił stronę")
 
     def draw(self, screen):
-        # Zawsze czyścimy tło na początku klatki
-        screen.fill((30, 30, 30))
-        # 1. LOGIKA EKRANU MAPY ORAZ PUŁAPKI
-        if self.screen == "map" or self.screen == "trap_info":
-            # Najpierw rysujemy podkład: teren, budynki i place budowy (litery P)
-            self.draw_map(screen)
+        screen.fill((30, 30, 30)) # Zawsze tło na start
 
-            # --- TUTAJ WPISZ PĘTLĘ DLA JEDNOSTEK ---
+        # --- KROK 1: RYSUJEMY TŁO (Zależnie od ekranu) ---
+        if self.screen == "map" or self.screen == "trap_info":
+            self.draw_map(screen)
             for unit in self.units:
-                # Sprawdzamy, czy jednostka nie jest ukryta (np. przez start_building)
                 if getattr(unit, 'visible', True):
                     unit.draw(screen)
-            # --------------------------------------
-
-            # Na samym końcu rysujemy interfejs, aby zawsze był na wierzchu
             self.draw_top_bar(screen)
             self.draw_ui(screen)
-
             if self.screen == "trap_info":
                 self.draw_trap_popup(screen)
 
-            # --- NA SAMYM KOŃCU FUNKCJI ---
-        if getattr(self, 'inspected_unit', None):
-            # Tutaj ustawiamy pozycje zależnie od ekranu
-            if self.screen == "garrison":
-                stats_x, stats_y = 300, 380
-            else:
-                stats_x, stats_y = 150, 200 # Pozycja dla mapy i innych
-                
-            self.draw_unit_stats_table(
-                screen, 
-                stats_x, 
-                stats_y, 
-                self.inspected_unit.type, 
-                self.inspected_unit
-            )
-
-        # 2. EKRAN ZAMKU (Główny)
         elif self.screen == "castle":
             self.draw_castle(screen)
-        
-            # TYLKO TUTAJ ma prawo pojawić się to brązowe menu
             if getattr(self, "menu_open", False):
                 mx, my = pygame.mouse.get_pos()
                 self.draw_castle_menu(screen, mx, my)
-        # 3. EKRAN KOSZAR (Garrison)
+
         elif self.screen == "garrison":
-            self.draw_garrison(screen) # Rysuje te duże ramki ze zdjęcia 1
+            # Sprawdzamy, czy to Strażnica czy Zamek, żeby wiedzieć co rysować pod spodem
+            if self.selected_castle and self.selected_castle.building_type == "Strażnica":
+                self.draw_garrison_only(screen)
+            else:
+                self.draw_garrison(screen)
             
         elif self.screen == "Strażnica": # <--- Jeśli tak nazwałeś to w kliknięciu
             self.draw_garrison_only(screen)
@@ -1816,6 +1793,19 @@ class World:
             
         elif self.screen == "unit_info":
             self.draw_unit_info(screen)
+
+        # --- KROK 2: NAKŁADKA (OVERLAY) STATYSTYK ---
+    # Ten blok musi być POZA wszystkimi elif, na samym dole funkcji draw!
+        if getattr(self, 'inspected_unit', None):
+            if self.screen == "garrison":
+                stats_x, stats_y = 300, 380
+            else:
+                stats_x, stats_y = 150, 200
+                
+            self.draw_unit_stats_table(
+                screen, stats_x, stats_y, 
+                self.inspected_unit.type, self.inspected_unit
+            )
 
         if getattr(self, "demolish_confirm", False):
             self.draw_demolish_confirm(screen)
@@ -3504,10 +3494,14 @@ class World:
 
             # 5. PRZEKŁADANIE JEDNOSTEK (Z budynku do armii)
             for i, unit_to_move in enumerate(group):
-                if i < 10: # Limit slotów w armii
+                if i < 10: 
                     new_army.garrison[i] = unit_to_move
                     
-                    # Usuwamy z garnizonu źródłowego (zamku/strażnicy)
+                    # USUNIĘCIE Z MAPY (Kluczowe!)
+                    if unit_to_move in self.units:
+                        self.units.remove(unit_to_move) # Jednostka "znika" jako osobny byt
+                        
+                    # Usuwamy z garnizonu źródłowego
                     for slot_idx in range(len(target.garrison)):
                         if target.garrison[slot_idx] == unit_to_move:
                             target.garrison[slot_idx] = None
