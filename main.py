@@ -20,7 +20,7 @@ world.load("final_map1.txt", "1.FAC")
 # Teraz world.players[0] już istnieje i jest to p1!
 world.spawn_test_builder()
 
-start_unit = Unit("Pikinier", 10, 10, 1,p1) 
+start_unit = Unit("Pikinier", 10, 10, p1) 
 world.units.append(start_unit)
 p1.units.append(start_unit)
 

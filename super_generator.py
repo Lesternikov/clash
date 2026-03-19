@@ -81,10 +81,20 @@ def super_map_generator(image_path, fac_path, final_output_path):
         print(f"BŁĄD: {e}")
 
 if __name__ == "__main__":
-    plik_fac = input("Podaj nazwę pliku FAC (np. 0.FAC): ")
-    if not plik_fac.endswith("0.FAC"):
-        plik_fac += "0.FAC"
-        
-    super_map_generator('!Karkhan.png', plik_fac, 'final_map1.txt')
+    # 1. WYBÓR PLIKU OBRAZU
+    obraz_mapy = input("Podaj nazwę obrazu mapy (np. !Karkhan.png): ")
+    if not (obraz_mapy.lower().endswith(".png") or obraz_mapy.lower().endswith(".jpg")):
+        obraz_mapy += ".png"
 
-import main
+    # 2. WYBÓR PLIKU FAC
+    plik_fac = input("Podaj nazwę pliku FAC (np. 1.FAC): ")
+    if not plik_fac.lower().endswith(".fac"):
+        plik_fac += ".FAC"
+
+    # 3. WYBÓR NAZWY PLIKU WYNIKOWEGO
+    nazwa_wynikowa = input("Jak ma się nazywać nowa mapa? (np. moja_mapa.txt): ")
+    if not nazwa_wynikowa.lower().endswith(".txt"):
+        nazwa_wynikowa += ".txt"
+        
+    # Uruchomienie generatora z Twoimi nazwami
+    super_map_generator(obraz_mapy, plik_fac, nazwa_wynikowa)

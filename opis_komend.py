@@ -53,7 +53,7 @@ def reset_unit(self): #możliwe że niepotrzebne
 def select_unit(self, x, y):
 #   wybieranie swojej jednostki 
 #   i blokowanie czego kolwiek innego
-def spawn_unit_ner_castle(self, unit, castle):
+def spawn_unit_near_castle(self, unit, castle):
 #   bydownie zmku na czterech polach
 def recruit_unit(self):
 #
@@ -64,22 +64,31 @@ def select_garrison_unit(self, unit): można wpakować gdzie indziej
 #   limit zaznaczenia
 def cler_selection(self):
 #   czyści parenty
-def train_select(self, castle):
+def train_selected(self, castle):
 #   wybieranie jednostki do trenowania
 def train_selected_garrison_units(self):
 #   
 def handle_events(self):
 #   
-#   
+def get_unit_at_pixel(self, mx, my): 
 #   
 def handle_mouse_click(self, mx, my, button):
 #   
-#   
+def handle_trap_info_click(self, mx, my):
+  
 #   
 def handle_garrison_click(self, mx, my, button):
 #   
-#   
-#   
+def handle_map_logic_combined(self, mx, my, button):
+
+def execute_trap_build(self, gx, gy):
+
+def execute_road_build(self, gx, gy):
+
+def handle_castle_main_click(self, mx, my):
+
+def handle_garrison_click(self, mx, my, button):
+
 def calculate_army_power(self, player):
 #   liczy siłę używana do dworu
 def calculate_gold(self, player):
@@ -106,7 +115,8 @@ def center_on_selected_unit(self):
 #   o centralnej jednostce na liście patentów
 def draw_recruitment(self, screen):
 #   
-#       
+def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
+    
 #   
 def draw_peasants(self, screen):
 #   
@@ -142,7 +152,8 @@ def draw_demolish_confirm(self, screen):
 #   potwierdzienie demolowania zamku
 def select_castle(self, x, y):
 #   wybierane zamku
-#  
+def create_unit(self, unit_type, x, y, owner):
+
 def click_on_recruitment(self, mx, my):
 #   sprawdzanie w rekrutacji
 #   który z narysowanych slotów został kliknięty
@@ -164,12 +175,15 @@ def handle_map_click(self, mx, my, button):
 #  
 def handle_castle_click(self, mx, my):
 #   
-#   
+def handle_recruitment_click(self, mx, my):
+ 
 def handle_peasants_click(self, mx, my):
 #  
 #  
 def demolish_castle(self, castle):
 #   niszczenie zamku
+def draw_building_template(self, screen, title, lines, theme_color=(100, 100, 130), border_color=(180, 180, 220)):
+
 def draw_forge(self, screen):
 #   rysowanie kuźni
 def draw_workshop(self, screen):
@@ -178,8 +192,7 @@ def draw_hospital(self, screen):
 #   rysowanie szpitala
 def draw_school(self, screen):
 #   rysowanie szkoły
-def release_selected_units(self):
-#   
+# #   
 def draw_unit_info(self, screen):
 #   
 def load_castles_from_fac(self, fac_path):
@@ -194,8 +207,7 @@ def draw_bottom_bar(self, screen):
 #   przyciski podstawowe
 def handle_mouse_up(self, mx, my):
 #   
-def execute_menu_command(self, menu, index):
-#   
+   
 def check_unit_info(self, mx, my):
 #   
 def handle_recruitment_scroll(self, event):
@@ -222,6 +234,9 @@ def enter_castle(self, unit, castle):
 def handle_action_button_click(self, button_index):
 #   
 def execute_build_action(self, index, u):
+
+def remove_unit_or_builder(self, army, builder):
+
 #   
 def spawn_test_builder(self): chyba niepotrzebne
 #   
@@ -242,21 +257,33 @@ def handle_building_logic(self, mx, my, gx, gy):
 def handle_castle_entry(self, mx, my):
 #   
 def draw_garrison_only(self, screen):
-#   
-def release_garrison(self):
-#   
+#      
 def process_active_builds(self):
-#   
-def check_straznica_click(self, mx, my):
 #   
 def destroy_straznica(self, castle):
 #   
-def execute_universal_release(self):
-#   
 def draw_building_footer(self, screen):
 #    
-def can_build_castle_at(self, gx, gy, b_type):
-# zasady budowania zamków 
+def release_selected_units(self):
+
+def find_multiple_spawn_positions(self, castle, num_groups):
+
+def handle_mouse_motion(self, mx, my):
+
+def show_foundation_menu(self, gx, gy):
+
+def draw_build_system(self, screen):
+
+def draw_grid_lines(self, screen):
+
+def can_build_trap(self, x, y):
+
+def draw_road_arrows(self, screen):
+
+def can_build_road(self, x, y):
+
+def is_area_occupied_by_foundation(self, gx, gy):
+ 
 #notatki 
 
 

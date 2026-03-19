@@ -625,7 +625,9 @@ class Castle:
 
         return True
     def add_to_garrison(self, unit):
-        if len(self.garrison) < self.garrison_limit:
-            self.garrison.append(unit)
-            return True
-        return False
+        # Przeszukujemy listę w poszukiwaniu pierwszego None
+        for i in range(len(self.garrison)):
+            if self.garrison[i] is None:
+                self.garrison[i] = unit
+                return True
+        return False # Wszystkie 10/12 slotów zajęte

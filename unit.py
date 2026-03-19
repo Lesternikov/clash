@@ -201,7 +201,7 @@ UNIT_STATS = {
         tempie pokonują 
         każdy łańcuch górski."""},
 
-    "Budowniczy":{"hp":80,"moves":36,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
+    "Budowniczy":{"hp":80,"moves":136,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
         Budowniczy - formacje nie-
         zbędne przy konstruowaniu 
         zamków, dróg, mostów itd. 
@@ -373,20 +373,17 @@ UNIT_STATS = {
    }
 
 class Unit:
-    def __init__(self, unit_type, x, y, name, owner, level=1 ):
-        self.name = name
-        self.x = x
-        self.y = y
-        self.level = level
-        self.move_points = 5
-        self.is_camouflaged = False
-        self.has_general = False
-        self.army_list = [name] # Lista jednostek w armii (max 10)
-        self.power = level * 10 # Uproszczona siła do testów wykrywania
+    def __init__(self, unit_type, x, y, owner, name=None, level=1):
         self.type = unit_type
+        # Jeśli nie podasz imienia, name zostanie ustawione na typ
+        self.name = name if name else unit_type 
         self.x = x
         self.y = y
         self.owner = owner
+        self.level = level
+        
+        # TWOJE DWIE LITERY:
+        self.short_name = unit_type[:2].upper()
 
         stats = UNIT_STATS.get(unit_type, {"hp": 100, "moves": 10, "attack": 10, "defense": 10})
 
@@ -428,32 +425,54 @@ class Unit:
         self.attack = stats.get("attack", 10)
         # Automatyczny skrót:
         self.short_name = unit_type[:2].upper()
-        #sprawdzanie czy jednostka jest zakamuflowana
-        self.is_camouflaged = False
-    def move_along_path(self, world):
-        # Dopóki jednostka ma punkty ruchu (MP) i zaplanowaną drogę
-        while self.move_points > 0 and getattr(self, 'planned_path', []):
-            next_step = self.planned_path[0]
-            dx = next_step[0] - self.x
-            dy = next_step[1] - self.y
-            
-            # Zapamiętujemy starą pozycję, by sprawdzić czy ruch się udał
-            old_x, old_y = self.x, self.y
-            
-            # Wywołujemy ruch z World
-            world.move_unit(self, dx, dy)
-            
-            # Jeśli jednostka się przesunęła, usuwamy krok z trasy
-            if self.x != old_x or self.y != old_y:
-                self.planned_path.pop(0)
-            else:
-                # Jeśli się nie przesunęła (np. zablokowana), przerywamy
-                break
+        import os
+        import pygame
+        self.walk_frames = []
+        if unit_type == "Budowniczy":
+            folder_path = "assets/builder_walk" # Ścieżka do folderu
+            for i in range(8):
+                file_name = f"BUDOW1_I_S32_{i}.png"
+                full_path = os.path.join(folder_path, file_name) # Łączymy: assets/builder_walk/walk_0.png
                 
-        # Po zakończeniu ruchu czyścimy cel, by kropki zniknęły
-        if not self.planned_path:
-            self.target_x = None
-            self.target_y = None
+                try:
+                    img = pygame.image.load(full_path).convert_alpha()
+                    img = pygame.transform.scale(img, (32, 32))                    
+                    self.walk_frames.append(img)
+                    print(f"Sukces! Wczytano: {full_path}") # Debug dla pewności
+                except Exception as e:
+                    print(f"Błąd: Nie udało się wczytać {full_path}. Powód: {e}")
+        
+        self.current_frame = 0
+        self.animation_speed = 0.1  # Prędkość zmiany klatek
+
+    def move_along_path(self, world):
+        from world import TERRAIN_TYPES # Import lokalny
+        while getattr(self, 'planned_path', []):
+            next_step = self.planned_path[0]
+            nx, ny = next_step
+            
+            tile_char = world.map[ny][nx]
+            
+            # POPRAWKA: Odwołujemy się do world.TERRAIN_TYPES
+            # Zakładając, że w world.py wkleiłeś ten słownik do klasy World
+            terrain_info = TERRAIN_TYPES.get(tile_char, {})
+            base_cost = terrain_info.get("cost", 4)
+            
+            dx = nx - self.x
+            dy = ny - self.y
+            move_modifier = 1.41 if (dx != 0 and dy != 0) else 1.0
+            
+            final_cost = base_cost * move_modifier
+
+            if self.move_points >= final_cost:
+                # Pamiętaj, żeby tu też przekazać final_cost
+                if world.move_unit(self, dx, dy, cost=final_cost):
+                    self.planned_path.pop(0)
+                else:
+                    break
+            else:
+                print(f"Za mało MP ({self.move_points} < {final_cost}). Koniec ruchu.")
+                break
     # -----------------------
     # BASIC
     # -----------------------
@@ -550,16 +569,6 @@ class Unit:
         if tile == "#":
             return self.type == "highlander"
         return tile == "."
-
-def toggle_camouflage(self, unit):
-    # Generał daje lvl 12, więc sprawdzamy realny lvl lub obecność generała
-    effective_lvl = 12 if unit.has_general else unit.level
-    
-    if effective_lvl >= 9:
-        unit.is_camouflaged = not unit.is_camouflaged
-        unit.move_points -= 2 # Kamuflaż może kosztować punkty ruchu
-    else:
-        print("Zbyt niskie doświadczenie na kamuflaż!")
 
 class GoldTransport:
     def __init__(self, x, y, owner, gold):
