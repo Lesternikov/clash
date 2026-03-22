@@ -114,6 +114,10 @@ class World:
         self.button_send_army = pygame.Rect(860, 600, 150, 40) # "OPUŚĆ KOSZARY"
 
         # =====================================================
+        #              EKRAN STRAŻNICY -GARNIZONU 
+        # =====================================================
+        self.release_tower = pygame.Rect
+        # =====================================================
         #              EKRAN REKRUTACJI (PATENTY)
         # =====================================================
         self.buy_patent_button = pygame.Rect(160, 630, 140, 35)
@@ -184,7 +188,6 @@ class World:
         self.traps = []
         self.trap_backgrounds = {}    # Słownik: (x, y) -> "oryginalny_znak_terenu"
         self.constructions = []
-        self.active_projects = {}
         self.trap_build_mode = False
         self.build_clicked = {}  # Słownik do śledzenia kliknięć w budynki
 
@@ -199,6 +202,59 @@ class World:
             # Zabezpieczenie: jeśli pliku nie ma, stwórz pustą powierzchnię, żeby gra się nie wywaliła
             self.icon_training = pygame.Surface((32, 32))
             self.icon_training.fill((255, 0, 255)) # Różowy kolor "błędu"
+        # --- NOWE KAFFELKI TERENU ---
+        base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
+        self.terrain_images = {}
+        
+        try:
+            self.terrain_images["$"] = pygame.image.load(f"{base_bg_path}752.png").convert_alpha()
+            self.terrain_images["S"] = pygame.image.load(f"{base_bg_path}733.png").convert_alpha()
+            self.terrain_images["&"] = pygame.image.load(f"{base_bg_path}736.png").convert_alpha()
+            
+            # Opcjonalnie skalujemy, by mieć pewność, że pasują do TILE_SIZE
+            for key in self.terrain_images:
+                self.terrain_images[key] = pygame.transform.scale(self.terrain_images[key], (TILE_SIZE, TILE_SIZE))
+        except Exception as e:
+            print(f"Błąd ładowania dodatkowych kafelków: {e}")
+        # ==================================================================
+        #                    ŁADOWANIE ANIMACJI ZAMKU
+        # ==================================================================
+        base_path = r"D:\clash reverse\assets\zamekczerwony\BUILDIN1_S32_"
+        
+        # --- GRAFIKI ZAMKU (2x2) ---
+        self.castle_tiles = {0: [], 1: [], 2: [], 3: [], 4: []}
+        for stage in range(4):
+            for i in range(4):
+                file_num = 225 + (stage * 4) + i
+                try:
+                    img = pygame.image.load(f"{base_path}{file_num}.png").convert_alpha()
+                    self.castle_tiles[stage].append(img)
+                except:
+                    print(f"Brak pliku zamku: {file_num}")
+
+        # Zniszczony zamek (257-260)
+        for i in range(4):
+            try:
+                img = pygame.image.load(f"{base_path}{257 + i}.png").convert_alpha()
+                self.castle_tiles[4].append(img)
+            except: pass
+
+        # --- GRAFIKI STRAŻNICY (1x1) ---
+        self.tower_tiles = {}
+        # Ładujemy pliki 0, 1, 2, 3 (Budowa + Gotowa)
+        for i in range(4): 
+            try:
+                img = pygame.image.load(f"{base_path}{i}.png").convert_alpha()
+                # 0, 1, 2 to etapy budowy, 3 to gotowa wieża
+                self.tower_tiles[i] = img
+            except:
+                print(f"Brak pliku strażnicy: {i}")
+        
+        # Zniszczona strażnica (plik nr 8)
+        try:
+            self.tower_tiles[4] = pygame.image.load(f"{base_path}8.png").convert_alpha()
+        except:
+            print("Brak pliku zniszczonej strażnicy (8.png)")
 
 # --- INICJALIZACJA GRACZY (Poprawiona pod Player.py) ---
         self.players = []
@@ -239,6 +295,7 @@ class World:
             if not moving:
                 self.camera_x = round(self.camera_x / 32) * 32 # Zakładając TILE_SIZE = 32
                 self.camera_y = round(self.camera_y / 32) * 32
+
     def load_map(self, filename):
             game_map = []
             try:
@@ -432,17 +489,20 @@ class World:
 
     def select_unit(self, x, y):
         for u in self.units:
+            # --- BLOKADA: Ignoruj jednostki w trakcie pracy ---
+            if getattr(u, 'is_building', False):
+                continue 
+
             if u.x == x and u.y == y:
                 if u.owner == self.players[self.current_player]:
                     self.selected_unit = u
-                    print("Wybrano jednostkę")
+                    print(f"Wybrano jednostkę: {u.type}")
                     return
                 else:
                     print("To nie jest twoja jednostka")
                     return
 
         print("Brak jednostki na tym polu")
-        print("Tura gracza:", self.players[self.current_player].name)
 
     def spawn_unit_near_castle(self, unit, castle):
         spawn_positions = [
@@ -634,17 +694,32 @@ class World:
             self.handle_map_logic_combined(mx, my, button)
             return
 
-        # 3. OBSŁUGA PRZYCISKU POWRÓT (Dynamiczny Rect dla Dworu)
+        # 3. OBSŁUGA PRZYCISKU POWRÓT (Poprawiona)
         back_rect = pygame.Rect(650, 530, 120, 40) if self.screen == "court" else self.back_button
         
         if back_rect.collidepoint(mx, my):
+            # A. Jeśli jesteśmy w REKRUTACJI -> zawsze wracamy do GARNIZONU
             if self.screen == "recruitment":
                 self.screen = "garrison"
-            elif self.screen in ["garrison", "forge", "hospital", "school", "peasants", "workshop", "court"]:
-                self.screen = "castle"
-            elif self.screen in ["castle", "Strażnica"]:
+            
+            # B. Jeśli jesteśmy w GARNIZONIE -> wybór zależy od typu budynku
+            elif self.screen == "garrison":
+                if self.selected_castle and self.selected_castle.building_type == "Strażnica":
+                    self.screen = "map" # Strażnica nie ma menu głównego
+                    self.selected_castle = None
+                else:
+                    self.screen = "castle" # Zamek ma menu główne
+            
+            # C. Jeśli jesteśmy w menu GŁÓWNYM Zamku -> wracamy na MAPĘ
+            elif self.screen == "castle":
                 self.screen = "map"
                 self.selected_castle = None
+
+            # D. Jeśli jesteśmy w budynkach rzemieślniczych -> ZAWSZE do menu GŁÓWNEGO Zamku
+            elif self.screen in ["forge", "hospital", "school", "peasants", "workshop", "court"]:
+                self.screen = "castle"
+            
+            self.selected_units.clear()
             return
 
         # 4. LOGIKA GŁÓWNEGO MENU ZAMKU / STRAŻNICY
@@ -1005,7 +1080,7 @@ class World:
                 terrain_data = TERRAIN_TYPES.get(bg_tile, TERRAIN_TYPES["."])
                 pygame.draw.rect(screen, terrain_data["color"], (pos_x, pos_y, TILE_SIZE, TILE_SIZE))
 
-        # --- 3. RYSOWANIE FUNDAMENTÓW I OBIEKTÓW (Druga pętla, żeby nie zamazać!) ---
+        # 3. RYSOWANIE FUNDAMENTÓW I OBIEKTÓW ---
         for y in range(max(0, start_y), min(len(self.map), start_y + tiles_on_screen_y)):
             for x in range(max(0, start_x), min(len(self.map[0]), start_x + tiles_on_screen_x)):
                 pos_x = (x * TILE_SIZE) - self.camera_x
@@ -1034,18 +1109,20 @@ class World:
                     pygame.draw.line(screen, trap_color, (pos_x + offset, pos_y + offset), (pos_x + TILE_SIZE - offset, pos_y + TILE_SIZE - offset), 3)
                     pygame.draw.line(screen, trap_color, (pos_x + TILE_SIZE - offset, pos_y + offset), (pos_x + offset, pos_y + TILE_SIZE - offset), 3)
 
-                elif tile_type == "&":
-                    # Świątynia
-                    pygame.draw.rect(screen, (255, 215, 0), (pos_x, pos_y, TILE_SIZE, TILE_SIZE), 2)
-                    label = self.font.render("†", True, (255, 215, 0))
-                    screen.blit(label, (pos_x + 8, pos_y + 2))
+                # Rysowanie nowych grafik zamiast prostokątów
+                if tile_type in self.terrain_images:
+                    screen.blit(self.terrain_images[tile_type], (pos_x, pos_y))
 
                 elif tile_type == "P":
-                    # Plac budowy
-                    pygame.draw.rect(screen, (255, 255, 0), (pos_x, pos_y, TILE_SIZE, TILE_SIZE), 2)
-                    p_txt = self.font.render("P", True, (255, 255, 0))
-                    screen.blit(p_txt, (pos_x + 10, pos_y + 5))
-
+                    # Sprawdzamy, czy to początek (lewy górny róg) większego projektu 2x2
+                    # (Zakładamy, że jeśli obok i pod spodem też jest "P", to jest to duży budynek)
+                    is_left_edge = (x == 0 or self.map[y][x-1] != "P")
+                    is_top_edge = (y == 0 or self.map[y-1][x] != "P")
+                    
+                    # Sprawdzamy czy to projekt 2x2 (czy ma sąsiadów "P" w prawo i w dół)
+                    has_right = (x + 1 < len(self.map[0]) and self.map[y][x+1] == "P")
+                    has_bottom = (y + 1 < len(self.map) and self.map[y+1][x] == "P")             
+                    
         # --- 3. SIATKA, PREVIEW I RESZTA (Poza pętlą terenu) ---
         if self.show_grid:
             self.draw_grid_lines(screen)
@@ -1054,57 +1131,54 @@ class World:
         if getattr(self, 'road_build_mode', False):
             self.draw_road_arrows(screen)
 
-        # --- 4. RYSOWANIE ZAMKÓW (DYNAMICZNY ROZMIAR) ---
+       # --- 4. RYSOWANIE ZAMKÓW (Poprawione Puzzle 2x2 i Strażnica) ---
         for castle in self.castles:
-            # KLUCZOWA ZMIANA: Sprawdzamy typ. Strażnica = 1 kafel, reszta = 2 kafle (64px)
-            if castle.building_type == "Strażnica":
-                draw_size = TILE_SIZE
-            else:
-                draw_size = TILE_SIZE * 2 # Czyli Twoje 64
-                
-            rect = pygame.Rect(
-                (castle.x * TILE_SIZE) - self.camera_x, 
-                (castle.y * TILE_SIZE) - self.camera_y, 
-                draw_size, 
-                draw_size
-            )
+            is_tower = (castle.building_type == "Strażnica")
             
+            # --- POPRAWKA STRAŻNICY: Nowa logika stanów ---
             if getattr(castle, 'destroyed', False):
-                # Rysowanie zniszczonego budynku
-                pygame.draw.rect(screen, (180, 0, 0), rect)
-                pygame.draw.rect(screen, (50, 0, 0), rect, 2)
-                pygame.draw.line(screen, (100, 0, 0), rect.topleft, rect.bottomright, 2)
-                pygame.draw.line(screen, (100, 0, 0), rect.topright, rect.bottomleft, 2)
+                s_idx = 4 # Zniszczona
+            elif getattr(castle, 'under_construction', False):
+                # Pętla budowy (0, 1 lub 2)
+                s_idx = min(2, castle.mury_percent // 34) 
             else:
-                # Kolor właściciela lub neutralny
-                if castle.owner is not None:
-                    # Skoro castle.owner to obiekt Player, po prostu bierzemy jego kolor
-                    owner = castle.owner
-                castle_color = (100, 100, 100) # Domyślny kolor (szary), jeśli coś pójdzie nie tak
+                # --- KLUCZ: Po zakończeniu budowy wymuszamy stan 3 (gotowy) ---
+                s_idx = 3 
 
-                if owner is not None:
-                    # Przypadek 1: owner to liczba (ID gracza)
-                    if isinstance(owner, int):
-                        if 0 <= owner < len(self.players):
-                            castle_color = self.players[owner].color
-                            
-                    # Przypadek 2: owner to obiekt Player (ma atrybut color)
-                    elif hasattr(owner, 'color'):
-                        castle_color = owner.color
+            # --- RYSOWANIE STRAŻNICY (1x1) ---
+            if is_tower:
+                # Pobieramy kafel 32x32 (0-4)
+                img = self.tower_tiles.get(s_idx)
+                if img:
+                    # Rysujemy dokładnie na kafelku
+                    screen.blit(img, (castle.x * TILE_SIZE - self.camera_x, castle.y * TILE_SIZE - self.camera_y))
+            
+            # --- RYSOWANIE ZAMKU (2x2 puzzle - Wymuszenie rozmiaru) ---
+            else:
+                tiles = self.castle_tiles.get(s_idx, [])
+                if len(tiles) == 4:
+                    offsets = [(0,0), (1,0), (0,1), (1,1)]
+                    
+                    for i in range(4):
+                        dx, dy = offsets[i]
+                        
+                        # Obliczamy pozycję: każdy kafel ma swój własny kwadrat 32x32
+                        tile_px = (castle.x + dx) * TILE_SIZE - self.camera_x
+                        tile_py = (castle.y + dy) * TILE_SIZE - self.camera_y
+                        
+                        # TEST: Wymuszamy rozmiar 32x32 przed narysowaniem
+                        temp_tile = pygame.transform.scale(tiles[i], (TILE_SIZE, TILE_SIZE))
+                        screen.blit(temp_tile, (tile_px, tile_py))
+
+            # --- Pasek postępu (tylko dla budowy) ---
+            #if getattr(castle, 'under_construction', False) and not getattr(castle, 'destroyed', False):
+             #   # Szerokość paska (32 lub 64)
+              #  w = TILE_SIZE if is_tower else TILE_SIZE * 2
+               # bar_x = castle.x * TILE_SIZE - self.camera_x
+                #bar_y = castle.y * TILE_SIZE - self.camera_y + (TILE_SIZE if is_tower else TILE_SIZE * 2) - 5
                 
-                # Rysujemy główny blok budynku
-                pygame.draw.rect(screen, castle_color, rect) 
-                pygame.draw.rect(screen, (0, 0, 0), rect, 2) # Obwódka
-                
-                # Litera typu budynku (S, T, Z)
-                label = castle.building_type[0].upper()
-                txt = self.font.render(label, True, (255, 255, 255))
-                screen.blit(txt, (rect.x + 5, rect.y + 2))
-                
-                # Detal wizualny (daszek) - dopasowany do rozmiaru budynku
-                roof_width = draw_size - 20
-                if roof_width > 0:
-                    pygame.draw.rect(screen, (255, 255, 255), (rect.x + 10, rect.y + 10, roof_width, 5), 0)
+            #    pygame.draw.rect(screen, (0,0,0), (bar_x, bar_y, w, 5))
+             #   pygame.draw.rect(screen, (0,255,0), (bar_x, bar_y, int(w * (castle.mury_percent/100)), 5))
 
         # --- 5. RYSOWANIE JEDNOSTEK (Tile-based counts) ---
         tile_units = {}
@@ -1745,7 +1819,8 @@ class World:
         if self.screen == "map" or self.screen == "trap_info":
             self.draw_map(screen)
             for unit in self.units:
-                if getattr(unit, 'visible', True):
+                # DODAJ TEN WARUNEK - to jest klucz do sukcesu:
+                if getattr(unit, 'visible', True) and not getattr(unit, 'is_building', False):
                     unit.draw(screen)
             self.draw_top_bar(screen)
             self.draw_ui(screen)
@@ -1914,6 +1989,10 @@ class World:
         
     def get_unit_at(self, x, y):
         for unit in self.units:
+            # Ignoruj jednostki, które są w trakcie budowy!
+            if getattr(unit, 'is_building', False):
+                continue
+                
             if unit.x == x and unit.y == y:
                 return unit
         return None
@@ -2026,41 +2105,51 @@ class World:
 
         # --- 2. LEWY PRZYCISK ---
         if button == 1:
-            # A. ZAZNACZANIE JEDNOSTKI (zmiana wyboru)
+            # A. NAJPIERW: Sprawdzamy, czy kliknięto w JEDNOSTKĘ (zmiana wyboru)
+            # Przeszukujemy wszystkich graczy, aby móc np. zaznaczyć wroga do ataku lub zmienić wybór
             for player in self.players:
                 for unit in player.units:
                     if unit.x == tile_x and unit.y == tile_y:
+                        # Jeśli kliknięto w jednostkę, ZAWSZE ją zaznaczamy i PRZERYWAMY
                         if unit.owner == self.players[self.current_player]:
                             self.selected_unit = unit
                             unit.target_x = unit.target_y = None
                             unit.planned_path = []
                             print(f"Zmieniono wybór na: {unit.type}")
-                            return 
+                            return # To wyjście jest kluczowe!
 
-            # B. LOGIKA RUCHU (Jeśli ktoś jest wybrany, to kliknięcie gdziekolwiek to ruch)
+            # B. POTEM: Jeśli kliknięto w puste pole (lub zamek) i mamy kogoś wybranego -> RUCH
             if self.selected_unit:
                 u = self.selected_unit
                 
-                # Jeśli klikasz drugi raz w to samo miejsce (potwierdzenie ruchu)
+                # Potwierdzenie ruchu (drugi klik)
                 if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
                     u.move_along_path(self)
-                    # Sprawdzamy, czy po ruchu jednostka stanęła na zamku
                     self.check_unit_castle_entry(u)
                     return
 
-                # Pierwsze kliknięcie - wyznaczanie trasy (nawet jeśli celem jest zamek)
+                # Pierwszy klik - planowanie trasy
                 u.target_x, u.target_y = tile_x, tile_y
                 u.planned_path = self.find_path(u, tile_x, tile_y)
                 return
 
-            # C. WEJŚCIE DO ZAMKU (Tylko jeśli self.selected_unit jest None!)
+            # C. NA KOŃCU: Wejście do obiektu (Zamek lub Strażnica)
             for castle in self.castles:
-                # Sprawdzanie obszaru zamku (np. 2x2)
-                if castle.x <= tile_x <= castle.x + 1 and castle.y <= tile_y <= castle.y + 1:
+                # Sprawdzamy czy kliknięto w pole zajmowane przez budynek
+                # (Dla strażnicy 1x1, dla zamku może być 2x2)
+                size = 2 if castle.building_type == "Zamek" else 1
+                
+                if castle.x <= tile_x < castle.x + size and castle.y <= tile_y < castle.y + size:
                     if not castle.destroyed:
                         self.selected_castle = castle
-                        self.screen = "castle"
-                        print(f"Wchodzisz do obiektu: {castle.building_type}")
+                        
+                        # --- KLUCZOWY ROZDRZIAŁ ---
+                        if castle.building_type == "Strażnica":
+                            self.screen = "garrison" # Idziemy od razu do slotów
+                            print("Wchodzisz bezpośrednio do Garnizonu Strażnicy")
+                        else:
+                            self.screen = "castle" # Idziemy do menu głównego Zamku
+                            print(f"Wchodzisz do menu obiektu: {castle.building_type}")
                         return
 
     def handle_castle_click(self, mx, my):
@@ -3013,24 +3102,16 @@ class World:
 
         # 4. BUDOWLE (Strażnica=3, Twierdza=4, Zamek=5)
         menu_to_type = {3: "Strażnica", 4: "Twierdza", 5: "Zamek"}
-        
+    
         if button_index in menu_to_type:
             b_type = menu_to_type[button_index]
             
-            # Rozpoczynamy budowę (przekazujemy budowniczego jako wykonawcę)
+            # WYWOŁUJEMY: Budowniczy i jego armia zostaną "wciągnięci" do zamku
             self.start_building(grid_x, grid_y, b_type, builder)
             
-            # Sprawdzamy czy projekt ruszył
-            if (grid_x, grid_y) in self.active_projects:
-                # Budowniczy "znika" w budowie (usuwamy go z garnizonu armii lub z mapy)
-                self.remove_unit_or_builder(army, builder)
-                
-                # Cała armia staje się stacjonarna (straż budowy)
-                army.move_points = 0 
-                
-                self.selected_unit = None
-                self.build_menu_open = False
-                print(f"Armia {army.type} rozpoczęła budowę {b_type} i pilnuje placu budowy.")
+            self.build_menu_open = False
+            self.selected_unit = None
+            return
 
     def remove_unit_or_builder(self, army, builder):
         # Jeśli armia to po prostu jeden budowniczy
@@ -3115,7 +3196,7 @@ class World:
         screen.blit(stop_txt, (self.btn_trap_stop.centerx - stop_txt.get_width()//2, self.btn_trap_stop.centery - stop_txt.get_height()//2))
         screen.blit(dalej_txt, (self.btn_trap_dalej.centerx - dalej_txt.get_width()//2, self.btn_trap_dalej.centery - dalej_txt.get_height()//2))
     
-    def start_building(self, x, y, b_type, builder_unit=None):
+    def start_building(self, x, y, b_type, builder=None):
         if b_type not in BUILDING_TYPES: return
         config = BUILDING_TYPES[b_type]
         
@@ -3123,9 +3204,8 @@ class World:
         anchor_x, anchor_y = ix, iy
         found_foundation = False
 
-        # Logika szukania miejsca
+        # 1. Logika szukania miejsca (zostaje bez zmian)
         if config.get("size") == 2:
-            # Logika dla Zamku/Twierdzy (szukanie fundamentu #)
             for dx in [0, -1]:
                 for dy in [0, -1]:
                     nx, ny = ix + dx, iy + dy
@@ -3136,147 +3216,99 @@ class World:
                             break
                 if found_foundation: break
             if not found_foundation: return
-        
         else:
-            # --- LOGIKA DLA STRAŻNICY (Rozmiar 1) ---
-            # 1. Sprawdzamy, czy pod nogami jest trawa/pustynia
-            if self.map[iy][ix] in [".", "p"]:
-                
-                # 2. KLUCZOWA BLOKADA: Sprawdzamy, czy to pole nie styka się z fundamentem #
-                if self.is_area_occupied_by_foundation(ix, iy):
-                    print("Błąd: Nie można budować Strażnicy na lub obok fundamentów zamku!")
-                    return # PRZERWIJ BUDOWĘ
-                
+            if self.map[iy][ix] in [".", "p"] and not self.is_area_occupied_by_foundation(ix, iy):
                 found_foundation = True
-            else: 
-                print("Błąd: Strażnicę można budować tylko na trawie lub pustyni!")
-                return
-        # UKRYWANIE BUDOWNICZEGO
-        if builder_unit:
-            builder_unit.visible = False
-            builder_unit.is_building = True
+            else: return
 
-        # TWORZENIE PROJEKTU
-        self.active_projects[(anchor_x, anchor_y)] = {
-            "type": b_type,
-            "remaining": config["turns"],
-            "owner": builder_unit.owner if builder_unit else self.current_player,
-            "pos": (anchor_x, anchor_y),
-            "builder": builder_unit
-        }
+        # 2. TWORZYMY OBIEKT ZAMKU OD RAZU
+        from castle import Castle
+        new_castle = Castle(anchor_x, anchor_y, self.current_player, building_type=b_type)
         
-        # SYMBOLE NA MAPIE
-        if config.get("size") == 2:
-            for i in range(2):
-                for j in range(2): self.map[anchor_y + i][anchor_x + j] = "P"
-        else:
-            self.map[anchor_y][anchor_x] = "P"
+        # NOWE STATYSTYKI BUDOWY:
+        new_castle.under_construction = True
+        new_castle.total_work_needed = 12.0  # Twoje bazowe 12 tur
+        new_castle.work_done = 0.0
+        new_castle.mury_percent = 0  # Postęp murów (obrona)
 
-        print(f"Rozpoczęto budowę {b_type}. Budowniczy ukryty w projekcie.")
+        # 3. PRZENOSZENIE CAŁEJ ARMII DO GARNIZONU
+        # Szukamy armii na tym polu (tej, która zainicjowała budowę)
+        army = self.get_unit_at(ix, iy) # Pobieramy armię zanim ją usuniemy
+        
+        if army:
+            # 1. Przenosimy jednostki do garnizonu zamku
+            self.enter_castle(army, new_castle) 
+            # Funkcja enter_castle już zajmie się usunięciem z self.units!
+        
+        self.castles.append(new_castle)
+
+        # --- SYMBOLE NA MAPIE ---
+        size = 2 if config.get("size") == 2 else 1
+        for dy in range(size):
+            for dx in range(size):
+                self.map[anchor_y + dy][anchor_x + dx] = "P"
+
+        print(f"Rozpoczęto budowę {b_type}. Garnizon pilnuje placu.")
 
     def process_construction(self):
-        finished = []
-        # Pracujemy na kopii kluczy, aby uniknąć błędów podczas usuwania
-        for pos in list(self.active_projects.keys()):
-            project = self.active_projects[pos]
-            
-            if project.get("builder"):
-                project["remaining"] -= 1
-                print(f"Postęp {project['type']} na {pos}: pozostało {project['remaining']}")
-            
-            if project["remaining"] <= 0:
-                finished.append(pos)
+        for castle in self.castles:
+            if getattr(castle, 'under_construction', False):
+                # 1. Liczymy ilu Budowniczych jest w garnizonie tego zamku
+                builders_count = sum(1 for slot in castle.garrison if slot and slot.type == "Budowniczy")
                 
-        for pos in finished:
-            project = self.active_projects[pos]
-            self.complete_building(project)
-            del self.active_projects[pos]
+                if builders_count > 0:
+                    # 2. Dodajemy postęp (1 budowniczy = 1 pkt terytorialny)
+                    castle.work_done += builders_count
+                    
+                    # 3. Wyliczamy % murów (do obrony w bitwie)
+                    castle.mury_percent = min(100, int((castle.work_done / castle.total_work_needed) * 100))
+                    print(f"Budowa {castle.building_type}: {castle.mury_percent}% murów.")
+
+                # 4. Sprawdzamy czy koniec
+                if castle.work_done >= castle.total_work_needed:
+                    castle.under_construction = False
+                    castle.mury_percent = 100
+                    
+                    # Zmieniamy "P" na symbol gotowego budynku
+                    sym = "S" if castle.building_type == "Strażnica" else "C"
+                    size = 2 if castle.building_type in ["Twierdza", "Zamek"] else 1
+                    for dy in range(size):
+                        for dx in range(size):
+                            self.map[castle.y + dy][castle.x + dx] = sym
+                    print(f"Budowa ukończona: {castle.building_type} gotowy!")
 
     def count_builders_near(self, pos):
         px, py = pos
         # Szukamy budowniczych dokładnie na kafelku placu budowy
         return sum(1 for u in self.units if u.x == px and u.y == py and u.type.lower() == "budowniczy")
-    
-    def complete_building(self, project):
-        x, y = project["pos"]
-        b_type = project["type"]
-        owner = project["owner"]
-        
-        from castle import Castle
-        new_building = Castle(x, y, owner)
-        # 2. DOPISUJEMY ZŁOTO STARTOWE
-        # Sprawdzamy, czy to Zamek (bo Strażnica może nie mieć złota)
-        if b_type == "Zamek":
-            new_building.gold = 1000  # Zamek zaczyna z tysiącem złota w skarbcu
-            print(f"Zamek na {x},{y} otrzymał 1000 złota na start.")
-
-        config = BUILDING_TYPES[b_type]
-        new_building.building_type = b_type
-        new_building.available_modules = config.get("modules", [])
-        new_building.garrison_limit = config.get("garrison_limit", 5)
-        
-        self.castles.append(new_building)
-        
-        # TRANSFER BUDOWNICZEGO
-        builder = project.get("builder")
-        if builder:
-            # Dodaj do listy garnizonu
-            new_building.add_to_garrison(builder)
-            builder.visible = True
-            builder.is_building = False
-            # Usuń z jednostek na mapie świata
-            if builder in self.units:
-                self.units.remove(builder)
-        
-        # MAPA
-        symbol = "S" if b_type == "Strażnica" else "C"
-        if config.get("size") == 2:
-            for i in range(2):
-                for j in range(2): self.map[y+i][x+j] = symbol
-        else:
-            self.map[y][x] = symbol
-
-        print(f"BUDOWA UKOŃCZONA: {b_type} na {x},{y}. Budowniczy w garnizonie.")
         
     def handle_building_logic(self, mx, my, gx, gy):
         tile = self.map[gy][gx]
-        builder = self.selected_unit
-        mode = getattr(self, "building_mode", None) # Np. "Tower", "Zamek", "Twierdza"
+        builder = self.selected_unit # Tutaj już używasz nazwy 'builder'
+        mode = getattr(self, "building_mode", None)
 
         if not builder or builder.type != "Budowniczy":
             return False
 
-        # --- PRZYPADEK 1: Klikamy na FUNDAMENTY (#) ---
         if tile == "#":
-            # Jeśli gracz chce tu postawić Strażnicę (Tower) - ZABRANIAMY
             if mode == "Tower":
-                print("BŁĄD: Strażnica jest zbyt mała na te fundamenty! Tu buduj Zamek.")
+                print("BŁĄD: Strażnica wymaga wolnego pola!")
                 return False
-            
-            # Jeśli gracz chce budować Zamek/Twierdzę - POZWALAMY
             if mode in ["Zamek", "Twierdza"]:
+                # Wywołujemy funkcję, która schowa buildera za nas
                 self.start_building(gx, gy, mode, builder)
-                self.cleanup_builder(builder) # Pomocnicza funkcja do usuwania budowniczego
                 return True
 
-        # --- PRZYPADEK 2: Klikamy na TRAWĘ (.) ---
         elif tile == ".":
-            # Jeśli gracz chce budować Zamek na trawie - ZABRANIAMY
             if mode in ["Zamek", "Twierdza"]:
-                print("BŁĄD: Zamek wymaga fundamentów (#)!")
+                print("BŁĄD: Zamek wymaga fundamentów!")
                 return False
-
-            # Jeśli gracz chce budować Strażnicę na trawie
             if mode == "Tower":
-                # DODATKOWY TEST: Czy to pole nie sąsiaduje z fundamentem? 
-                # (Żeby strażnica nie stała "pół piksela" od muru zamku)
                 if self.is_area_occupied_by_foundation(gx, gy):
-                    print("BŁĄD: Zbyt blisko fundamentów zamku!")
                     return False
-
                 self.start_building(gx, gy, "Strażnica", builder)
-                self.cleanup_builder(builder)
                 return True
+        return False
             #elif mode == "Foundation":
                 # Stawiamy fundamenty pod Zamek/Twierdzę
                 #self.map[gy][gx] = "#"
@@ -3285,16 +3317,7 @@ class World:
                 # Tutaj budowniczy NIE musi znikać, bo to postawienie kafelka, a nie budowa czasowa
                 #return True
         return False
-
-    def cleanup_builder(self, builder):
-        """Pomocnicza funkcja, żeby nie powtarzać kodu usuwania jednostki."""
-        if builder in self.units:
-            self.units.remove(builder)
-        self.selected_unit = None
-        self.building_mode = None
-                
-        
-                
+                        
     def handle_castle_entry(self, mx, my):
         """Sprawdza kliknięcie w budynki na mapie. Zwraca True, jeśli wejdzie do środka."""
         for castle in self.castles:
@@ -3349,14 +3372,24 @@ class World:
             # 2. Rysuj jednostkę, jeśli istnieje
             if i < len(castle.garrison) and castle.garrison[i]:
                 unit = castle.garrison[i]
+                
+                # Rysowanie ikonki (jeśli masz unit.image) lub tekstu
+                # Jeśli używasz tekstu:
+                u_txt = font.render(unit.type[:5], True, (255, 255, 255))
+                screen.blit(u_txt, (slot_rect.centerx - u_txt.get_width()//2, 
+                                    slot_rect.centery - u_txt.get_height()//2))
+
+                # --- NOWOŚĆ: Obwódka jeśli jednostka jest zaznaczona do wyjścia ---
+                if unit in self.selected_units:
+                    pygame.draw.rect(screen, (0, 255, 0), slot_rect, 4) # Zielona ramka
 
         # Przycisk POWRÓT (już masz)
         self.back_button = pygame.Rect(screen.get_width()//2 - 250, 650, 160, 45)
         self.draw_button(screen, "POWRÓT", self.back_button)
 
         # Przycisk RELEASE
-        self.button_send_army = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)
-        self.draw_button(screen, "RELEASE", self.button_send_army)
+        self.release_tower = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)
+        self.draw_button(screen, "RELEASE", self.release_tower)
 
         
         # Przycisk ZNISZCZ
@@ -3366,32 +3399,6 @@ class World:
         txt = font.render("ZNISZCZ", True, (255, 255, 255))
         screen.blit(txt, (self.destroy_button.centerx - txt.get_width()//2, 
                         self.destroy_button.centery - txt.get_height()//2))
-
-    def process_active_builds(self):
-        """Przetwarza postęp budowy wszystkich obiektów."""
-        finished = []
-        for pos, data in list(self.active_projects.items()):
-            data["work_done"] += len(data.get("builders", []))
-            
-            if data["work_done"] >= data["total_work_needed"]:
-                from castle import Castle
-                new_b = Castle(pos[0], pos[1], self.current_player, building_type=data["type"])
-                
-                # --- DODAJ TO: Wkładanie budowniczych do środka ---
-                for b in data.get("builders", []):
-                    # Szukamy wolnego slotu w garnizonie (zakładamy 10 slotów)
-                    for i in range(len(new_b.garrison)):
-                        if new_b.garrison[i] is None:
-                            new_b.garrison[i] = b
-                            break
-                # --------------------------------------------------
-
-                self.castles.append(new_b)
-                self.map[pos[1]][pos[0]] = "S" if data["type"] == "Strażnica" else "C"
-                finished.append(pos)
-                
-        for pos in finished:
-            del self.active_projects[pos]    
 
     def destroy_straznica(self, castle):
         """Niszczy strażnicę, tworzy jedną armię z jej załogi i zostawia ruiny."""
@@ -3438,86 +3445,88 @@ class World:
         return True
 
     def draw_building_footer(self, screen):
-        # 1. POWRÓT (Teraz z efektem hover!)
+
+        # Rysuj POWRÓT zawsze
         self.draw_button(screen, "POWRÓT", self.back_button, (140, 80, 80))
 
-        # 2. Logika kontekstowa przycisku akcji
+        # Rysuj OPUŚĆ tylko w garnizonie
         if self.screen == "garrison":
-            self.draw_button(screen, "OPUŚĆ KOSZARY", self.button_send_army, (160, 120, 60))
+            self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
 
-        # 4. Przycisk ZBURZ
-        if self.screen == "straznica":
-            # Tu zakładam, że destroy_button ma zdefiniowany kolor domyślny lub go podasz
+        # Rysuj ZBURZ tylko jeśli to Strażnica
+        if self.selected_castle and self.selected_castle.building_type == "Strażnica":
             self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
     def release_selected_units(self):
-        """
-        Uniwersalna funkcja uwalniania jednostek. 
-        Zastępuje execute_universal_release i stare release_selected_units.
-        """
-        # 1. Sprawdzamy co jest źródłem (Zamek czy Strażnica/Budynek)
         target = self.selected_castle or getattr(self, 'active_building', None)
         if not target or not self.selected_units:
-            print("Błąd: Nic nie zaznaczono do wypuszczenia!")
             return
 
-        # 2. Inteligentny podział na grupy (żeby Chłopi nie byli w jednej armii z Rycerzami)
-        # To zapobiega błędom w logice ekonomii/walki
+        # 1. Podział na grupy
         chłopi_group = [u for u in self.selected_units if u.type == "Chłop"]
         złoto_group = [u for u in self.selected_units if u.type == "Złoto"]
         wojsko_group = [u for u in self.selected_units if u.type not in ["Chłop", "Złoto"]]
-
-        # Tworzymy listę grup, które faktycznie nie są puste
         groups_to_spawn = [g for g in [chłopi_group, złoto_group, wojsko_group] if g]
         
-        # 3. Szukanie miejsc (wykorzystujemy Twoją funkcję find_multiple_spawn_positions)
-        # Jeśli jej nie masz, użyj pętli z directions z Twojego pierwszego kodu
         spawn_positions = self.find_multiple_spawn_positions(target, len(groups_to_spawn))
-
         from unit import Unit
         
         for idx, group in enumerate(groups_to_spawn):
             pos = spawn_positions[idx] if idx < len(spawn_positions) else None
-            if not pos:
-                print(f"Brak miejsca na mapie dla grupy {idx}!")
-                continue
+            if not pos: continue
             
             nx, ny = pos
-            # Nazwa armii: typ pierwszej jednostki w grupie
-            army_type = group[0].type 
 
-            # 4. TWORZENIE NOWEJ ARMII NA MAPIE
-            new_army = Unit(army_type, nx, ny, target.owner)
-            new_army.move_points = 50  # Standardowy ruch
-            new_army.vision_range = 5  # Żeby widziała mapę
-            new_army.garrison = [None] * 10 # Puste sloty w nowej armii
+            if len(group) == 1:
+                # ================= SCENARIUSZ A: SOLO (np. Budowniczy) =================
+                solo_unit = group[0]
+                
+                # --- KLUCZOWA POPRAWKA: USUWANIE ZE SLOTU ---
+                for slot_idx in range(len(target.garrison)):
+                    if target.garrison[slot_idx] is solo_unit: # 'is' sprawdza konkretny obiekt
+                        target.garrison[slot_idx] = None
+                        break
+                # --------------------------------------------
 
-            # 5. PRZEKŁADANIE JEDNOSTEK (Z budynku do armii)
-            for i, unit_to_move in enumerate(group):
-                if i < 10: 
-                    new_army.garrison[i] = unit_to_move
+                solo_unit.x, solo_unit.y = nx, ny
+                if hasattr(solo_unit, 'rect'):
+                    solo_unit.rect.topleft = (nx * TILE_SIZE, ny * TILE_SIZE)
+                solo_unit.visible = True
+                
+                if solo_unit not in self.units:
+                    self.units.append(solo_unit)
+
+                if target.owner and solo_unit not in target.owner.units:
+                    target.owner.units.append(solo_unit)
                     
-                    # USUNIĘCIE Z MAPY (Kluczowe!)
-                    if unit_to_move in self.units:
-                        self.units.remove(unit_to_move) # Jednostka "znika" jako osobny byt
+                print(f"Wypuszczono solo: {solo_unit.type} i wyczyszczono slot.")
+
+            else:
+                # ================= SCENARIUSZ B: GRUPA (ARMIA) =================
+                army_type = group[0].type 
+                new_army = Unit(army_type, nx, ny, target.owner)
+                new_army.garrison = [None] * 10
+
+                for i, unit_to_move in enumerate(group):
+                    if i < 10:
+                        new_army.garrison[i] = unit_to_move
                         
-                    # Usuwamy z garnizonu źródłowego
-                    for slot_idx in range(len(target.garrison)):
-                        if target.garrison[slot_idx] == unit_to_move:
-                            target.garrison[slot_idx] = None
-                            break
+                        # --- CZYŚCIMY SLOTY W BUDYNKU ---
+                        for slot_idx in range(len(target.garrison)):
+                            if target.garrison[slot_idx] is unit_to_move:
+                                target.garrison[slot_idx] = None
+                                break 
 
-            # 6. REJESTRACJA W SYSTEMIE
-            self.units.append(new_army)
-            if target.owner:
-                target.owner.units.append(new_army)
+                        if unit_to_move in self.units:
+                            self.units.remove(unit_to_move)
+                
+                self.units.append(new_army)
+                if target.owner:
+                    target.owner.units.append(new_army)
 
-        # Czyścimy zaznaczenie po operacji
         self.selected_units.clear()
-        
-        # Opcjonalnie: self.screen = "map" jeśli chcesz wyjść, 
-        # albo zostawiasz "garrison" żeby wypuszczać dalej.
-        print("Ewakuacja zakończona sukcesem.")
+        self.screen = "map"
+        print("Ewakuacja zakończona.")
 
     def find_multiple_spawn_positions(self, castle, num_groups):
         # gdzie wychodzą jednostki

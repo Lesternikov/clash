@@ -91,6 +91,10 @@ class Castle:
         "unit_type": "Posp. ruszenie",
         "stats": UNIT_STATS["Posp. ruszenie"]
         } 
+        self.under_construction = False  # Czy budynek jest w trakcie budowy
+        self.work_done = 0.0             # Ile punktów pracy już włożono
+        self.total_work_needed = 12.0    # Bazowa wartość (12 tur dla 1 budowniczego)
+        self.mury_percent = 0            # Wytrzymałość murów (0-100%)
     @property
     def owner(self):
         # Jeśli _owner_data to liczba (ID), spróbujmy znaleźć gracza w świecie gry
