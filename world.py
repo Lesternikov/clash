@@ -930,10 +930,25 @@ class World:
             return
         
         elif self.screen == "garrison":
-            if hasattr(self, 'button_send_army') and self.button_send_army.collidepoint(mx, my):
+            # 1. Przycisk WYPUŚĆ / RELEASE (Obsługa dla Zamku i Strażnicy)
+            # Sprawdzamy oba możliwe przyciski (button_send_army to stary, release_tower to nowy)
+            is_release = (hasattr(self, 'button_send_army') and self.button_send_army.collidepoint(mx, my)) or \
+                         (hasattr(self, 'release_tower') and self.release_tower.collidepoint(mx, my))
+            
+            if is_release:
+                print("Akcja: Wypuszczanie zaznaczonych jednostek na mapę")
                 self.release_selected_units()
-            else:
-                self.handle_garrison_click(mx, my, button)
+                return
+
+            # 2. Przycisk ZBURZ / ZNISZCZ (Tylko dla Strażnicy)
+            if hasattr(self, 'destroy_button') and self.destroy_button.collidepoint(mx, my):
+                if self.selected_castle and self.selected_castle.building_type == "Strażnica":
+                    print("Akcja: Burzenie Strażnicy")
+                    self.destroy_straznica(self.selected_castle)
+                    return
+
+            # 3. Jeśli nie przyciski akcji, to sprawdzamy kliknięcie w kafelki jednostek
+            self.handle_garrison_click(mx, my, button)
             return
 
         # 6. BLOKADA DLA RESZTY (Forge, Hospital, School, Workshop, Court, Peasants)
