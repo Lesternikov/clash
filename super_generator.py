@@ -2,20 +2,13 @@ import re
 from PIL import Image
 
 def super_map_generator(image_path, fac_path, final_output_path):
-    print("--- ROZPOCZĘCIE GENEROWANIA MAPY ---")
+    print("--- GENEROWANIE MAPY: SYNCHRONIZACJA RELIGII (Logika ID % 5) ---")
     
-    # --- KROK 1: KONWERSJA OBRAZU NA TEREN ---
     tile_size = 2
-    # Definicja kolorów terenu (z Twojej palety)
     color_map = {
-        (0, 202, 255):   'W', # Woda
-        (60, 95, 35):    'l', # Las
-        (100, 140, 65):  '.', # Trawa
-        (185, 105, 50):  'p', # Ziemia
-        (155, 145, 140): '_', # Drogi
-        (115, 110, 110): 'g', # Skały
-        (80, 75, 75):    'G', # Góry
-        (95, 35, 10):    'B', # Bagna
+        (0, 202, 255):   'W', (60, 95, 35):    'l', (100, 140, 65):  '.',
+        (185, 105, 50):  'p', (155, 145, 140): '_', (115, 110, 110): 'g',
+        (80, 75, 75):    'G', (95, 35, 10):    'B',
     }
 
     def get_closest_terrain(pixel):
@@ -31,70 +24,67 @@ def super_map_generator(image_path, fac_path, final_output_path):
 
     try:
         img = Image.open(image_path).convert('RGB')
-        width, height = img.size
-        # Budujemy matrycę terenu
-        terrain_grid = []
-        for y in range(0, height, tile_size):
-            row = []
-            for x in range(0, width, tile_size):
-                pixel = img.getpixel((x, y))
-                row.append(get_closest_terrain(pixel))
-            terrain_grid.append(row)
-        
-        grid_h = len(terrain_grid)
-        grid_w = len(terrain_grid[0])
-        print(f"1. Teren przetworzony ({grid_w}x{grid_h})")
+        w, h = img.size
+        # Tworzymy siatkę terenu 100x100
+        grid = [[get_closest_terrain(img.getpixel((x, y))) for x in range(0, w, tile_size)] for y in range(0, h, tile_size)]
+        gh, gw = len(grid), len(grid[0])
 
-        # --- KROK 2: ODCZYT OBIEKTÓW Z 0.FAC ---
         with open(fac_path, 'r', encoding='utf-8') as f:
             fac_content = f.read()
 
-        # Definiujemy co chcemy nałożyć (bez pułapek 'X')
-        object_defs = [
-            ("Fundamenty (#)", r"\(zamek_place (\d+) (\d+)\)", "#"),
-            ("Świątynie (&)", r"\(swiatynia (\d+) (\d+)\)", "&"),
-            ("Skarby ($)", r"\(skarb (\d+) (\d+)\)", "$"),
-            ("Zamki (S)", r"\(zbudowano zamek (\d+) (\d+)\)", "S")
-        ]
+        # Czyszczenie śmieci z pliku
+        fac_content = re.sub(r"\\", "", fac_content)
 
-        # --- KROK 3: FUZJA (NAKŁADANIE) ---
+        # 1. Mapowanie religii z sekcji gameinfo (pobiera dane dla graczy 0-4)
+        religie = {int(g): int(c) for g, c in re.findall(r"gameinfo gracz (\d+) .*? chrzesc (\d+)", fac_content)}
+
+        # Inicjalizacja licznika (to naprawia Twój błąd!)
         objects_count = 0
-        for name, pattern, symbol in object_defs:
-            matches = re.findall(pattern, fac_content)
-            for x, y in matches:
-                ix, iy = int(x), int(y)
-                # Nakładamy tylko jeśli mieści się w granicach obrazu
-                if 0 <= ix < grid_w and 0 <= iy < grid_h:
-                    terrain_grid[iy][ix] = symbol
-                    objects_count += 1
-        
-        print(f"2. Nałożono {objects_count} obiektów z pliku {fac_path}")
 
-        # --- KROK 4: ZAPIS KOŃCOWY ---
+        # 3. SKARBY ($)
+        for x, y in re.findall(r"\(skarb (\d+) (\d+)\)", fac_content):
+            ix, iy = int(x), int(y)
+            if 0 <= iy < gh and 0 <= ix < gw:
+                grid[iy][ix] = "$"
+                objects_count += 1
+
+        # 4. ŚWIĄTYNIE († / ψ) - LOGIKA MODULO 5
+        # Rozwiązuje problem proporcji 69 do 2
+        for province_id, y in re.findall(r"\(swiatynia (\d+) (\d+)\)", fac_content):
+            ix, iy = int(province_id), int(y)
+            if 0 <= iy < gh and 0 <= ix < gw:
+                # Obliczamy właściciela (0-4) na podstawie ID prowincji
+                owner_id = ix % 5
+                # Sprawdzamy czy właściciel (0 lub 2) to chrześcijanin
+                is_chr = religie.get(owner_id, 0)
+                grid[iy][ix] = "†" if is_chr == 1 else "ψ"
+                objects_count += 1
+
+        # 5. FUNDAMENTY (#)
+        for x, y in re.findall(r"\(zamek_place (\d+) (\d+)\)", fac_content):
+            ix, iy = int(x), int(y)
+            if 0 <= iy < gh and 0 <= ix < gw:
+                grid[iy][ix] = "#"
+                objects_count += 1
+
+        # 6. ZAMKI ZBUDOWANE (S)
+        zbudowane = re.findall(r"\(zbudowano zamek (\d+)\)", fac_content)
+        for z_id in zbudowane:
+            sch = re.search(fr"\(schemat {z_id} (\d+) (\d+)\)", fac_content)
+            if sch:
+                sx, sy = int(sch.group(1)), int(sch.group(2))
+                if 0 <= sy < gh and 0 <= sx < gw:
+                    grid[sy][sx] = "S"
+
+        # Zapis do pliku
         with open(final_output_path, 'w', encoding='utf-8') as f_out:
-            for row in terrain_grid:
+            for row in grid:
                 f_out.write("".join(row) + "\n")
         
-        print(f"3. Sukces! Finalna mapa zapisana w: {final_output_path}")
+        print(f"Sukces! Nałożono {objects_count} obiektów na mapę {gw}x{gh}.")
 
     except Exception as e:
         print(f"BŁĄD: {e}")
 
 if __name__ == "__main__":
-    # 1. WYBÓR PLIKU OBRAZU
-    obraz_mapy = input("Podaj nazwę obrazu mapy (np. !Karkhan.png): ")
-    if not (obraz_mapy.lower().endswith(".png") or obraz_mapy.lower().endswith(".jpg")):
-        obraz_mapy += ".png"
-
-    # 2. WYBÓR PLIKU FAC
-    plik_fac = input("Podaj nazwę pliku FAC (np. 1.FAC): ")
-    if not plik_fac.lower().endswith(".fac"):
-        plik_fac += ".FAC"
-
-    # 3. WYBÓR NAZWY PLIKU WYNIKOWEGO
-    nazwa_wynikowa = input("Jak ma się nazywać nowa mapa? (np. moja_mapa.txt): ")
-    if not nazwa_wynikowa.lower().endswith(".txt"):
-        nazwa_wynikowa += ".txt"
-        
-    # Uruchomienie generatora z Twoimi nazwami
-    super_map_generator(obraz_mapy, plik_fac, nazwa_wynikowa)
+    super_map_generator(input("Obraz: "), input("Plik FAC: "), input("Wynik: "))

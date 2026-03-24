@@ -250,15 +250,11 @@ def process_construction(self):
 #   
 def count_builders_near(self, pos):
 #   
-def complete_building(self, project):
-#   
 def handle_building_logic(self, mx, my, gx, gy):
 #   
 def handle_castle_entry(self, mx, my):
 #   
 def draw_garrison_only(self, screen):
-#      
-def process_active_builds(self):
 #   
 def destroy_straznica(self, castle):
 #   
