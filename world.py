@@ -2,12 +2,13 @@ from unit import Unit, UNIT_STATS
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player
 from map_loader import load_map, load_fac_objects
-import pygame
 from castle import BUILDINGS
 from castle import BUILDING_TYPES
 import sys
 import heapq
-
+import os      # Obsługa ścieżek do plików (to naprawi Twój błąd)
+import random  # Do losowania drzew (żeby las nie był nudny)
+import pygame  # Silnik gry
 
 TILE_SIZE = 32
 SCREEN_WIDTH = 1280
@@ -56,6 +57,39 @@ class World:
         self.btn_font = pygame.font.SysFont(None, 28, bold=True)
 
         # --- LOGIKA I DANE ---
+        # ====================================================
+        #                     ŁADOWANIE GRAFIKI MAPY
+        # ====================================================
+        self.grass_images = []
+        self.tree_images = []
+        self.goryn_images = []
+        self.pustynia_images =[]
+        self.grass_decorations = {} 
+        self.tree_decorations = {}  
+        self.goryn_decorations = {}
+        self.pustynia_decorations ={}
+        self.map_decorations = {} # Jeśli jeszcze go używasz
+        self.deep_water_images = []
+        for i in range(587, 595):
+            path = os.path.join("assets", "woda", f"BACKGR1_S32_{i}.png")
+            if os.path.exists(path):
+                img = pygame.image.load(path).convert_alpha()
+                self.deep_water_images.append(pygame.transform.scale(img, (32, 32)))
+        # Wywołujemy funkcje, które wczytują pliki do list powyżej
+        self.load_tree_graphics()
+        self.load_grass_graphics()
+        print(f"ZAŁADOWANO TRAW: {len(self.grass_images)}") # Jeśli pokaże 0, to masz złe nazwy plików!
+        self.load_goryn_graphics()
+        self.load_pustynia_graphics()
+
+        # 1. Najpierw definiujemy puste listy/słowniki
+        self.water_layers = [[] for _ in range(13)] # 12 brzegów + 1 morze
+        self.deep_water_images = []
+        self.water_frame_index = 0
+        
+        # 2. Potem wywołujemy funkcję, która je wypełni obrazkami
+        self.load_animated_water()
+        # Inicjalizacja pozostałych list
         self.map = []
         self.units = []
         self.castles = []
@@ -72,7 +106,6 @@ class World:
         self.camera_x = 0
         self.camera_y = 0
         self.inspected_unit = None  # Dodaj to w sekcji zmiennych logicznych
-
         # Ładowanie danych
         self.map = self.load_map("final_map1.txt")
         self.load_castles_from_fac("1.FAC")
@@ -255,6 +288,7 @@ class World:
             self.tower_tiles[4] = pygame.image.load(f"{base_path}8.png").convert_alpha()
         except:
             print("Brak pliku zniszczonej strażnicy (8.png)")
+        
 
 # --- INICJALIZACJA GRACZY (Poprawiona pod Player.py) ---
         self.players = []
@@ -271,46 +305,204 @@ class World:
             # i to nasze player_id (0, 1, 2, 3, 4)
             new_player = Player(i, name, color)
             self.players.append(new_player)
+            
+    def load_goryn_graphics(self):
+        import os
+        import pygame
+        
+        # Ścieżka do folderu z górkami
+        goryn_path = os.path.join("assets", "goryn")
+        
+        # range(165, 168) wczyta pliki: 165, 166, 167
+        for i in range(165, 168):
+            file_name = f"BACKGR1_S32_{i}.png"
+            full_path = os.path.join(goryn_path, file_name)
+            
+            if os.path.exists(full_path):
+                img = pygame.image.load(full_path).convert_alpha()
+                img = pygame.transform.scale(img, (32, 32))
+                self.goryn_images.append(img)
+            else:
+                print(f"Ostrzeżenie: Brak grafiki gór {file_name}")
+    def load_pustynia_graphics(self):
+        import os
+        import pygame
+        
+        # Ścieżka do folderu z górkami
+        pustynia_path = os.path.join("assets", "pustynia")
+        
+        # range(165, 168) wczyta pliki: 165, 166, 167
+        for i in range(32, 45):
+            file_name = f"BACKGR3_S32_{i}.png"
+            full_path = os.path.join(pustynia_path, file_name)
+            
+            if os.path.exists(full_path):
+                img = pygame.image.load(full_path).convert_alpha()
+                img = pygame.transform.scale(img, (32, 32))
+                self.pustynia_images.append(img)
+            else:
+                print(f"Ostrzeżenie: Brak grafiki pustyni {file_name}")
+
+    def load_animated_water(self):
+        self.water_layers = [[] for _ in range(12)]
+        
+        # 1. Ładowanie brzegów (223-414)
+        start_id = 223
+        for i in range(start_id, 415):
+            path = os.path.join("assets", "woda", f"BACKGR1_S32_{i}.png")
+            if os.path.exists(path):
+                img = pygame.transform.scale(pygame.image.load(path).convert_alpha(), (32, 32))
+                group_index = (i - start_id) % 12
+                self.water_layers[group_index].append(img)
+
+        # 2. Ładowanie głębokiego morza (TYLKO TUTAJ)
+        self.deep_water_frames = [] # Używajmy konsekwentnie tej nazwy
+        for i in range(587, 595):
+            path = os.path.join("assets", "woda", f"BACKGR1_S32_{i}.png")
+            if os.path.exists(path):
+                img = pygame.transform.scale(pygame.image.load(path).convert_alpha(), (32, 32))
+                self.deep_water_frames.append(img)
+        
+        print(f"Załadowano animacje wody i {len(self.deep_water_frames)} klatek morza.")
+
+    def get_water_tile_type(self, x, y):
+        # Sprawdzamy, czy sąsiad jest LĄDEM (nie jest 'W')
+        U = self.map[y-1][x] != 'W' if y > 0 else False
+        D = self.map[y+1][x] != 'W' if y < len(self.map)-1 else False
+        L = self.map[y][x-1] != 'W' if x > 0 else False
+        R = self.map[y][x+1] != 'W' if x < len(self.map[0])-1 else False
+
+        # Skosy
+        UL = self.map[y-1][x-1] != 'W' if (y > 0 and x > 0) else False
+        UR = self.map[y-1][x+1] != 'W' if (y > 0 and x < len(self.map[0])-1) else False
+        DL = self.map[y+1][x-1] != 'W' if (y < len(self.map)-1 and x > 0) else False
+        DR = self.map[y+1][x+1] != 'W' if (y < len(self.map)-1 and x < len(self.map[0])-1) else False
+
+        # --- TESTOWANIE DOPASOWANIA ---
+        # Musimy dopasować te warunki do Twoich grafik 223-234
+        
+        # ROGI WEWNĘTRZNE (Wklęsłe zatoczki)
+        if not U and not L and UL: return 11 # Przykład: 231 był wklęsły
+        if not U and not R and UR: return 10 # 234
+        if not D and not L and DL: return 9 # 
+        if not D and not R and DR: return 8 # 
+
+        # ROGI ZEWNĘTRZNE (Wypukłe czubki wyspy)
+        if U and L: return 0  # 230 to był róg wypukły
+        if U and R: return 2  # 223
+        if D and L: return 5  # 227
+        if D and R: return 7 # 229
+
+        # KRAWĘDZIE PROSTE
+        if U: return 1  # Brzeg górny 224
+        if D: return 6  # Brzeg dolny 228
+        if L: return 3  # Brzeg lewy 
+        if R: return 4  # Brzeg prawy 
+        return 12
+    def load_grass_graphics(self):
+        import os
+        import pygame        
+        # Ścieżka do folderu z trawą
+        grass_path = os.path.join("assets", "trawa")
+        
+        # Pętla dla 9 plików trawy: BAT_BKG1_S32_1.png do BAT_BKG1_S32_9.png
+        for i in range(15, 23):
+            file_name = f"BAT_BKG1_S32_{i}.png"
+            full_path = os.path.join(grass_path, file_name)
+            
+            if os.path.exists(full_path):
+                img = pygame.image.load(full_path).convert_alpha()
+                img = pygame.transform.scale(img, (32, 32))
+                self.grass_images.append(img)
+            else:
+                print(f"Ostrzeżenie: Brak grafiki trawy {file_name}")
+
+    def load_tree_graphics(self):
+        
+        trees_path = os.path.join("assets", "trees")
+        for i in range(45, 58):
+            file_name = f"BACKGR1_S32_{i}.png"
+            full_path = os.path.join(trees_path, file_name)
+            
+            if os.path.exists(full_path):
+                # Ładujemy i skalujemy do 32x32
+                img = pygame.image.load(full_path).convert_alpha()
+                img = pygame.transform.scale(img, (32, 32))
+                self.tree_images.append(img)
+            else:
+                print(f"Ostrzeżenie: Brak grafiki {file_name}")
 
     def update(self):
-            keys = pygame.key.get_pressed()
-            moving = False
-            speed = 8  # Prędkość przesuwu (musi być dzielnikiem TILE_SIZE, np. 32/8=4)
+        # --- ANIMACJA WODY ---
+        # Zwiększamy licznik. 0.1 to spokojna fala, 0.3 to wzburzone morze.
+        self.water_frame_index += 0.1 
+        
+        # Zapętlamy licznik, żeby nie urósł do gigantycznych liczb (pamięć!)
+        # 200 to bezpieczny limit, bo masz około tyle klatek łącznie.
+        if self.water_frame_index >= 200:
+            self.water_frame_index = 0
 
-            # Obsługa płynnego ruchu
-            if keys[pygame.K_LEFT]:
-                self.camera_x -= speed
-                moving = True
-            if keys[pygame.K_RIGHT]:
-                self.camera_x += speed
-                moving = True
-            if keys[pygame.K_UP]:
-                self.camera_y -= speed
-                moving = True
-            if keys[pygame.K_DOWN]:
-                self.camera_y += speed
-                moving = True
+        # --- TWOJA LOGIKA RUCHU KAMERY ---
+        keys = pygame.key.get_pressed()
+        moving = False
+        speed = 8  
 
-    # DOCIĄGANIE (Snapping): Jeśli nie trzymasz klawiszy, wyrównaj do TILE_SIZE
-            if not moving:
-                self.camera_x = round(self.camera_x / 32) * 32 # Zakładając TILE_SIZE = 32
-                self.camera_y = round(self.camera_y / 32) * 32
+        if keys[pygame.K_LEFT]:
+            self.camera_x -= speed
+            moving = True
+        if keys[pygame.K_RIGHT]:
+            self.camera_x += speed
+            moving = True
+        if keys[pygame.K_UP]:
+            self.camera_y -= speed
+            moving = True
+        if keys[pygame.K_DOWN]:
+            self.camera_y += speed
+            moving = True
+
+        # DOCIĄGANIE (Snapping)
+        if not moving:
+            self.camera_x = round(self.camera_x / 32) * 32 
+            self.camera_y = round(self.camera_y / 32) * 32
 
     def load_map(self, filename):
-            game_map = []
-            try:
-                with open(filename, 'r') as f:
-                    # Czytamy każdą linię z final_map.txt i usuwamy znaki nowej linii
-                    for line in f:
-                        game_map.append(list(line.strip()))
-                print(f"Mapa wczytana: {len(game_map)}x{len(game_map[0])}")
-            except FileNotFoundError:
-                # Jeśli pliku nie ma, tworzymy awaryjną trawę 100x100
-                print("Błąd: Nie znaleziono final_map.txt! Tworzę pustą mapę.")
-                game_map = [["l" for _ in range(100)] for _ in range(100)]
-        
+        game_map = []
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                lines = [line.strip() for line in f if line.strip()] # Usuwa puste linie
+                
+                if not lines:
+                    raise ValueError("Plik mapy jest pusty!")
+
+                for y, line in enumerate(lines):
+                    row = list(line)
+                    for x, char in enumerate(row):
+                        # Przypisujemy trawę dla '.' oraz 'l'
+                        if char in ['.', 'l', 'g', 'p'] and self.grass_images:
+                            self.grass_decorations[(x, y)] = random.choice(self.grass_images)
+                        
+                        # Przypisujemy drzewo dla 'l'
+                        if char == 'l' and self.tree_images:
+                            self.tree_decorations[(x, y)] = random.choice(self.tree_images)
+
+                        if char == 'g' and self.goryn_images:
+                            self.goryn_decorations[(x, y)] = random.choice(self.goryn_images)
+                        if char == 'p' and self.pustynia_images:
+                            self.pustynia_decorations[(x, y)] = random.choice(self.pustynia_images)
+                    game_map.append(row)
+
+            print(f"Mapa wczytana: {len(game_map)}x{len(game_map[0])}")
             return game_map
 
+        except Exception as e:
+            print(f"BŁĄD wczytywania {filename}: {e}. Tworzę mapę zastępczą.")
+            # Tworzy bezpieczną mapę 100x100, żeby gra się nie wywaliła
+            fallback = [["." for _ in range(100)] for _ in range(100)]
+            for y in range(100):
+                for x in range(100):
+                    if self.grass_images:
+                        self.grass_decorations[(x, y)] = random.choice(self.grass_images)
+            return fallback
     def load(self, map_file, fac_file):
         self.map = self.load_map(map_file)
         # Zakładam, że load_fac_objects zwraca słownik z listami
@@ -1067,18 +1259,56 @@ class World:
         start_x = self.camera_x // TILE_SIZE
         start_y = self.camera_y // TILE_SIZE
 
-        # --- 2. RYSOWANIE SAMEGO TŁA (Wszystkie kafelki) ---
+        # 1. Pętla po WIERSZACH (y)
         for y in range(max(0, start_y), min(len(self.map), start_y + tiles_on_screen_y)):
+            # 2. Pętla po KOLUMNACH (x)
             for x in range(max(0, start_x), min(len(self.map[0]), start_x + tiles_on_screen_x)):
+                
+                # OTO KLUCZOWE MIEJSCE - te linijki MUSZĄ być pod "for x"
                 pos_x = (x * TILE_SIZE) - self.camera_x
                 pos_y = (y * TILE_SIZE) - self.camera_y
                 tile_type = self.map[y][x] 
 
-                # Rysujemy TYLKO kolor podłoża
-                bg_tile = tile_type
-                if tile_type == "X": bg_tile = self.trap_backgrounds.get((x, y), ".")
-                terrain_data = TERRAIN_TYPES.get(bg_tile, TERRAIN_TYPES["."])
-                pygame.draw.rect(screen, terrain_data["color"], (pos_x, pos_y, TILE_SIZE, TILE_SIZE))
+                # --- Rysowanie podłoża ---
+                if tile_type == "." or tile_type == "l" or tile_type == "g" or tile_type =="p":
+                    grass_img = self.grass_decorations.get((x, y))
+                    if grass_img:
+                        screen.blit(grass_img, (pos_x, pos_y))
+                    else:
+                        pygame.draw.rect(screen, (34, 139, 34), (pos_x, pos_y, TILE_SIZE, TILE_SIZE))
+                
+                else:
+                    # DLA WSZYSTKICH INNYCH (W, G, p, B, b, #, &, S, $, _, x)
+                    terrain_data = TERRAIN_TYPES.get(tile_type, TERRAIN_TYPES["."])
+                    pygame.draw.rect(screen, terrain_data["color"], (pos_x, pos_y, TILE_SIZE, TILE_SIZE))
+
+                # --- Nakładanie drzewa (jeśli las) ---
+                if tile_type == "l":
+                    tree_img = self.tree_decorations.get((x, y))
+                    if tree_img:
+                        screen.blit(tree_img, (pos_x, pos_y))
+                if tile_type == "g":
+                    goryn_img = self.goryn_decorations.get((x,y))
+                    if goryn_img:
+                        screen.blit(goryn_img, (pos_x, pos_y))
+                if tile_type == "p":
+                    pustynia_img = self.pustynia_decorations.get((x,y))
+                    if pustynia_img:
+                        screen.blit(pustynia_img, (pos_x, pos_y))
+                if tile_type == "W":
+                    tile_kind = self.get_water_tile_type(x, y)
+                    if tile_kind == 12: # Czyste morze
+                        if self.deep_water_frames:
+                            # Używamy modulo, żeby klatki morza kręciły się w kółko
+                            frame = int(self.water_frame_index) % len(self.deep_water_frames)
+                            screen.blit(self.deep_water_frames[frame], (pos_x, pos_y))
+                    else: # Brzegi (0-11)
+                        frames = self.water_layers[tile_kind]
+                        if frames:
+                            frame = int(self.water_frame_index) % len(frames)
+                            screen.blit(frames[frame], (pos_x, pos_y))
+            # Koniec pętli x
+        # Koniec pętli y
 
         # 3. RYSOWANIE FUNDAMENTÓW I OBIEKTÓW ---
         for y in range(max(0, start_y), min(len(self.map), start_y + tiles_on_screen_y)):
@@ -3703,6 +3933,15 @@ class World:
                 if self.map[cy][cx] == "#":
                     return True
         return False
+
+    
+
+# --- URUCHOMIENIE ---
+# generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")
+
+# PRZYKŁAD UŻYCIA:
+# coords = [(random.randint(0, 2000), random.randint(0, 2000)) for _ in range(1500)]
+# generate_forest("mapa_base.png", "grafiki/trees", coords, "mapa_z_lasem.png")
     #def draw_map
     #jeśli chce aby kratki były tak jak w oryginale
         #keys = pygame.key.get_pressed()
