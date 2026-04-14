@@ -1,3 +1,4 @@
+import main
 from unit import Unit, UNIT_STATS
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player
@@ -3978,3 +3979,5 @@ class World:
                # if self.screen == "garrison":
                     # Tutaj tylko podświetlamy ramkę (jeśli masz taką logikę)
                     #self.handle_mouse_hover(mx, my)
+
+                    #wwwww
