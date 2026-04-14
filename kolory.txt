@@ -1,0 +1,10 @@
+Najpopularniejsze kolory na mapie !Karkhan.png:
+------------------------------------------------------------
+RGB: (93, 134, 60)   | Wystąpień: 9112   | Prawdopodobnie: Zieleń (Trawa lub Las)
+RGB: (0, 199, 251)   | Wystąpień: 8686   | Prawdopodobnie: Niebieski (Woda)
+RGB: (190, 101, 44)  | Wystąpień: 8274   | Prawdopodobnie: Czerwony/Brązowy (Pustynia/Bagno)
+RGB: (73, 109, 44)   | Wystąpień: 4212   | Prawdopodobnie: Zieleń (Trawa lub Las)
+RGB: (109, 101, 101) | Wystąpień: 3370   | Prawdopodobnie: Czerwony/Brązowy (Pustynia/Bagno)
+RGB: (81, 69, 69)    | Wystąpień: 3212   | Prawdopodobnie: Czerwony/Brązowy (Pustynia/Bagno)
+RGB: (158, 146, 138) | Wystąpień: 2244   | Prawdopodobnie: Czerwony/Brązowy (Pustynia/Bagno)
+RGB: (101, 28, 0)    | Wystąpień: 690    | Prawdopodobnie: Czerwony/Brązowy (Pustynia/Bagno)
