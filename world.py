@@ -77,6 +77,8 @@ class World:
         self.load_road_graphics() # <--- TO MUSI TU BYĆ       
         self.load_all_water_assets()
         self.load_castle_and_tower()
+        self.castle_gfx = CastleGraphics(SCREEN_WIDTH, SCREEN_HEIGHT)
+
         # Inicjalizacja pozostałych list
         self.map = []
         self.units = []
@@ -94,7 +96,6 @@ class World:
         self.camera_x = 0
         self.camera_y = 0
         self.inspected_unit = None  # Dodaj to w sekcji zmiennych logicznych
-        self.castle_gfx = CastleGraphics("assets")
         # Ładowanie danych
         # =====================================================
         #              SYSTEMOWE PRZYCISKI (STAŁE)
@@ -209,7 +210,71 @@ class World:
         self.constructions = []
         self.trap_build_mode = False
         self.build_clicked = {}  # Słownik do śledzenia kliknięć w budynki
+# DO SPRAWDZENIA !!!
+        # ===============================================================
+        #                       ŁADOWANIE IKON 
+        # ===============================================================
+        try:
+            self.icon_training = pygame.image.load("assets/swords.png").convert_alpha()
+            # Przeskaluj ją, żeby pasowała do slotu (np. 32x32 piksele)
+            self.icon_training = pygame.transform.scale(self.icon_training, (32, 32))
+        except:
+            # Zabezpieczenie: jeśli pliku nie ma, stwórz pustą powierzchnię, żeby gra się nie wywaliła
+            self.icon_training = pygame.Surface((32, 32))
+            self.icon_training.fill((255, 0, 255)) # Różowy kolor "błędu"
+        # --- NOWE KAFFELKI TERENU ---
+        base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
+        self.terrain_images = {}
+        
+        try:
+            self.terrain_images["$"] = pygame.image.load(f"{base_bg_path}752.png").convert_alpha()
+            self.terrain_images["S"] = pygame.image.load(f"{base_bg_path}733.png").convert_alpha()
+            self.terrain_images["&"] = pygame.image.load(f"{base_bg_path}736.png").convert_alpha()
+            
+            # Opcjonalnie skalujemy, by mieć pewność, że pasują do TILE_SIZE
+            for key in self.terrain_images:
+                self.terrain_images[key] = pygame.transform.scale(self.terrain_images[key], (TILE_SIZE, TILE_SIZE))
+        except Exception as e:
+            print(f"Błąd ładowania dodatkowych kafelków: {e}")
+        # ==================================================================
+        #                    ŁADOWANIE ANIMACJI ZAMKU
+        # ==================================================================
+        base_path = r"D:\clash reverse\assets\zamekczerwony\BUILDIN1_S32_"
+        
+        # --- GRAFIKI ZAMKU (2x2) ---
+        self.castle_tiles = {0: [], 1: [], 2: [], 3: [], 4: []}
+        for stage in range(4):
+            for i in range(4):
+                file_num = 225 + (stage * 4) + i
+                try:
+                    img = pygame.image.load(f"{base_path}{file_num}.png").convert_alpha()
+                    self.castle_tiles[stage].append(img)
+                except:
+                    print(f"Brak pliku zamku: {file_num}")
 
+        # Zniszczony zamek (257-260)
+        for i in range(4):
+            try:
+                img = pygame.image.load(f"{base_path}{257 + i}.png").convert_alpha()
+                self.castle_tiles[4].append(img)
+            except: pass
+
+        # --- GRAFIKI STRAŻNICY (1x1) ---
+        self.tower_tiles = {}
+        # Ładujemy pliki 0, 1, 2, 3 (Budowa + Gotowa)
+        for i in range(4): 
+            try:
+                img = pygame.image.load(f"{base_path}{i}.png").convert_alpha()
+                # 0, 1, 2 to etapy budowy, 3 to gotowa wieża
+                self.tower_tiles[i] = img
+            except:
+                print(f"Brak pliku strażnicy: {i}")
+        
+        # Zniszczona strażnica (plik nr 8)
+        try:
+            self.tower_tiles[4] = pygame.image.load(f"{base_path}8.png").convert_alpha()
+        except:
+            print("Brak pliku zniszczonej strażnicy (8.png)")
         
      
 # --- INICJALIZACJA GRACZY (Poprawiona pod Player.py) ---
@@ -312,7 +377,7 @@ class World:
         
         # Ruiny - słownik wariantów
         self.ruins_img = self.load_single_img(os.path.join("assets", "zamekczerwony", "BUILDIN1_S32_8.png")),
-    
+
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
         for radius in range(1, 4): # Szuka w promieniu 1, 2, 3 kratek
@@ -1787,6 +1852,156 @@ class World:
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
+# Do sprawdzenia 
+# 3. RYSOWANIE FUNDAMENTÓW I OBIEKTÓW ---
+        for y in range(max(0, start_y), min(len(self.map), start_y + tiles_on_screen_y)):
+            for x in range(max(0, start_x), min(len(self.map[0]), start_x + tiles_on_screen_x)):
+                pos_x = (x * TILE_SIZE) - self.camera_x
+                pos_y = (y * TILE_SIZE) - self.camera_y
+                tile_type = self.map[y][x]
+
+                if tile_type == "#":
+                    is_left = (x == 0 or self.map[y][x-1] != "#")
+                    is_top = (y == 0 or self.map[y-1][x] != "#")
+                    
+                    if is_left and is_top:
+                        # Rysujemy ramkę 64x64 NAD narysowaną już trawą
+                        big_rect = pygame.Rect(pos_x, pos_y, TILE_SIZE * 2, TILE_SIZE * 2)
+                        pygame.draw.rect(screen, (255, 255, 255), big_rect, 4)
+                        
+                        # Duża litera Z
+                        big_font = pygame.font.Font(None, 50)
+                        label = big_font.render("Z", True, (255, 255, 255))
+                        text_rect = label.get_rect(center=(pos_x + TILE_SIZE, pos_y + TILE_SIZE))
+                        screen.blit(label, text_rect)
+
+                elif tile_type == "X":
+                    # Krzyżyk pułapki
+                    trap_color = (200, 0, 0)
+                    offset = 6
+                    pygame.draw.line(screen, trap_color, (pos_x + offset, pos_y + offset), (pos_x + TILE_SIZE - offset, pos_y + TILE_SIZE - offset), 3)
+                    pygame.draw.line(screen, trap_color, (pos_x + TILE_SIZE - offset, pos_y + offset), (pos_x + offset, pos_y + TILE_SIZE - offset), 3)
+
+                # Rysowanie nowych grafik zamiast prostokątów
+                if tile_type in self.terrain_images:
+                    screen.blit(self.terrain_images[tile_type], (pos_x, pos_y))
+
+                elif tile_type == "P":
+                    # Sprawdzamy, czy to początek (lewy górny róg) większego projektu 2x2
+                    # (Zakładamy, że jeśli obok i pod spodem też jest "P", to jest to duży budynek)
+                    is_left_edge = (x == 0 or self.map[y][x-1] != "P")
+                    is_top_edge = (y == 0 or self.map[y-1][x] != "P")
+                    
+                    # Sprawdzamy czy to projekt 2x2 (czy ma sąsiadów "P" w prawo i w dół)
+                    has_right = (x + 1 < len(self.map[0]) and self.map[y][x+1] == "P")
+                    has_bottom = (y + 1 < len(self.map) and self.map[y+1][x] == "P")             
+                    
+        # --- 3. SIATKA, PREVIEW I RESZTA (Poza pętlą terenu) ---
+        if self.show_grid:
+            self.draw_grid_lines(screen)
+
+        # Dodaj tu swoje rysowanie strzałek drogi, jeśli już je masz:
+        if getattr(self, 'road_build_mode', False):
+            self.draw_road_arrows(screen)
+
+       # --- 4. RYSOWANIE ZAMKÓW (Poprawione Puzzle 2x2 i Strażnica) ---
+        for castle in self.castles:
+            is_tower = (castle.building_type == "Strażnica")
+            
+            # --- POPRAWKA STRAŻNICY: Nowa logika stanów ---
+            if getattr(castle, 'destroyed', False):
+                s_idx = 4 # Zniszczona
+            elif getattr(castle, 'under_construction', False):
+                # Pętla budowy (0, 1 lub 2)
+                s_idx = min(2, castle.mury_percent // 34) 
+            else:
+                # --- KLUCZ: Po zakończeniu budowy wymuszamy stan 3 (gotowy) ---
+                s_idx = 3 
+
+            # --- RYSOWANIE STRAŻNICY (1x1) ---
+            if is_tower:
+                # Pobieramy kafel 32x32 (0-4)
+                img = self.tower_tiles.get(s_idx)
+                if img:
+                    # Rysujemy dokładnie na kafelku
+                    screen.blit(img, (castle.x * TILE_SIZE - self.camera_x, castle.y * TILE_SIZE - self.camera_y))
+            
+            # --- RYSOWANIE ZAMKU (2x2 puzzle - Wymuszenie rozmiaru) ---
+            else:
+                tiles = self.castle_tiles.get(s_idx, [])
+                if len(tiles) == 4:
+                    offsets = [(0,0), (1,0), (0,1), (1,1)]
+                    
+                    for i in range(4):
+                        dx, dy = offsets[i]
+                        
+                        # Obliczamy pozycję: każdy kafel ma swój własny kwadrat 32x32
+                        tile_px = (castle.x + dx) * TILE_SIZE - self.camera_x
+                        tile_py = (castle.y + dy) * TILE_SIZE - self.camera_y
+                        
+                        # TEST: Wymuszamy rozmiar 32x32 przed narysowaniem
+                        temp_tile = pygame.transform.scale(tiles[i], (TILE_SIZE, TILE_SIZE))
+                        screen.blit(temp_tile, (tile_px, tile_py))
+
+# --- 5. RYSOWANIE JEDNOSTEK (Tile-based counts) ---
+        tile_units = {}
+        for player in self.players:
+            for u in player.units:
+                if u.x >= 0 and u.y >= 0:
+                    key = (u.x, u.y)
+                    tile_units[key] = tile_units.get(key, 0) + 1
+
+        unit_font = pygame.font.SysFont(None, 24)
+
+        for u in self.units:
+            # Oblicz pozycję na ekranie
+            px = int(u.x) * TILE_SIZE - self.camera_x
+            py = int(u.y) * TILE_SIZE - self.camera_y
+            
+            # 1. KOLOR PODSTAWOWY (Dla tła lub gdy nie ma grafiki)
+            owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
+
+            # 2. RYSOWANIE GRAFIKI (ANIMACJA)
+            # Sprawdzamy, czy jednostka ma klatki animacji
+            if hasattr(u, 'walk_frames') and u.walk_frames:
+                # Obliczamy klatkę na podstawie czasu (zmiana co 150ms)
+                frame_idx = (pygame.time.get_ticks() // 150) % len(u.walk_frames)
+                current_img = u.walk_frames[frame_idx]
+                
+                # Wyśrodkowanie obrazka na kafelku
+                # Jeśli obrazek ma 32x32, a kafelek 32x32, px i py są idealne.
+                screen.blit(current_img, (px, py))
+                
+            else:
+                # --- BACKUP: Stary system (jeśli brakuje plików graficznych) ---
+                # Rysujemy kwadracik jednostki
+                pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
+                
+                label = u.type[:2].upper() 
+                txt_surface = unit_font.render(label, True, (255, 255, 255))
+                text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
+                
+                pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
+                screen.blit(txt_surface, text_rect)
+
+            # 3. OZNACZENIE ZAZNACZENIA (Biała ramka DOOKOŁA)
+            if u == self.selected_unit:
+
+                # Rysujemy tylko ramkę (ostatni parametr '2' to grubość linii)
+                pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 2)     
+            
+        # --- 6. KROPKI DROGI ---
+        # Sprawdzamy nie tylko czy jest wybrana, ale czy w ogóle istnieje jeszcze w grze (self.units)
+        if self.selected_unit and self.selected_unit in self.units:
+            if getattr(self.selected_unit, 'planned_path', None):
+                self.draw_path_dots(screen, self.selected_unit, self.selected_unit.planned_path)
+        # 2. WYWOŁANIE STRZAŁEK BUDOWY (Zawsze nad wszystkim innym)
+        if getattr(self, 'road_build_mode', False):
+            self.draw_road_arrows(screen)
+
+        # 3. WYWOŁANIE PREVIEW PUŁAPKI
+        if getattr(self, 'trap_build_mode', False):
+            self.draw_build_system(screen)
 
         # --- KONIEC PĘTLI KAFELKÓW ---
         random.seed()
@@ -1878,9 +2093,13 @@ class World:
                 screen.blit(tiles[i], (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
             
     def draw_castle_interface(self, screen): # Usunąłem parametr castle, bo bierzesz go z self
+        
         castle = self.selected_castle
         if not castle: 
             return
+        
+        # NOWE: grafika tła zamku
+        self.castle_gfx.draw(screen, castle)
 
         # 1. Specjalny widok dla Strażnicy
         if castle.building_type == "Strażnica":
@@ -2483,19 +2702,34 @@ class World:
         print("Generał zmienił stronę")
 
     def draw(self, screen):
-        screen.fill((30, 30, 30)) # Zawsze tło na start
+        # WARSTWA 0: Tło absolutne
+        screen.fill((30, 30, 30)) 
 
-        # --- KROK 1: RYSUJEMY TŁO (Zależnie od ekranu) ---
-        if self.screen == "map" or self.screen == "trap_info":
+        # --- WARSTWA 1: MAPA I JEDNOSTKI ---
+        # Rysujemy mapę ZAWSZE, chyba że jesteś w jakimś menu, które ma całkowicie ją zasłonić.
+        # Jeśli chcesz widzieć mapę pod spodem menu, usuń warunek if self.screen == "map".
+        
+        # Lista ekranów, na których mapa ma być widoczna w tle:
+        screens_with_bg = ["map", "trap_info", "castle", "garrison", "unit_info", "forge", "workshop"]
+        
+        if self.screen in screens_with_bg:
             self.draw_map(screen)
             for unit in self.units:
                 # DODAJ TEN WARUNEK - to jest klucz do sukcesu:
                 if getattr(unit, 'visible', True) and not getattr(unit, 'is_building', False):
                     unit.draw(screen)
+
+        # --- WARSTWA 2: INTERFEJSY SPECIFICZNE (Menu/Okna) ---
+        # Tutaj używamy if/elif, bo naraz może być otwarte tylko jedno główne menu
+        
+        if self.screen == "map":
             self.draw_top_bar(screen)
             self.draw_ui(screen)
-            if self.screen == "trap_info":
-                self.draw_trap_popup(screen)
+
+        elif self.screen == "trap_info":
+            self.draw_top_bar(screen)
+            self.draw_ui(screen)
+            self.draw_trap_popup(screen)
 
         elif self.screen == "castle":
             # BYŁO: self.draw_castle(screen) 
@@ -2506,9 +2740,8 @@ class World:
                 mx, my = pygame.mouse.get_pos()
                 self.draw_castle_menu(screen, mx, my)
 
-        elif self.screen == "garrison":
-            # Sprawdzamy, czy to Strażnica czy Zamek, żeby wiedzieć co rysować pod spodem
-            if self.selected_castle and self.selected_castle.building_type == "Strażnica":
+        elif self.screen == "garrison" or self.screen == "Strażnica":
+            if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
                 self.draw_garrison_only(screen)
             else:
                 self.draw_garrison(screen)
@@ -2524,21 +2757,14 @@ class World:
             self.draw_court(screen)
         
         elif self.screen == "peasants":
-            self.draw_peasants(screen) # Dodaj to, jeśli masz taką metodę
+            self.draw_peasants(screen)
 
-        # 5. NOWE EKRANY BUDYNKÓW (Tego brakowało!)
-        elif self.screen == "forge":
-            self.draw_forge(screen)
-            
-        elif self.screen == "workshop":
-            self.draw_workshop(screen)
-            
-        elif self.screen == "hospital":
-            self.draw_hospital(screen)
-            
-        elif self.screen == "school":
-            self.draw_school(screen)
-            
+        elif self.screen in ["forge", "workshop", "hospital", "school"]:
+            # Dynamiczne wywołanie metody na podstawie nazwy ekranu
+            draw_func = getattr(self, f"draw_{self.screen}", None)
+            if draw_func:
+                draw_func(screen)
+
         elif self.screen == "unit_info":
             self.draw_unit_info(screen)
 
@@ -2555,6 +2781,7 @@ class World:
                 self.inspected_unit.type, self.inspected_unit
             )
 
+        # Potwierdzenie wyburzenia
         if getattr(self, "demolish_confirm", False):
             self.draw_demolish_confirm(screen)
 

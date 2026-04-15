@@ -16,6 +16,8 @@ p2 = Player(2, "Gracz 2", (50, 150, 255))
 world.add_player(p1)
 world.add_player(p2)
 
+# --- KLUCZOWA ZMIANA TUTAJ ---
+# Podajemy samą nazwę bazową ("final_map1") i plik FAC ("0.FAC")
 world.load("final_map1", "0.FAC") 
 world.spawn_test_builder()
 
