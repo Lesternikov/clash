@@ -29,7 +29,7 @@ p1.units.append(start_unit)
 
 # --- INICJALIZACJA WIDOKU ZAMKU ---
 # Zakładam, że tło zamku (Z_01_GFX.jpg) leży w folderze np. "assets" albo "gfx"
-castle_view = CastleGraphics("assets") 
+
 
 # --- MASZYNA STANÓW ---
 current_state = "MAP"      # Na start pokazujemy mapę

@@ -96,7 +96,6 @@ class World:
         self.camera_x = 0
         self.camera_y = 0
         self.inspected_unit = None  # Dodaj to w sekcji zmiennych logicznych
-        self.castle_gfx = CastleGraphics("assets")
         # Ładowanie danych
         # =====================================================
         #              SYSTEMOWE PRZYCISKI (STAŁE)
@@ -1865,6 +1864,156 @@ class World:
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
+# Do sprawdzenia 
+# 3. RYSOWANIE FUNDAMENTÓW I OBIEKTÓW ---
+        for y in range(max(0, start_y), min(len(self.map), start_y + tiles_on_screen_y)):
+            for x in range(max(0, start_x), min(len(self.map[0]), start_x + tiles_on_screen_x)):
+                pos_x = (x * TILE_SIZE) - self.camera_x
+                pos_y = (y * TILE_SIZE) - self.camera_y
+                tile_type = self.map[y][x]
+
+                if tile_type == "#":
+                    is_left = (x == 0 or self.map[y][x-1] != "#")
+                    is_top = (y == 0 or self.map[y-1][x] != "#")
+                    
+                    if is_left and is_top:
+                        # Rysujemy ramkę 64x64 NAD narysowaną już trawą
+                        big_rect = pygame.Rect(pos_x, pos_y, TILE_SIZE * 2, TILE_SIZE * 2)
+                        pygame.draw.rect(screen, (255, 255, 255), big_rect, 4)
+                        
+                        # Duża litera Z
+                        big_font = pygame.font.Font(None, 50)
+                        label = big_font.render("Z", True, (255, 255, 255))
+                        text_rect = label.get_rect(center=(pos_x + TILE_SIZE, pos_y + TILE_SIZE))
+                        screen.blit(label, text_rect)
+
+                elif tile_type == "X":
+                    # Krzyżyk pułapki
+                    trap_color = (200, 0, 0)
+                    offset = 6
+                    pygame.draw.line(screen, trap_color, (pos_x + offset, pos_y + offset), (pos_x + TILE_SIZE - offset, pos_y + TILE_SIZE - offset), 3)
+                    pygame.draw.line(screen, trap_color, (pos_x + TILE_SIZE - offset, pos_y + offset), (pos_x + offset, pos_y + TILE_SIZE - offset), 3)
+
+                # Rysowanie nowych grafik zamiast prostokątów
+                if tile_type in self.terrain_images:
+                    screen.blit(self.terrain_images[tile_type], (pos_x, pos_y))
+
+                elif tile_type == "P":
+                    # Sprawdzamy, czy to początek (lewy górny róg) większego projektu 2x2
+                    # (Zakładamy, że jeśli obok i pod spodem też jest "P", to jest to duży budynek)
+                    is_left_edge = (x == 0 or self.map[y][x-1] != "P")
+                    is_top_edge = (y == 0 or self.map[y-1][x] != "P")
+                    
+                    # Sprawdzamy czy to projekt 2x2 (czy ma sąsiadów "P" w prawo i w dół)
+                    has_right = (x + 1 < len(self.map[0]) and self.map[y][x+1] == "P")
+                    has_bottom = (y + 1 < len(self.map) and self.map[y+1][x] == "P")             
+                    
+        # --- 3. SIATKA, PREVIEW I RESZTA (Poza pętlą terenu) ---
+        if self.show_grid:
+            self.draw_grid_lines(screen)
+
+        # Dodaj tu swoje rysowanie strzałek drogi, jeśli już je masz:
+        if getattr(self, 'road_build_mode', False):
+            self.draw_road_arrows(screen)
+
+       # --- 4. RYSOWANIE ZAMKÓW (Poprawione Puzzle 2x2 i Strażnica) ---
+        for castle in self.castles:
+            is_tower = (castle.building_type == "Strażnica")
+            
+            # --- POPRAWKA STRAŻNICY: Nowa logika stanów ---
+            if getattr(castle, 'destroyed', False):
+                s_idx = 4 # Zniszczona
+            elif getattr(castle, 'under_construction', False):
+                # Pętla budowy (0, 1 lub 2)
+                s_idx = min(2, castle.mury_percent // 34) 
+            else:
+                # --- KLUCZ: Po zakończeniu budowy wymuszamy stan 3 (gotowy) ---
+                s_idx = 3 
+
+            # --- RYSOWANIE STRAŻNICY (1x1) ---
+            if is_tower:
+                # Pobieramy kafel 32x32 (0-4)
+                img = self.tower_tiles.get(s_idx)
+                if img:
+                    # Rysujemy dokładnie na kafelku
+                    screen.blit(img, (castle.x * TILE_SIZE - self.camera_x, castle.y * TILE_SIZE - self.camera_y))
+            
+            # --- RYSOWANIE ZAMKU (2x2 puzzle - Wymuszenie rozmiaru) ---
+            else:
+                tiles = self.castle_tiles.get(s_idx, [])
+                if len(tiles) == 4:
+                    offsets = [(0,0), (1,0), (0,1), (1,1)]
+                    
+                    for i in range(4):
+                        dx, dy = offsets[i]
+                        
+                        # Obliczamy pozycję: każdy kafel ma swój własny kwadrat 32x32
+                        tile_px = (castle.x + dx) * TILE_SIZE - self.camera_x
+                        tile_py = (castle.y + dy) * TILE_SIZE - self.camera_y
+                        
+                        # TEST: Wymuszamy rozmiar 32x32 przed narysowaniem
+                        temp_tile = pygame.transform.scale(tiles[i], (TILE_SIZE, TILE_SIZE))
+                        screen.blit(temp_tile, (tile_px, tile_py))
+
+# --- 5. RYSOWANIE JEDNOSTEK (Tile-based counts) ---
+        tile_units = {}
+        for player in self.players:
+            for u in player.units:
+                if u.x >= 0 and u.y >= 0:
+                    key = (u.x, u.y)
+                    tile_units[key] = tile_units.get(key, 0) + 1
+
+        unit_font = pygame.font.SysFont(None, 24)
+
+        for u in self.units:
+            # Oblicz pozycję na ekranie
+            px = int(u.x) * TILE_SIZE - self.camera_x
+            py = int(u.y) * TILE_SIZE - self.camera_y
+            
+            # 1. KOLOR PODSTAWOWY (Dla tła lub gdy nie ma grafiki)
+            owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
+
+            # 2. RYSOWANIE GRAFIKI (ANIMACJA)
+            # Sprawdzamy, czy jednostka ma klatki animacji
+            if hasattr(u, 'walk_frames') and u.walk_frames:
+                # Obliczamy klatkę na podstawie czasu (zmiana co 150ms)
+                frame_idx = (pygame.time.get_ticks() // 150) % len(u.walk_frames)
+                current_img = u.walk_frames[frame_idx]
+                
+                # Wyśrodkowanie obrazka na kafelku
+                # Jeśli obrazek ma 32x32, a kafelek 32x32, px i py są idealne.
+                screen.blit(current_img, (px, py))
+                
+            else:
+                # --- BACKUP: Stary system (jeśli brakuje plików graficznych) ---
+                # Rysujemy kwadracik jednostki
+                pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
+                
+                label = u.type[:2].upper() 
+                txt_surface = unit_font.render(label, True, (255, 255, 255))
+                text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
+                
+                pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
+                screen.blit(txt_surface, text_rect)
+
+            # 3. OZNACZENIE ZAZNACZENIA (Biała ramka DOOKOŁA)
+            if u == self.selected_unit:
+
+                # Rysujemy tylko ramkę (ostatni parametr '2' to grubość linii)
+                pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 2)     
+            
+        # --- 6. KROPKI DROGI ---
+        # Sprawdzamy nie tylko czy jest wybrana, ale czy w ogóle istnieje jeszcze w grze (self.units)
+        if self.selected_unit and self.selected_unit in self.units:
+            if getattr(self.selected_unit, 'planned_path', None):
+                self.draw_path_dots(screen, self.selected_unit, self.selected_unit.planned_path)
+        # 2. WYWOŁANIE STRZAŁEK BUDOWY (Zawsze nad wszystkim innym)
+        if getattr(self, 'road_build_mode', False):
+            self.draw_road_arrows(screen)
+
+        # 3. WYWOŁANIE PREVIEW PUŁAPKI
+        if getattr(self, 'trap_build_mode', False):
+            self.draw_build_system(screen)
 
         # --- KONIEC PĘTLI KAFELKÓW ---
         random.seed()
@@ -1970,7 +2119,11 @@ class World:
             self.draw_garrison_only(screen) 
             return
 
-       
+        # 2. Tło i Tytuł
+        screen.fill((60, 50, 40)) # To zamaluje całą mapę! (prawidłowe dla menu)
+        font = pygame.font.SysFont(None, 28)
+        title = font.render(f"{castle.building_type.upper()}", True, (255, 255, 255))
+        screen.blit(title, (40, 40))
 
         # 3. PRZYCISKI W TWOICH ORYGINALNYCH MIEJSCACH
         
@@ -2775,10 +2928,6 @@ class World:
         # screen.blit(self.font.render(f"Złoto: {self.selected_castle.gold}", ...))
         # itd.
         # 1. Zewnętrzny plik rysuje całą grafikę zamku! (Czysto i elegancko)
-        self.castle_gfx.draw_background(screen)
-        
-        # Tutaj przekażesz obiekt zamku, w którym aktualnie jesteś
-        self.castle_gfx.draw_buildings(screen, self.select_castle)
 
         if self.screen != "castle":
             return 
