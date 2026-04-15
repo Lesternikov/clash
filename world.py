@@ -769,7 +769,6 @@ class World:
                 bridge_img = self.bridge_gfx.get(bridge_part_key)
                 if bridge_img:
                     screen.blit(bridge_img, pos)
-
    
     def get_bridge_tile(self, x, y):
         """Ustala, czy narysować rampę (zjazd), czy środek mostu."""
@@ -857,6 +856,7 @@ class World:
             self.tower_tiles[4] = pygame.transform.scale(img, TARGET_SIZE)
         except:
             print("Brak pliku zniszczonej strażnicy (8.png)")
+
     def update(self):
         # --- ANIMACJA WODY ---
         # Zwiększamy licznik. 0.1 to spokojna fala, 0.3 to wzburzone morze.
@@ -866,29 +866,6 @@ class World:
         # 200 to bezpieczny limit, bo masz około tyle klatek łącznie.
         if self.water_frame_index >= 200:
             self.water_frame_index = 0
-
-        # --- TWOJA LOGIKA RUCHU KAMERY ---
-        keys = pygame.key.get_pressed()
-        moving = False
-        speed = 8  
-
-        if keys[pygame.K_LEFT]:
-            self.camera_x -= speed
-            moving = True
-        if keys[pygame.K_RIGHT]:
-            self.camera_x += speed
-            moving = True
-        if keys[pygame.K_UP]:
-            self.camera_y -= speed
-            moving = True
-        if keys[pygame.K_DOWN]:
-            self.camera_y += speed
-            moving = True
-
-        # DOCIĄGANIE (Snapping)
-        if not moving:
-            self.camera_x = round(self.camera_x / 32) * 32 
-            self.camera_y = round(self.camera_y / 32) * 32
 
     def load_map(self, filename):
         game_map = []
@@ -929,13 +906,21 @@ class World:
                 else:
                     self.castle_locations.append((x, y))
 
-        for c in self.castles:
-            if c.owner:
-                owner_obj = self.players[c.owner] if isinstance(c.owner, int) else c.owner
-                self.add_unit(Unit("lekka piechota", c.x, c.y + 2, owner_obj))
-
         print(f"Zbudowano zamków: {len(self.castles)}")
         print(f"Miejsc pod budowę: {len(self.castle_locations)}")
+
+    def setup_starting_units(self):
+            """Rozdaje graczom początkowe wojsko pod ich zamkami."""
+            for c in self.castles:
+                if c.owner:
+                    # Wyciągamy obiekt gracza
+                    owner_obj = self.players[c.owner] if isinstance(c.owner, int) else c.owner
+                    
+                    # Dodajemy piechotę przed zamkiem (y + 2)
+                    start_unit = Unit("lekka piechota", c.x, c.y + 2, owner_obj)
+                    self.add_unit(start_unit)
+                    
+                    print(f"Rozstawiono armię startową dla gracza: {owner_obj.name}")
 
     def add_player(self, player):
         self.players.append(player)
@@ -1183,7 +1168,9 @@ class World:
         # WAŻNE: Nie czyść listy, jeśli chcesz widzieć, że jednostki zniknęły 
         # (przeszły do slotów treningowych) w tym samym widoku.
         self.selected_units.clear()
-
+#===============#
+# HANDLE EVENTS #
+#===============#
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.QUIT:
@@ -1590,6 +1577,7 @@ class World:
                     print(f"DEBUG: Zaznaczono: {unit.type}")
                 else:
                     print("DEBUG: Garnizon jest pełen!")
+
     def calculate_army_power(self, player):
         power = 0
         for u in player.units:
@@ -2059,9 +2047,7 @@ class World:
                 max_scroll
             )
         )
-    # =======================
-    # DRAW RECRUITMENT
-    # =======================
+
     def draw_recruitment(self, screen):
         screen.fill((60, 50, 40)) 
         font = pygame.font.SysFont(None, 24)
@@ -2622,6 +2608,7 @@ class World:
         u = Unit(unit_type, x, y, owner)
         self.add_unit(u)
         return u
+
     def click_on_recruitment(self, mx, my):
         # Sprawdzamy, który z narysowanych slotów został kliknięty
         for i, rect in enumerate(self.unit_list_rects):
@@ -2754,7 +2741,6 @@ class World:
             if mx > menu_x: 
                 self.build_open = False
         
-
     def draw_build_submenu(self, screen, menu_x, menu_y):
         castle = self.selected_castle
         if not castle: return
@@ -3275,25 +3261,73 @@ class World:
 
     def handle_camera(self):
         keys = pygame.key.get_pressed()
-        scroll_speed = 10 
+        
+        # --- ZMIANA PRĘDKOŚCI KAMERY ---
+        scroll_speed = 30  # <--- Zmień tę liczbę, aby przyspieszyć/zwolnić (np. 10, 15, 20)
+        
+        # Osobne flagi dla ruchu w poziomie (X) i pionie (Y)
+        moving_x = False
+        moving_y = False
+# === OGRANICZENIA MAPY (GRANICE KAFELKOWE) ===
+        # Zakładamy, że kafelki mają 32x32 piksele
+        TILE_SIZE = 32
+        
+        # Pobieramy prawdziwą wielkość mapy z Twojej listy (np. 64 na 64)
+        if hasattr(self, 'map') and self.map:
+            map_width_tiles = len(self.map[0])
+            map_height_tiles = len(self.map)
+        else:
+            # Awaryjnie, gdyby mapy nie było, ustawiamy sztywny rozmiar (np. 64)
+            map_width_tiles = 64
+            map_height_tiles = 64
 
+        # Obliczamy maksymalny wychył kamery. 
+        # Od szerokości całej mapy w pikselach ODEJMUJEMY szerokość Twojego okna (1024x768).
+        max_x = (map_width_tiles * TILE_SIZE) - 1024
+        max_y = (map_height_tiles * TILE_SIZE) - 768
+
+        # Zabezpieczenie: jeśli zrobisz mapę testową, która jest mniejsza niż ekran,
+        # max_x/max_y byłyby na minusie. To nie pozwala im spaść poniżej 0.
+        max_x = max(0, max_x)
+        max_y = max(0, max_y)
+
+        # Twarda blokada (Clamp): nie pozwalamy kamerze spaść poniżej 0 (lewa krawędź)
+        # ani przekroczyć max_x (prawa krawędź).
+        self.camera_x = max(0, min(self.camera_x, max_x))
+        self.camera_y = max(0, min(self.camera_y, max_y))
+        
+        # --- RUCH W POZIOMIE (Oś X) ---
+        # Używamy elif, żeby ubezpieczyć się przed wciśnięciem 'A' i 'D' jednocześnie
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.camera_x -= scroll_speed
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            moving_x = True
+        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.camera_x += scroll_speed
+            moving_x = True
+
+        # --- RUCH W PIONIE (Oś Y) ---
         if keys[pygame.K_UP] or keys[pygame.K_w]:
             self.camera_y -= scroll_speed
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            moving_y = True
+        elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
             self.camera_y += scroll_speed
+            moving_y = True
 
-        # AUTOMATYCZNE OBLICZANIE GRANIC:
-        # Szerokość mapy w pikselach = liczba kafelków * 32
-        map_pixel_width = len(self.map[0]) * TILE_SIZE
-        map_pixel_height = len(self.map) * TILE_SIZE
+        # === NIEZALEŻNE DOCIĄGANIE (Snapping) ===
+        # Puszczasz klawisze lewo/prawo? Wyrównujemy tylko oś X!
+        if not moving_x:
+            self.camera_x = round(self.camera_x / 32) * 32
+            
+        # Puszczasz klawisze góra/dół? Wyrównujemy tylko oś Y!
+        if not moving_y:
+            self.camera_y = round(self.camera_y / 32) * 32
 
-        # Ograniczenia (800 i 600 to wymiary Twojego okna)
-        self.camera_x = max(0, min(self.camera_x, map_pixel_width - 800))
-        self.camera_y = max(0, min(self.camera_y, map_pixel_height - 600))
+        # ============================================
+        # TUTAJ MOŻESZ ODKOMENTOWAĆ OGRANICZENIA MAPY
+        map_pixel_width = len(self.map[0]) * 32
+        map_pixel_height = len(self.map) * 32
+        self.camera_x = max(0, min(self.camera_x, map_pixel_width - 1024))
+        self.camera_y = max(0, min(self.camera_y, map_pixel_height - 768))
 
     def draw_top_bar(self, screen):
         mx, my = pygame.mouse.get_pos()
@@ -3585,6 +3619,7 @@ class World:
                     self.selected_unit = None # Odznaczamy po wejściu
                     return True
         return False  
+
     def handle_dropdown_clicks(self, mx, my):
         #tu jest dokłana obsługa
         # def execute_menu_command(self, menu, index):
@@ -4059,6 +4094,7 @@ class World:
                 print(f"Wejście do: {b_type} na {castle.x},{castle.y}")
                 return True
         return False
+
     def draw_garrison_only(self, screen):
         # --- KLUCZOWA POPRAWKA ---
         castle = self.selected_castle
@@ -4280,6 +4316,7 @@ class World:
                 results.append(None) # Brak miejsca dla tej konkretnej grupy
                 
         return results
+
     def handle_mouse_motion(self, mx, my):
         # Resetujemy podgląd, jeśli nie znajdziemy jednostki
         self.inspected_unit = None
@@ -4303,6 +4340,7 @@ class World:
                     if unit:
                         self.inspected_unit = unit
                         break
+
     def show_foundation_menu(self, gx, gy):
         self.screen = "foundation_selection"
         self.construction_target = (gx, gy) # Zapamiętujemy, gdzie budujemy
@@ -4411,6 +4449,7 @@ class World:
             return False
             
         return True
+
     def is_area_occupied_by_foundation(self, gx, gy):
         # mówi gdzie są fundamenty
         """Zwraca True, jeśli pole gx, gy jest częścią (lub samym) fundamentem #."""
