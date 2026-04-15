@@ -10,6 +10,7 @@ import heapq
 import os      # Obsługa ścieżek do plików (to naprawi Twój błąd)
 import random  # Do losowania drzew (żeby las nie był nudny)
 import pygame  # Silnik gry
+from castle_graphics import CastleGraphics
 
 TILE_SIZE = 32
 SCREEN_WIDTH = 1280
@@ -76,6 +77,8 @@ class World:
         self.load_road_graphics() # <--- TO MUSI TU BYĆ       
         self.load_all_water_assets()
         self.load_castle_and_tower()
+        self.castle_gfx = CastleGraphics(SCREEN_WIDTH, SCREEN_HEIGHT)
+
         # Inicjalizacja pozostałych list
         self.map = []
         self.units = []
@@ -207,7 +210,71 @@ class World:
         self.constructions = []
         self.trap_build_mode = False
         self.build_clicked = {}  # Słownik do śledzenia kliknięć w budynki
+# DO SPRAWDZENIA !!!
+        # ===============================================================
+        #                       ŁADOWANIE IKON 
+        # ===============================================================
+        try:
+            self.icon_training = pygame.image.load("assets/swords.png").convert_alpha()
+            # Przeskaluj ją, żeby pasowała do slotu (np. 32x32 piksele)
+            self.icon_training = pygame.transform.scale(self.icon_training, (32, 32))
+        except:
+            # Zabezpieczenie: jeśli pliku nie ma, stwórz pustą powierzchnię, żeby gra się nie wywaliła
+            self.icon_training = pygame.Surface((32, 32))
+            self.icon_training.fill((255, 0, 255)) # Różowy kolor "błędu"
+        # --- NOWE KAFFELKI TERENU ---
+        base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
+        self.terrain_images = {}
+        
+        try:
+            self.terrain_images["$"] = pygame.image.load(f"{base_bg_path}752.png").convert_alpha()
+            self.terrain_images["S"] = pygame.image.load(f"{base_bg_path}733.png").convert_alpha()
+            self.terrain_images["&"] = pygame.image.load(f"{base_bg_path}736.png").convert_alpha()
+            
+            # Opcjonalnie skalujemy, by mieć pewność, że pasują do TILE_SIZE
+            for key in self.terrain_images:
+                self.terrain_images[key] = pygame.transform.scale(self.terrain_images[key], (TILE_SIZE, TILE_SIZE))
+        except Exception as e:
+            print(f"Błąd ładowania dodatkowych kafelków: {e}")
+        # ==================================================================
+        #                    ŁADOWANIE ANIMACJI ZAMKU
+        # ==================================================================
+        base_path = r"D:\clash reverse\assets\zamekczerwony\BUILDIN1_S32_"
+        
+        # --- GRAFIKI ZAMKU (2x2) ---
+        self.castle_tiles = {0: [], 1: [], 2: [], 3: [], 4: []}
+        for stage in range(4):
+            for i in range(4):
+                file_num = 225 + (stage * 4) + i
+                try:
+                    img = pygame.image.load(f"{base_path}{file_num}.png").convert_alpha()
+                    self.castle_tiles[stage].append(img)
+                except:
+                    print(f"Brak pliku zamku: {file_num}")
 
+        # Zniszczony zamek (257-260)
+        for i in range(4):
+            try:
+                img = pygame.image.load(f"{base_path}{257 + i}.png").convert_alpha()
+                self.castle_tiles[4].append(img)
+            except: pass
+
+        # --- GRAFIKI STRAŻNICY (1x1) ---
+        self.tower_tiles = {}
+        # Ładujemy pliki 0, 1, 2, 3 (Budowa + Gotowa)
+        for i in range(4): 
+            try:
+                img = pygame.image.load(f"{base_path}{i}.png").convert_alpha()
+                # 0, 1, 2 to etapy budowy, 3 to gotowa wieża
+                self.tower_tiles[i] = img
+            except:
+                print(f"Brak pliku strażnicy: {i}")
+        
+        # Zniszczona strażnica (plik nr 8)
+        try:
+            self.tower_tiles[4] = pygame.image.load(f"{base_path}8.png").convert_alpha()
+        except:
+            print("Brak pliku zniszczonej strażnicy (8.png)")
         
      
 # --- INICJALIZACJA GRACZY (Poprawiona pod Player.py) ---
@@ -310,7 +377,7 @@ class World:
         
         # Ruiny - słownik wariantów
         self.ruins_img = self.load_single_img(os.path.join("assets", "zamekczerwony", "BUILDIN1_S32_8.png")),
-    
+
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
         for radius in range(1, 4): # Szuka w promieniu 1, 2, 3 kratek
@@ -358,65 +425,53 @@ class World:
 
         screen.blit(img, pos)
 
-    def get_tile_connection_id(self, x, y, target_type, base_type=None):
-        # 1. Definiujemy relacje przyjaźni (kto z kim się łączy bez brzegu)
+    def get_tile_connection_id(self, x, y, target_type, base_type=None, layer="bg"):
+        # Relacje przyjaźni
         friends = {
-            # Pustynia widzi góry i inną pustynię jako "przyjaciół"
-            "p": ["p", "P","_", "g", "G", "W","S", "&", "$", None], 
-            "P": ["P", "p", "g","_", "G", "W", "S", "&", "$", None],
-            "B": ["B", "_", "S", "&", "#", "R", "V",".", "l", "p", "W", "g", "G", "S", "&", "$", "R", "#", "_", None],
-            # Góry muszą odwzajemnić tę miłość, inaczej góra na styku z pustynią narysuje brzeg!
-            "g": ["g" , "P", "W", None],
-            "G": ["G", "P", None],
-            "_": ["B","G", "g", None],
-            "l": ["l", "S", "&","_", "#", "W", None],
-            ".": ["_", "S", "&", "#", "R", "V",".", "l", "p", "W", "g", "G", "S", "&", "$", "R", "#", ".","","M", None],
-            "M": ["w", "V", "M", "", None],
+            "p": ["p", "P","_", "W", "M", "S", "&", "$", None], 
+            "P": ["P", "p", "_", "W", "M", "S", "&", "$", None],
+            "B": ["B", "_", "S", "&", "#", "R", "V",".", "l", "p", "W", "M", "S", "&", "$", "R", "#", "_", None],
+            "_": ["B", None],
+            "l": ["l", "S", "&","_", "#", "W", "M", None],
+            ".": ["_", "S", "&", "#", "R", "V",".", "l", "p", "W", "M", "S", "&", "$", "R", "#", ".","", None],
+            "M": ["M", "W", "V", None],
+            "W": ["W", "M", "V", None],
+            # GÓRY NA WARSTWIE OBIEKTÓW: Łączą się tylko ze sobą i pustką
+            "g": ["g", "G", None],
+            "G": ["G", "g", None]
         }
         
-        
-        # Pobieramy listę przyjaciół dla aktualnie rysowanego typu
         current_friends = friends.get(target_type, [target_type])
 
         def is_friendly(tx, ty):
-            # ZMIANA: Autotiling musi patrzeć na tło, a nie obiekty!
-            neighbor = self.get_bg_tile_at(tx, ty)
+            # ZMIANA: Sprawdzamy odpowiednią warstwę!
+            if layer == "obj":
+                neighbor = self.get_tile_at(tx, ty)
+            else:
+                neighbor = self.get_bg_tile_at(tx, ty)
             return neighbor in current_friends
 
-        # Sprawdzanie sąsiadów
         U = is_friendly(x, y-1)
         D = is_friendly(x, y+1)
         L = is_friendly(x-1, y)
         R = is_friendly(x+1, y)
-        
-        # Skosy (potrzebne do Twoich nowych kafelków 8-11)
         UL = is_friendly(x-1, y-1)
         UR = is_friendly(x+1, y-1)
         DL = is_friendly(x-1, y+1)
         DR = is_friendly(x+1, y+1)
 
-       # --- LOGIKA DOPASOWANIA INDEKSU (0-12) ---
-
-        # 1. NAJPIERW ROGI WEWNĘTRZNE (te z czarnym tłem, ID 8-11)
         if U and L and not UL: return 11
         if U and R and not UR: return 10
         if D and L and not DL: return 9
         if D and R and not DR: return 8
-
-        # 2. POTEM ROGI ZEWNĘTRZNE (Twoje "cypelki" - w tym ten brakujący lewy górny!)
-        # Muszą być przed krawędziami prostymi, bo róg to technicznie dwie krawędzie proste naraz.
-        if not U and not L: return 0  # To jest Twój lewy górny róg
-        if not U and not R: return 2  # Prawy górny róg
-        if not D and not L: return 5  # Lewy dolny róg
-        if not D and not R: return 7  # Prawy dolny róg
-
-        # 3. NA SAMYM KOŃCU KRAWĘDZIE PROSTE
+        if not U and not L: return 0  
+        if not U and not R: return 2  
+        if not D and not L: return 5  
+        if not D and not R: return 7  
         if not U: return 1
         if not D: return 6
         if not L: return 3
         if not R: return 4
-
-        # 4. Jeśli nic powyższego nie pasuje, to znaczy, że kafel jest otoczony (środek)
         return 12
     
     def get_tile_at(self, x, y):
@@ -657,13 +712,14 @@ class World:
         # 5. NAKŁADKI NA RZEKĘ (Płaskie brzegi lądu wchodzące na wodę 'W')
         # ==========================================
         overlay_starts = {
-            ".": 561,  # Trawa
+            ".": 563,  # Trawa
+            "l": 563,  # Las (używa identycznych brzegów co trawa!) <--- DODAJ TO
             "p": 543,  # Pustynia
             "P": 543,  # Wydmy (korzystają z brzegów pustyni)
-            "B": 573,  # Bagno
-            "b": 573,  # Płytkie bagno
-            "g": 585,  # Niskie góry (zaczynają się od 585!)
-            "G": 585   # Wysokie góry
+            "B": 575,  # Bagno
+            "b": 575,  # Płytkie bagno
+            "g": 575,  # Niskie góry (zaczynają się od 585!)
+            "G": 575   # Wysokie góry
         }
 
         self.river_overlays = {}
@@ -714,7 +770,7 @@ class World:
             return False # Wodospad blokuje wszystkich (chyba że masz latające jednostki)
         return True
 
-    def get_river_direction(self, x, y):
+    def ffget_river_direction(self, x, y):
         # Sprawdzamy, z której strony jest najbliższy ląd
         if y > 0 and self.map[y-1][x] in [".", "p", "B"]: return "UP"
         if x > 0 and self.map[y][x-1] in [".", "p", "B"]: return "LEFT"
@@ -745,13 +801,18 @@ class World:
 
         # --- WARSTWA 2B: PŁASKIE BRZEGI RZEKI (Tylko dla Rzeki 'W') ---
         elif tile_type == "W":
-            edge_id = self.get_water_edge_id(x, y) 
-            if edge_id > 0:
+            # Używamy naszego perfekcyjnego skanera terenu!
+            edge_id = self.get_tile_connection_id(x, y, "W") 
+            
+            # Jeśli edge_id to 12, to znaczy że rzeka jest otoczona wodą (środek)
+            if edge_id != 12:
+                # Sprawdzamy, z jakim twardym lądem sąsiadujemy
                 neighbor_land = self.get_dominant_land_neighbor(x, y, "W") 
+                
+                # Pobieramy zestaw nakładek i rysujemy odpowiedni kafel!
                 if neighbor_land in self.river_overlays:
-                    mapping = {0:0, 1:0, 2:1, 3:2, 4:2, 5:3, 6:4, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:10, 14:11, 15:11}
-                    idx = mapping.get(edge_id, 0)
-                    screen.blit(self.river_overlays[neighbor_land][idx], pos)
+                    overlay_img = self.river_overlays[neighbor_land][edge_id]
+                    screen.blit(overlay_img, pos)
 
         # --- WARSTWA 3: MOST (Rysujemy, jeśli na mapie obiektów jest droga) ---
         if self.get_tile_at(x, y) == "_":
@@ -761,16 +822,7 @@ class World:
                 if bridge_img:
                     screen.blit(bridge_img, pos)
 
-    def get_water_edge_id(self, x, y):
-        edge_id = 0
-        land_tiles = [".", "p", "B", "g", "G"] 
-        # ZMIANA: Woda sprawdza brzegi na warstwie tła
-        if self.get_bg_tile_at(x, y-1) in land_tiles: edge_id |= 1
-        if self.get_bg_tile_at(x+1, y) in land_tiles: edge_id |= 2
-        if self.get_bg_tile_at(x, y+1) in land_tiles: edge_id |= 4
-        if self.get_bg_tile_at(x-1, y) in land_tiles: edge_id |= 8
-        return edge_id
-
+   
     def get_bridge_tile(self, x, y):
         """Ustala, czy narysować rampę (zjazd), czy środek mostu."""
         
@@ -804,15 +856,15 @@ class World:
         return "H_C"
     
     def get_dominant_land_neighbor(self, x, y, tile_type):
-        priority = [".", "p", "B", "b", "l", "g"] 
+        priority = ["B", "b", "p", "P", "s", "l", ".", "g", "G"] 
         for terrain in priority:
             if tile_type == terrain: continue
-            for dx, dy in [(0,-1), (0,1), (-1,0), (1,0)]:
-                # ZMIANA: Sprawdzamy tło
+            # ZMIANA: Skanujemy 8 kierunków (dodane skosy: -1,-1 itd.)
+            for dx, dy in [(0,-1), (0,1), (-1,0), (1,0), (-1,-1), (1,-1), (-1,1), (1,1)]:
                 if self.get_bg_tile_at(x + dx, y + dy) == terrain:
                     return terrain
         return "."
-    
+
     def load_castle_and_tower(self):
         # ==================================================================
         #           ŁADOWANIE ANIMACJI ZAMKU (SKALOWANE DO 32x32)
@@ -1740,42 +1792,12 @@ class World:
                     # 3. Nakładanie reszty (Pustynia, Bagno, Góry, Las)
                     if bg_tile in self.edges and bg_tile != ".":
                         edge_id = self.get_tile_connection_id(x, y, bg_tile)
+
+                        full_set = self.edges[bg_tile].copy()
+                        full_set[12] = self.centers.get(bg_tile, self.grass_variants)
+                        self.draw_custom_overlay(screen, x, y, pos, full_set, edge_id)
+                        # -------------------------------------------------
                         
-                        # --- SPECJALNA LOGIKA DLA GÓR ---
-                        if bg_tile in ["g", "G"]:
-                            if bg_tile == "G":
-                                swamp_set = getattr(self, 'high_mountain_swamp_edges', self.mountain_grass_edges)
-                                desert_set = getattr(self, 'high_mountain_desert_edges', self.mountain_grass_edges)
-                                grass_set = getattr(self, 'high_mountain_grass_edges', self.mountain_grass_edges)
-                            else:
-                                swamp_set = getattr(self, 'mountain_swamp_edges', self.mountain_grass_edges)
-                                desert_set = getattr(self, 'mountain_desert_edges', self.mountain_grass_edges)
-                                grass_set = getattr(self, 'mountain_grass_edges', self.edges["g"])
-
-                            # ZMIANA: Szukamy, jakiego terenu dotyka góra!
-                            neighbor = self.get_dominant_land_neighbor(x, y, bg_tile)
-
-                            # Wybieramy zestaw brzegów na podstawie sąsiada
-                            if neighbor in ["B", "b"]: 
-                                current_set = swamp_set.copy()
-                            elif neighbor in ["p", "P", "s"]: 
-                                current_set = desert_set.copy()
-                            else: 
-                                current_set = grass_set.copy()
-
-                            # Zabezpieczenie na wypadek, gdyby środek był listą
-                            center_img = self.centers.get(bg_tile)
-                            if center_img:
-                                current_set[12] = center_img
-                                
-                            self.draw_custom_overlay(screen, x, y, pos, current_set, edge_id)
-                        
-                        else:
-                            # Standardowy teren (Las, Bagno, Pustynia)
-                            full_set = self.edges[bg_tile].copy()
-                            full_set[12] = self.centers.get(bg_tile, self.grass_variants)
-                            self.draw_custom_overlay(screen, x, y, pos, full_set, edge_id)
-
                 # ==========================================
                 # WARSTWA 2: OBIEKTY (z map_objects)
                 # ==========================================
@@ -1800,7 +1822,32 @@ class World:
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
+                elif obj_tile in ["g", "G"]:
+                    # 1. Góra patrzy w dół, na czym stoi (Tło)
+                    bg_under = self.get_bg_tile_at(x, y)
+                    
+                    # 2. Wybiera odpowiedni kolor skał
+                    if obj_tile == "G":
+                        swamp_set = getattr(self, 'high_mountain_swamp_edges', self.mountain_grass_edges)
+                        desert_set = getattr(self, 'high_mountain_desert_edges', self.mountain_grass_edges)
+                        grass_set = getattr(self, 'high_mountain_grass_edges', self.mountain_grass_edges)
+                    else:
+                        swamp_set = getattr(self, 'mountain_swamp_edges', self.mountain_grass_edges)
+                        desert_set = getattr(self, 'mountain_desert_edges', self.mountain_grass_edges)
+                        grass_set = self.mountain_grass_edges
 
+                    if bg_under in ["B", "b"]: current_set = swamp_set.copy()
+                    elif bg_under in ["p", "P", "s"]: current_set = desert_set.copy()
+                    else: current_set = grass_set.copy()
+
+                    # Zabezpieczenie środka góry
+                    center_list = self.centers.get(obj_tile)
+                    if center_list: current_set[12] = center_list
+
+                    # 3. Kształtuje się na podstawie sąsiednich gór (Warstwa Obiektów!)
+                    edge_id = self.get_tile_connection_id(x, y, obj_tile, layer="obj")
+                    
+                    self.draw_custom_overlay(screen, x, y, pos, current_set, edge_id)
         # --- KONIEC PĘTLI KAFELKÓW ---
         random.seed()
 
@@ -1891,9 +1938,13 @@ class World:
                 screen.blit(tiles[i], (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
             
     def draw_castle_interface(self, screen): # Usunąłem parametr castle, bo bierzesz go z self
+        
         castle = self.selected_castle
         if not castle: 
             return
+        
+        # NOWE: grafika tła zamku
+        self.castle_gfx.draw(screen, castle)
 
         # 1. Specjalny widok dla Strażnicy
         if castle.building_type == "Strażnica":
@@ -1901,11 +1952,7 @@ class World:
             self.draw_garrison_only(screen) 
             return
 
-        # 2. Tło i Tytuł
-        screen.fill((60, 50, 40)) # To zamaluje całą mapę! (prawidłowe dla menu)
-        font = pygame.font.SysFont(None, 28)
-        title = font.render(f"{castle.building_type.upper()}", True, (255, 255, 255))
-        screen.blit(title, (40, 40))
+       
 
         # 3. PRZYCISKI W TWOICH ORYGINALNYCH MIEJSCACH
         
@@ -2498,78 +2545,75 @@ class World:
         print("Generał zmienił stronę")
 
     def draw(self, screen):
-        screen.fill((30, 30, 30)) # Zawsze tło na start
+        # WARSTWA 0: Tło absolutne
+        screen.fill((30, 30, 30)) 
 
-        # --- KROK 1: RYSUJEMY TŁO (Zależnie od ekranu) ---
-        if self.screen == "map" or self.screen == "trap_info":
+        # --- WARSTWA 1: MAPA I JEDNOSTKI ---
+        # Rysujemy mapę ZAWSZE, chyba że jesteś w jakimś menu, które ma całkowicie ją zasłonić.
+        # Jeśli chcesz widzieć mapę pod spodem menu, usuń warunek if self.screen == "map".
+        
+        # Lista ekranów, na których mapa ma być widoczna w tle:
+        screens_with_bg = ["map", "trap_info", "castle", "garrison", "unit_info", "forge", "workshop"]
+        
+        if self.screen in screens_with_bg:
             self.draw_map(screen)
             for unit in self.units:
-                # DODAJ TEN WARUNEK - to jest klucz do sukcesu:
                 if getattr(unit, 'visible', True) and not getattr(unit, 'is_building', False):
                     unit.draw(screen)
+
+        # --- WARSTWA 2: INTERFEJSY SPECIFICZNE (Menu/Okna) ---
+        # Tutaj używamy if/elif, bo naraz może być otwarte tylko jedno główne menu
+        
+        if self.screen == "map":
             self.draw_top_bar(screen)
             self.draw_ui(screen)
-            if self.screen == "trap_info":
-                self.draw_trap_popup(screen)
+
+        elif self.screen == "trap_info":
+            self.draw_top_bar(screen)
+            self.draw_ui(screen)
+            self.draw_trap_popup(screen)
 
         elif self.screen == "castle":
-            # BYŁO: self.draw_castle(screen) 
-            # MUSI BYĆ: Rysujemy interfejs, który wcześniej przygotowałeś!
             self.draw_castle_interface(screen) 
-            
             if getattr(self, "menu_open", False):
                 mx, my = pygame.mouse.get_pos()
                 self.draw_castle_menu(screen, mx, my)
 
-        elif self.screen == "garrison":
-            # Sprawdzamy, czy to Strażnica czy Zamek, żeby wiedzieć co rysować pod spodem
-            if self.selected_castle and self.selected_castle.building_type == "Strażnica":
+        elif self.screen == "garrison" or self.screen == "Strażnica":
+            if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
                 self.draw_garrison_only(screen)
             else:
                 self.draw_garrison(screen)
-            
-        elif self.screen == "Strażnica": # <--- Jeśli tak nazwałeś to w kliknięciu
-            self.draw_garrison_only(screen)
 
         elif self.screen == "recruitment":
-            self.draw_recruitment(screen) # Dodaj to, jeśli masz taką metodę
+            self.draw_recruitment(screen)
 
-        # 4. LOGIKA DWORU I CHŁOPÓW
         elif self.screen == "court":
             self.draw_court(screen)
         
         elif self.screen == "peasants":
-            self.draw_peasants(screen) # Dodaj to, jeśli masz taką metodę
+            self.draw_peasants(screen)
 
-        # 5. NOWE EKRANY BUDYNKÓW (Tego brakowało!)
-        elif self.screen == "forge":
-            self.draw_forge(screen)
-            
-        elif self.screen == "workshop":
-            self.draw_workshop(screen)
-            
-        elif self.screen == "hospital":
-            self.draw_hospital(screen)
-            
-        elif self.screen == "school":
-            self.draw_school(screen)
-            
+        elif self.screen in ["forge", "workshop", "hospital", "school"]:
+            # Dynamiczne wywołanie metody na podstawie nazwy ekranu
+            draw_func = getattr(self, f"draw_{self.screen}", None)
+            if draw_func:
+                draw_func(screen)
+
         elif self.screen == "unit_info":
             self.draw_unit_info(screen)
 
-        # --- KROK 2: NAKŁADKA (OVERLAY) STATYSTYK ---
-    # Ten blok musi być POZA wszystkimi elif, na samym dole funkcji draw!
+        # --- WARSTWA 3: NAKŁADKI (Zawsze na samym wierzchu) ---
+        
+        # Tabela statystyk (Overlay)
         if getattr(self, 'inspected_unit', None):
-            if self.screen == "garrison":
-                stats_x, stats_y = 300, 380
-            else:
-                stats_x, stats_y = 150, 200
-                
+            stats_x, stats_y = (300, 380) if self.screen == "garrison" else (150, 200)
             self.draw_unit_stats_table(
                 screen, stats_x, stats_y, 
                 self.inspected_unit.type, self.inspected_unit
             )
 
+        # Potwierdzenie wyburzenia
         if getattr(self, "demolish_confirm", False):
             self.draw_demolish_confirm(screen)
 
