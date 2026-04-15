@@ -96,6 +96,7 @@ class World:
         self.camera_x = 0
         self.camera_y = 0
         self.inspected_unit = None  # Dodaj to w sekcji zmiennych logicznych
+        self.castle_gfx = CastleGraphics("assets")
         # Ładowanie danych
         # =====================================================
         #              SYSTEMOWE PRZYCISKI (STAŁE)
@@ -425,53 +426,66 @@ class World:
 
         screen.blit(img, pos)
 
-    def get_tile_connection_id(self, x, y, target_type, base_type=None, layer="bg"):
-        # Relacje przyjaźni
+    def get_tile_connection_id(self, x, y, target_type, base_type=None):
+        # 1. Definiujemy relacje przyjaźni (kto z kim się łączy bez brzegu)
         friends = {
-            "p": ["p", "P","_", "W", "M", "S", "&", "$", None], 
-            "P": ["P", "p", "_", "W", "M", "S", "&", "$", None],
-            "B": ["B", "_", "S", "&", "#", "R", "V",".", "l", "p", "W", "M", "S", "&", "$", "R", "#", "_", None],
-            "_": ["B", None],
-            "l": ["l", "S", "&","_", "#", "W", "M", None],
-            ".": ["_", "S", "&", "#", "R", "V",".", "l", "p", "W", "M", "S", "&", "$", "R", "#", ".","", None],
-            "M": ["M", "W", "V", None],
-            "W": ["W", "M", "V", None],
-            # GÓRY NA WARSTWIE OBIEKTÓW: Łączą się tylko ze sobą i pustką
-            "g": ["g", "G", None],
-            "G": ["G", "g", None]
+            # Pustynia widzi góry i inną pustynię jako "przyjaciół"
+            "p": ["p", "P","_", "g", "G", "W","S", "&", "$", None], 
+            "P": ["P", "p", "g","_", "G", "W", "S", "&", "$", None],
+            "B": ["B", "_", "S", "&", "#", "R", "V",".", "l", "p", "W", "g", "G", "S", "&", "$", "R", "#", "_", None],
+            # Góry muszą odwzajemnić tę miłość, inaczej góra na styku z pustynią narysuje brzeg!
+            "g": ["g" , "P", "W", None],
+            "G": ["G", "P", None],
+            "_": ["B","G", "g", None],
+            "l": ["l", "S", "&","_", "#", "W", None],
+            ".": ["_", "S", "&", "#", "R", "V",".", "l", "p", "W", "g", "G", "S", "&", "$", "R", "#", ".","","M", None],
+            "M": ["w", "V", "M", "", None],
+            "W": ["W", "M", "V", None], # <--- DODAJ TĘ LINIJKĘ DLA RZEKI!
         }
         
+        
+        # Pobieramy listę przyjaciół dla aktualnie rysowanego typu
         current_friends = friends.get(target_type, [target_type])
 
         def is_friendly(tx, ty):
-            # ZMIANA: Sprawdzamy odpowiednią warstwę!
-            if layer == "obj":
-                neighbor = self.get_tile_at(tx, ty)
-            else:
-                neighbor = self.get_bg_tile_at(tx, ty)
+            # ZMIANA: Autotiling musi patrzeć na tło, a nie obiekty!
+            neighbor = self.get_bg_tile_at(tx, ty)
             return neighbor in current_friends
 
+        # Sprawdzanie sąsiadów
         U = is_friendly(x, y-1)
         D = is_friendly(x, y+1)
         L = is_friendly(x-1, y)
         R = is_friendly(x+1, y)
+        
+        # Skosy (potrzebne do Twoich nowych kafelków 8-11)
         UL = is_friendly(x-1, y-1)
         UR = is_friendly(x+1, y-1)
         DL = is_friendly(x-1, y+1)
         DR = is_friendly(x+1, y+1)
 
+       # --- LOGIKA DOPASOWANIA INDEKSU (0-12) ---
+
+        # 1. NAJPIERW ROGI WEWNĘTRZNE (te z czarnym tłem, ID 8-11)
         if U and L and not UL: return 11
         if U and R and not UR: return 10
         if D and L and not DL: return 9
         if D and R and not DR: return 8
-        if not U and not L: return 0  
-        if not U and not R: return 2  
-        if not D and not L: return 5  
-        if not D and not R: return 7  
+
+        # 2. POTEM ROGI ZEWNĘTRZNE (Twoje "cypelki" - w tym ten brakujący lewy górny!)
+        # Muszą być przed krawędziami prostymi, bo róg to technicznie dwie krawędzie proste naraz.
+        if not U and not L: return 0  # To jest Twój lewy górny róg
+        if not U and not R: return 2  # Prawy górny róg
+        if not D and not L: return 5  # Lewy dolny róg
+        if not D and not R: return 7  # Prawy dolny róg
+
+        # 3. NA SAMYM KOŃCU KRAWĘDZIE PROSTE
         if not U: return 1
         if not D: return 6
         if not L: return 3
         if not R: return 4
+
+        # 4. Jeśli nic powyższego nie pasuje, to znaczy, że kafel jest otoczony (środek)
         return 12
     
     def get_tile_at(self, x, y):
@@ -770,7 +784,7 @@ class World:
             return False # Wodospad blokuje wszystkich (chyba że masz latające jednostki)
         return True
 
-    def ffget_river_direction(self, x, y):
+    def get_river_direction(self, x, y):
         # Sprawdzamy, z której strony jest najbliższy ląd
         if y > 0 and self.map[y-1][x] in [".", "p", "B"]: return "UP"
         if x > 0 and self.map[y][x-1] in [".", "p", "B"]: return "LEFT"
@@ -1236,9 +1250,8 @@ class World:
         # (przeszły do slotów treningowych) w tym samym widoku.
         self.selected_units.clear()
 
-    def handle_events(self):
-        
-        for event in pygame.event.get():
+    def handle_events(self, events):
+        for event in events:
             if event.type == pygame.QUIT:
                 pygame.quit(); import sys; sys.exit()
             
@@ -1792,12 +1805,42 @@ class World:
                     # 3. Nakładanie reszty (Pustynia, Bagno, Góry, Las)
                     if bg_tile in self.edges and bg_tile != ".":
                         edge_id = self.get_tile_connection_id(x, y, bg_tile)
-
-                        full_set = self.edges[bg_tile].copy()
-                        full_set[12] = self.centers.get(bg_tile, self.grass_variants)
-                        self.draw_custom_overlay(screen, x, y, pos, full_set, edge_id)
-                        # -------------------------------------------------
                         
+                        # --- SPECJALNA LOGIKA DLA GÓR ---
+                        if bg_tile in ["g", "G"]:
+                            if bg_tile == "G":
+                                swamp_set = getattr(self, 'high_mountain_swamp_edges', self.mountain_grass_edges)
+                                desert_set = getattr(self, 'high_mountain_desert_edges', self.mountain_grass_edges)
+                                grass_set = getattr(self, 'high_mountain_grass_edges', self.mountain_grass_edges)
+                            else:
+                                swamp_set = getattr(self, 'mountain_swamp_edges', self.mountain_grass_edges)
+                                desert_set = getattr(self, 'mountain_desert_edges', self.mountain_grass_edges)
+                                grass_set = getattr(self, 'mountain_grass_edges', self.edges["g"])
+
+                            # ZMIANA: Szukamy, jakiego terenu dotyka góra!
+                            neighbor = self.get_dominant_land_neighbor(x, y, bg_tile)
+
+                            # Wybieramy zestaw brzegów na podstawie sąsiada
+                            if neighbor in ["B", "b"]: 
+                                current_set = swamp_set.copy()
+                            elif neighbor in ["p", "P", "s"]: 
+                                current_set = desert_set.copy()
+                            else: 
+                                current_set = grass_set.copy()
+
+                            # Zabezpieczenie na wypadek, gdyby środek był listą
+                            center_img = self.centers.get(bg_tile)
+                            if center_img:
+                                current_set[12] = center_img
+                                
+                            self.draw_custom_overlay(screen, x, y, pos, current_set, edge_id)
+                        
+                        else:
+                            # Standardowy teren (Las, Bagno, Pustynia)
+                            full_set = self.edges[bg_tile].copy()
+                            full_set[12] = self.centers.get(bg_tile, self.grass_variants)
+                            self.draw_custom_overlay(screen, x, y, pos, full_set, edge_id)
+
                 # ==========================================
                 # WARSTWA 2: OBIEKTY (z map_objects)
                 # ==========================================
@@ -1822,32 +1865,7 @@ class World:
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
-                elif obj_tile in ["g", "G"]:
-                    # 1. Góra patrzy w dół, na czym stoi (Tło)
-                    bg_under = self.get_bg_tile_at(x, y)
-                    
-                    # 2. Wybiera odpowiedni kolor skał
-                    if obj_tile == "G":
-                        swamp_set = getattr(self, 'high_mountain_swamp_edges', self.mountain_grass_edges)
-                        desert_set = getattr(self, 'high_mountain_desert_edges', self.mountain_grass_edges)
-                        grass_set = getattr(self, 'high_mountain_grass_edges', self.mountain_grass_edges)
-                    else:
-                        swamp_set = getattr(self, 'mountain_swamp_edges', self.mountain_grass_edges)
-                        desert_set = getattr(self, 'mountain_desert_edges', self.mountain_grass_edges)
-                        grass_set = self.mountain_grass_edges
 
-                    if bg_under in ["B", "b"]: current_set = swamp_set.copy()
-                    elif bg_under in ["p", "P", "s"]: current_set = desert_set.copy()
-                    else: current_set = grass_set.copy()
-
-                    # Zabezpieczenie środka góry
-                    center_list = self.centers.get(obj_tile)
-                    if center_list: current_set[12] = center_list
-
-                    # 3. Kształtuje się na podstawie sąsiednich gór (Warstwa Obiektów!)
-                    edge_id = self.get_tile_connection_id(x, y, obj_tile, layer="obj")
-                    
-                    self.draw_custom_overlay(screen, x, y, pos, current_set, edge_id)
         # --- KONIEC PĘTLI KAFELKÓW ---
         random.seed()
 
@@ -2643,14 +2661,25 @@ class World:
         screen.blit(font.render("NIE", True, (255,255,255)), (win_x + 210, win_y + 100))
 
     def select_castle(self, x, y):
-        for c in self.castles:
-            if c.x == x and c.y == y:
-                self.selected_castle = c
-                print("Wybrano zamek:", x, y)
-                return
+            for c in self.castles:
+                # Pobieramy rozmiar zamku (1 to 32px, 2 to 64px itd.)
+                # Zakładam, że TILE_SIZE to 32.
+                size_in_pixels = 32
+                if hasattr(c, 'building_type') and c.building_type in ["Zamek", "Twierdza"]:
+                    size_in_pixels = 64 # Zamki są duże (2x2)
 
-        self.selected_castle = None
-        return
+                # Sprawdzamy, czy kliknięcie myszki mieści się w kwadracie zamku
+                if c.x <= x < c.x + size_in_pixels and c.y <= y < c.y + size_in_pixels:
+                    self.selected_castle = c
+                    print(f" Wybrano zamek: {c.x}, {c.y}")
+                    
+                    # WAŻNE: Tutaj musisz przełączyć grę w tryb zamku!
+                    # np. self.show_castle_menu = True (zależnie jak to nazwałeś u siebie)
+                    
+                    return
+
+            self.selected_castle = None
+            print("Pudło! Kliknięto w:", x, y)
 
     def create_unit(self, unit_type, x, y, owner):
         u = Unit(unit_type, x, y, owner)
@@ -2729,7 +2758,28 @@ class World:
                 return unit
         return None
 
+# Przykład: funkcja rysująca widok zamku (u Ciebie może się nazywać draw_castle_ui itp.)
     def draw_castle_menu(self, screen, mx, my):
+        
+        # 1. Nasz "Malarz" z pliku castle_graphics.py maluje tło
+        if hasattr(self, 'castle_gfx'):
+            self.castle_gfx.draw_background(screen)
+            
+            # 2. Przekazujemy mu self.selected_castle, żeby narysował odpowiednie budynki!
+            self.castle_gfx.draw_buildings(screen, self.selected_castle)
+
+        # -----------------------------------------------------------
+        # 3. TUTAJ ZACZYNA SIĘ TWÓJ STARY KOD (Nic nie kasuj!)
+        # -----------------------------------------------------------
+        # pygame.draw.rect(screen, (100, 100, 100), self.button_rect)
+        # screen.blit(self.font.render(f"Złoto: {self.selected_castle.gold}", ...))
+        # itd.
+        # 1. Zewnętrzny plik rysuje całą grafikę zamku! (Czysto i elegancko)
+        self.castle_gfx.draw_background(screen)
+        
+        # Tutaj przekażesz obiekt zamku, w którym aktualnie jesteś
+        self.castle_gfx.draw_buildings(screen, self.select_castle)
+
         if self.screen != "castle":
             return 
 
