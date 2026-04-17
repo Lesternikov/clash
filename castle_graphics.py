@@ -1,166 +1,146 @@
 import os
 import pygame
 
-# =====================================================
-#   CASTLE_GRAPHICS.PY
-#   System wyświetlania grafiki wnętrza zamku.
-#
-#   Grafika zamku składa się z DWÓCH WARSTW:
-#     - Lewa strona:  szpital, koszary, warsztat
-#     - Prawa strona: szkoła, kuźnia
-#
-#   Pliki graficzne (wszystkie w assets/zamek_widoki/):
-#     Z_01_GFX.png  - pusta lewa strona
-#     Z_02_GFX.png  - pusta prawa strona
-#     Z_03_GFX.png  - szpital (lewa)
-#     Z_04_GFX.png  - szkoła (prawa)
-#     Z_05_GFX.png  - warsztat (lewa)
-#     Z_06_GFX.png  - kuźnia (prawa)
-#     Z_07_GFX.png  - szpital + warsztat (lewa)
-#     Z_08_GFX.png  - szkoła + kuźnia (prawa)
-#     Z_09_GFX.png  - koszary (lewa)
-#     Z_10_GFX.png  - koszary + szpital (lewa)
-#     Z_11_GFX.png  - koszary + warsztat (lewa)
-#     Z_12_GFX.png  - koszary + szpital + warsztat (lewa)
-#     Z_13_GFX.png  - pełny zamek (obie strony)
-#
-#   Logika:
-#     Lewa warstwa  + Prawa warstwa  = finalny widok
-#     np. koszary+szpital + szkoła   = Z_10 nałożone na Z_04
-# =====================================================
-
-# Ścieżka do folderu z grafikami zamku
-# ZMIEŃ jeśli trzymasz pliki w innym miejscu
+# Ścieżki i mapowania (zostają te same co wcześniej)
 CASTLE_GFX_PATH = os.path.join("assets", "zamek_widoki")
 
-# -------------------------------------------------------
-# MAPOWANIE: jakie budynki → który plik lewej strony
-# -------------------------------------------------------
-# Klucz: frozenset zbudowanych budynków po lewej stronie
-# Wartość: numer pliku Z_XX
-
 LEFT_SIDE_MAP = {
-    frozenset():                                    "Z_01",  # pusta lewa
-    frozenset(["hospital"]):                        "Z_03",  # szpital
-    frozenset(["workshop"]):                        "Z_05",  # warsztat
-    frozenset(["hospital", "workshop"]):            "Z_07",  # szpital + warsztat
-    frozenset(["Koszary"]):                         "Z_09",  # koszary
-    frozenset(["Koszary", "hospital"]):             "Z_10",  # koszary + szpital
-    frozenset(["Koszary", "workshop"]):             "Z_11",  # koszary + warsztat
-    frozenset(["Koszary", "hospital", "workshop"]): "Z_12",  # koszary + szpital + warsztat
+    frozenset(): "Z_01",
+    frozenset(["hospital"]): "Z_03",
+    frozenset(["workshop"]): "Z_05",
+    frozenset(["hospital", "workshop"]): "Z_07",
+    frozenset(["koszary"]): "Z_09",
+    frozenset(["koszary", "hospital"]): "Z_10",
+    frozenset(["koszary", "workshop"]): "Z_11",
+    frozenset(["koszary", "hospital", "workshop"]): "Z_12",
 }
 
-# -------------------------------------------------------
-# MAPOWANIE: jakie budynki → który plik prawej strony
-# -------------------------------------------------------
 RIGHT_SIDE_MAP = {
-    frozenset():                        "Z_02",  # pusta prawa
-    frozenset(["school"]):              "Z_04",  # szkoła
-    frozenset(["forge"]):               "Z_06",  # kuźnia
-    frozenset(["school", "forge"]):     "Z_08",  # szkoła + kuźnia
+    frozenset(): "Z_02",
+    frozenset(["school"]): "Z_04",
+    frozenset(["forge"]): "Z_06",
+    frozenset(["school", "forge"]): "Z_08",
 }
 
-# Budynki należące do lewej i prawej strony
-LEFT_BUILDINGS  = {"hospital", "workshop", "Koszary"}
+LEFT_BUILDINGS = {"hospital", "workshop", "koszary"}
 RIGHT_BUILDINGS = {"school", "forge"}
 
-
 class CastleGraphics:
-    """
-    Ładuje i zarządza grafikami widoku wnętrza zamku.
-    Użycie:
-        W World.__init__:
-            self.castle_gfx = CastleGraphics(screen_width, screen_height)
-        W draw_castle_interface:
-            self.castle_gfx.draw(screen, castle)
-    """
-
     def __init__(self, screen_width: int, screen_height: int):
         self.screen_w = screen_width
         self.screen_h = screen_height
-        self.images = {}          # nazwa_pliku -> pygame.Surface
-        self.special_full = None  # Z_13 - pełny zamek (obie strony)
+        self.images = {} # GFX
+        self.masks = {}  # M_GFX
+        
+        # MAPA KOLORÓW Z TWOICH PLIKÓW:
+        self.COLOR_MAP = {
+            (255, 255, 0): "court",      # ŻÓŁTY -> Dwór
+            (255, 255, 255): "court", # BIAŁY -> Dwór
+            (0, 0, 255):   "koszary",    # NIEBIESKI -> Koszary
+            (255, 0, 255): "hospital",   # RÓŻOWY -> Szpital
+            (0, 255, 255): "workshop",   # CYJAN -> Warsztat
+            (255, 0, 0):   "school",     # CZERWONY -> Szkoła
+            (0, 255, 0):   "forge",      # ZIELONY -> Kuźnia
+            (128, 0, 255): "peasants",   # FIOLETOWY -> Chłopi
+        }
+        
         self._load_all()
 
-    # --------------------------------------------------
-    # ŁADOWANIE
-    # --------------------------------------------------
-
-    def _load_img(self, name: str) -> pygame.Surface | None:
-        """Ładuje jeden plik PNG i skaluje do rozmiaru ekranu."""
-        path = os.path.join(CASTLE_GFX_PATH, f"{name}_GFX.png")
+    def _load_img(self, name: str, is_mask=False) -> pygame.Surface | None:
+        suffix = "M_GFX.png" if is_mask else "_GFX.png"
+        path = os.path.join(CASTLE_GFX_PATH, f"{name}{suffix}")
+        
         if not os.path.exists(path):
-            print(f"[CastleGraphics] BRAK PLIKU: {path}")
             return None
-        img = pygame.image.load(path).convert_alpha()
-        img = pygame.transform.scale(img, (self.screen_w, self.screen_h))
-        return img
+        
+        # convert() jest szybszy dla masek z colorkey
+        img = pygame.image.load(path).convert()
+        
+        # KLUCZOWA POPRAWKA: Maski też muszą mieć przezroczystą czerń!
+        # Dzięki temu lewa i prawa maska nie będą się nawzajem zasłaniać.
+        img.set_colorkey((0, 0, 0)) 
+            
+        return pygame.transform.scale(img, (self.screen_w, self.screen_h))
 
     def _load_all(self):
-        """Ładuje wszystkie 13 grafik do słownika."""
-        all_files = set(LEFT_SIDE_MAP.values()) | set(RIGHT_SIDE_MAP.values()) | {"Z_13"}
-        for name in all_files:
-            self.images[name] = self._load_img(name)
-        self.special_full = self.images.get("Z_13")
+        # Ładujemy wszystkie 13 stanów (GFX i Maski)
+        for i in range(1, 14):
+            name = f"Z_{str(i).zfill(2)}"
+            self.images[name] = self._load_img(name, is_mask=False)
+            self.masks[name] = self._load_img(name, is_mask=True)
 
-    # --------------------------------------------------
-    # WYBÓR GRAFIKI
-    # --------------------------------------------------
+    def get_building_at_pos(self, mx, my, castle):
+        raw_buildings = getattr(castle, "buildings", [])
+        buildings = set(b.lower() for b in raw_buildings)
 
-    def _get_left_img(self, buildings: set) -> pygame.Surface | None:
-        """Zwraca grafikę lewej strony na podstawie zbudowanych budynków."""
-        left_built = frozenset(b for b in buildings if b in LEFT_BUILDINGS)
-        key = LEFT_SIDE_MAP.get(left_built, "Z_01")
-        return self.images.get(key)
+        # 1. Priorytet dla pełnego zamku
+        all_req = {b.lower() for b in (LEFT_BUILDINGS | RIGHT_BUILDINGS)}
+        if all_req.issubset(buildings):
+            return self._check_mask(self.masks.get("Z_13"), mx, my, "Z_13")
 
-    def _get_right_img(self, buildings: set) -> pygame.Surface | None:
-        """Zwraca grafikę prawej strony na podstawie zbudowanych budynków."""
+        # 2. Sprawdzamy warstwy: Prawa, potem Lewa
+        # (Zmieniamy kolejność, bo prawa strona w Clashu jest często "nad" lewą)
         right_built = frozenset(b for b in buildings if b in RIGHT_BUILDINGS)
-        key = RIGHT_SIDE_MAP.get(right_built, "Z_02")
-        return self.images.get(key)
-
-    def _is_fully_built(self, buildings: set) -> bool:
-        """Sprawdza czy wszystkie budynki są zbudowane → użyj Z_13."""
-        all_buildings = LEFT_BUILDINGS | RIGHT_BUILDINGS
-        return all_buildings.issubset(buildings)
-
-    # --------------------------------------------------
-    # RYSOWANIE
-    # --------------------------------------------------
-
-    def draw(self, screen: pygame.Surface, castle) -> None:
-        """
-        Główna funkcja — wywołaj ją na początku draw_castle_interface().
-        Nakłada lewą i prawą warstwę graficzną zależnie od stanu zamku.
-        """
-        buildings = set(getattr(castle, "buildings", []))
-
-        # Specjalny przypadek: wszystkie budynki → Z_13
-        if self._is_fully_built(buildings):
-            if self.special_full:
-                screen.blit(self.special_full, (0, 0))
-            else:
-                screen.fill((60, 50, 40))
-            return
-
-        # Normalne nakładanie: lewa + prawa warstwa
-        left_img  = self._get_left_img(buildings)
-        right_img = self._get_right_img(buildings)
-
-        if left_img:
-            screen.blit(left_img, (0, 0))
-        else:
-            screen.fill((60, 50, 40))
-
-        if right_img:
-            # Prawa strona nakładana z pełną przezroczystością (alpha blending)
-            screen.blit(right_img, (0, 0))
-
-    def debug_info(self, castle) -> str:
-        """Pomocnicze: zwraca info o aktualnym stanie grafiki (do drukowania)."""
-        buildings = set(getattr(castle, "buildings", []))
-        left_built  = frozenset(b for b in buildings if b in LEFT_BUILDINGS)
-        right_built = frozenset(b for b in buildings if b in RIGHT_BUILDINGS)
-        left_key  = LEFT_SIDE_MAP.get(left_built, "Z_01")
         right_key = RIGHT_SIDE_MAP.get(right_built, "Z_02")
-        return f"Lewa: {left_key} {set(left_built)} | Prawa: {right_key} {set(right_built)}"
+        
+        left_built = frozenset(b for b in buildings if b in LEFT_BUILDINGS)
+        left_key = LEFT_SIDE_MAP.get(left_built, "Z_01")
+
+        # Najpierw sprawdzamy prawą maskę
+        res = self._check_mask(self.masks.get(right_key), mx, my, right_key)
+        if res: return res
+        
+        # Jeśli nic nie było na prawej, sprawdzamy lewą
+        return self._check_mask(self.masks.get(left_key), mx, my, left_key)
+
+    def _check_mask(self, mask, mx, my, file_name):
+        if not mask: return None
+        try:
+            color = mask.get_at((mx, my))
+            rgb = (color.r, color.g, color.b)
+            
+            # Ignorujemy czarny (tło)
+            if rgb == (0, 0, 0): return None
+            
+            result = self.COLOR_MAP.get(rgb)
+            
+            # DEBUG: Pomoże nam sprawdzić dlaczego Dwór to Garnizon
+            if result:
+                print(f"KLIK! Plik: {file_name} | Kolor RGB: {rgb} | Budynek: {result}")
+            else:
+                # Jeśli trafiliśmy w kolor, którego nie ma w COLOR_MAP
+                print(f"NIEZNANY KOLOR! Plik: {file_name} | RGB: {rgb}")
+                
+            return result
+        except IndexError:
+            return None
+        
+    def draw(self, screen: pygame.Surface, castle, debug_mode=False) -> None:
+        # 1. Tło
+        screen.fill((60, 50, 40))
+
+        raw_buildings = getattr(castle, "buildings", [])
+        buildings = set(b.lower() for b in raw_buildings)
+
+        # Logika wyboru kluczy (lewa/prawa)
+        left_built = frozenset(b for b in buildings if b in LEFT_BUILDINGS)
+        left_key = LEFT_SIDE_MAP.get(left_built, "Z_01")
+        
+        right_built = frozenset(b for b in buildings if b in RIGHT_BUILDINGS)
+        right_key = RIGHT_SIDE_MAP.get(right_built, "Z_02")
+
+        # WYBÓR: Rysujemy normalne grafiki czy maski?
+        source_dict = self.masks if debug_mode else self.images
+
+        img_l = source_dict.get(left_key)
+        img_r = source_dict.get(right_key)
+
+        # Rysujemy
+        if img_l: screen.blit(img_l, (0, 0))
+        if img_r: screen.blit(img_r, (0, 0))
+
+        # Dodatkowy napis informacyjny w trybie debugowania
+        if debug_mode:
+            font = pygame.font.SysFont("Arial", 20, bold=True)
+            txt = font.render(f"TRYB DEBUG MASKI | Lewa: {left_key} | Prawa: {right_key}", True, (255, 0, 0))
+            screen.blit(txt, (10, 10))
