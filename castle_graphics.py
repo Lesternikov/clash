@@ -41,7 +41,7 @@ class CastleGraphics:
             (0, 255, 255): "workshop",   # CYJAN -> Warsztat
             (255, 0, 0):   "school",     # CZERWONY -> Szkoła
             (0, 255, 0):   "forge",      # ZIELONY -> Kuźnia
-            (128, 0, 255): "peasants",   # FIOLETOWY -> Chłopi
+            (125, 0, 255): "peasants",   # FIOLETOWY -> Chłopi
         }
         
         self._load_all()
