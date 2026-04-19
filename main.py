@@ -1,4 +1,3 @@
-import main
 import pygame
 import sys
 from world import World
@@ -39,7 +38,6 @@ while running:
     # Wykonają się dokładnie JEDEN RAZ na klatkę obrazu.
     # =========================================================
     world.handle_events(events) 
-    world.update()  
     world.handle_camera()
 
     # Rysowanie

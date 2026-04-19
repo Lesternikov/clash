@@ -1,8 +1,9 @@
 class Player:
-    def __init__(self, player_id, name, color):
+    def __init__(self, player_id, name, color, color_name="red"):
         self.id = player_id
         self.name = name
-        self.color = color
+        self.color = color           # To zostaje dla UI (RGB)
+        self.color_name = color_name # To dodajemy dla silnika graficznego (tekst)
         # zasoby / statystyki
         self.victories = 0
         self.defeats = 0
