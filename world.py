@@ -1,5 +1,5 @@
 import main
-from unit import Unit, UNIT_STATS
+from unit import Unit
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player
 from map_loader import load_map, load_fac_objects
@@ -13,6 +13,8 @@ import random  # Do losowania drzew (żeby las nie był nudny)
 import pygame  # Silnik gry
 from castle_graphics import CastleGraphics
 import map_graphics
+from UI_components import UnitInfoWindow
+from settings import UNIT_STATS, UNIT_NAMES
 
 TILE_SIZE = 32
 SCREEN_WIDTH = 1280
@@ -22,20 +24,23 @@ MAP_WIDTH = 100
 MAP_HEIGHT = 100
 
 TERRAIN_TYPES = {
-    "&": {"name": "kult", "color": (139, 69, 19)},
-    "S": {"name": "świątynia","color": (255, 255, 255)},
-    "$": {"name": "złoto", "color": (255, 215, 0),"cost": 4},
-    "_": {"name": "droga","color": (185, 185, 185),"cost": 3},
-    "x": {"name": "pułapka","color": (25, 25, 25)},
-    ".": {"name": "trawa", "color": (34, 139, 34),"cost": 4},
-    "l": {"name": "las", "color": (0, 100, 0),"cost": 6},
-    "p": {"name": "pustynia","color": (210, 105, 30),"cost": 5},
+    # --- NIEPRZEJEZDNE (Brak klucza 'cost' = blokada) ---
     "W": {"name": "woda", "color": (0, 199, 255)},
-    "B": {"name": "bagno","color": (255, 0, 0)},
-    "b": {"name": "bagno płytkie","color": (169, 169, 169),"cost": 7},
-    "G": {"name": "góry","color": (85, 85, 85)},
-    "g": {"name": "góry niskie","color":(119, 119, 119),"cost": 8},
-    "#": {"name": "zamek","color":(34, 139, 34), "cost": 4},
+    "M": {"name": "morze", "color": (0, 0, 128)},
+    "G": {"name": "góry wysokie", "color": (85, 85, 85)},
+    "B": {"name": "bagna", "color": (139, 0, 0)},
+    "&": {"name": "kult", "color": (139, 69, 19)},
+    "S": {"name": "świątynia", "color": (255, 255, 255)},
+
+    # --- PRZEJEZDNE (Mają 'cost') ---
+    ".": {"name": "trawa", "color": (34, 139, 34), "cost": 4},
+    "l": {"name": "las", "color": (0, 100, 0), "cost": 6},
+    "p": {"name": "pustynia", "color": (210, 105, 30), "cost": 5},
+    "P": {"name": "pustynia sucha", "color": (237, 201, 175), "cost": 5},
+    "g": {"name": "góry niskie", "color": (119, 119, 119), "cost": 8},
+    "_": {"name": "droga", "color": (185, 185, 185), "cost": 3},
+    "$": {"name": "złoto", "color": (255, 215, 0), "cost": 4},
+    "#": {"name": "zamek", "color": (34, 139, 34), "cost": 4},
 }
 
 def draw_text(screen, text, x, y, color=(0, 0, 0)):
@@ -235,7 +240,7 @@ class World:
         # --- DOLNY PANEL AKCJI (MAPA) ---
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
         self.action_buttons = []
-        
+        self.unit_info_window = UnitInfoWindow()
         # Tworzymy 6 przycisków w siatce 2x3 (tak jak miałeś wcześniej)
         panel_x = 800
         panel_y = 640
@@ -263,7 +268,7 @@ class World:
             self.icon_training = pygame.Surface((32, 32))
             self.icon_training.fill((255, 0, 255)) # Różowy kolor "błędu"
         # --- NOWE KAFFELKI TERENU ---
-        base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
+        base_bg_path = r"assets\BACKGR3_S32_"
         self.terrain_images = {}
         
         try:
@@ -278,22 +283,22 @@ class World:
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
         
      
-# --- INICJALIZACJA GRACZY (Poprawiona pod Player.py) ---
+# Wewnątrz world.py, w sekcji inicjalizacji graczy:
         self.players = []
         player_data = [
-            ("Don Marek", (200, 0, 0)),    # ID 0
-            ("Lech VI", (0, 0, 200)),      # ID 1
-            ("Mściwój", (0, 150, 0)),      # ID 2
-            ("Biały Kieł", (220, 220, 220)),# ID 3
-            ("Złoty Pan", (200, 200, 0))   # ID 4
+            ("Don Marek", (200, 0, 0), "red"),     # ID 0
+            ("Lech VI", (0, 0, 200), "blue"),      # ID 1
+            ("Mściwój", (0, 150, 0), "green"),     # ID 2
+            ("Biały Kieł", (220, 220, 220), "white"),# ID 3
+            ("Złoty Pan", (200, 200, 0), "yellow")  # ID 4
         ]
 
         from player import Player
-        for i, (name, color) in enumerate(player_data):
-            # i to nasze player_id (0, 1, 2, 3, 4)
-            new_player = Player(i, name, color)
+        for i, (name, color_rgb, color_name) in enumerate(player_data):
+            # Przekazujemy teraz też color_name
+            new_player = Player(i, name, color_rgb, color_name)
             self.players.append(new_player)
-    
+
             self.back_destination = "map" # Cel powrotu
     
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
@@ -338,7 +343,7 @@ class World:
         # ==================================================================
         #           ŁADOWANIE ANIMACJI ZAMKU (SKALOWANE DO 32x32)
         # ==================================================================
-        base_path = r"D:\clash reverse\assets\zamekczerwony\BUILDIN1_S32_"
+        base_folder = r"assets\zamekczerwony\BUILDIN1_S32_"
         TARGET_SIZE = (32, 32)
         
         # --- GRAFIKI ZAMKU (2x2) ---
@@ -347,7 +352,7 @@ class World:
             for i in range(4):
                 file_num = 225 + (stage * 4) + i
                 try:
-                    img = pygame.image.load(f"{base_path}{file_num}.png").convert_alpha()
+                    img = pygame.image.load(f"{base_folder}{file_num}.png").convert_alpha()
                     # KLUCZOWA POPRAWKA: Skalujemy każdy fragment do 32x32
                     img = pygame.transform.scale(img, TARGET_SIZE)
                     self.castle_tiles[stage].append(img)
@@ -357,7 +362,7 @@ class World:
         # Zniszczony zamek (257-260)
         for i in range(4):
             try:
-                img = pygame.image.load(f"{base_path}{257 + i}.png").convert_alpha()
+                img = pygame.image.load(f"{base_folder}{257 + i}.png").convert_alpha()
                 img = pygame.transform.scale(img, TARGET_SIZE)
                 self.castle_tiles[4].append(img)
             except: pass
@@ -366,7 +371,7 @@ class World:
         self.tower_tiles = {}
         for i in range(4): 
             try:
-                img = pygame.image.load(f"{base_path}{i}.png").convert_alpha()
+                img = pygame.image.load(f"{base_folder}{i}.png").convert_alpha()
                 # Strażnica też musi mieć 32x32, żeby pasowała do siatki
                 self.tower_tiles[i] = pygame.transform.scale(img, TARGET_SIZE)
             except:
@@ -374,7 +379,7 @@ class World:
         
         # Zniszczona strażnica (plik nr 8)
         try:
-            img = pygame.image.load(f"{base_path}8.png").convert_alpha()
+            img = pygame.image.load(f"{base_folder}8.png").convert_alpha()
             self.tower_tiles[4] = pygame.transform.scale(img, TARGET_SIZE)
         except:
             print("Brak pliku zniszczonej strażnicy (8.png)")
@@ -422,17 +427,25 @@ class World:
         print(f"Miejsc pod budowę: {len(self.castle_locations)}")
 
     def setup_starting_units(self):
-            """Rozdaje graczom początkowe wojsko pod ich zamkami."""
-            for c in self.castles:
-                if c.owner:
-                    # Wyciągamy obiekt gracza
-                    owner_obj = self.players[c.owner] if isinstance(c.owner, int) else c.owner
-                    
-                    # Dodajemy piechotę przed zamkiem (y + 2)
-                    start_unit = Unit("lekka piechota", c.x, c.y + 2, owner_obj)
-                    self.add_unit(start_unit)
-                    
-                    print(f"Rozstawiono armię startową dla gracza: {owner_obj.name}")
+        """Rozdaje graczom początkowe wojsko pod ich zamkami."""
+        for c in self.castles:
+            if c.owner:
+                owner_obj = self.players[c.owner] if isinstance(c.owner, int) else c.owner
+                
+                # 1. PIECHOTA (Dwa kafelki pod zamkiem)
+                start_x = int(c.x)
+                start_y = int(c.y + 2)
+                infantry = Unit("INFL", start_x, start_y, owner_obj)
+                self.add_unit(infantry)
+                
+                # 2. BUDOWNICZY (Jeden kafelek w prawo, jeden w dół od zamku)
+                # Zmieniamy c.x na c.x + 1, żeby nie stał NA zamku
+                builder_x = int(c.x + 5)
+                builder_y = int(c.y - 75)
+                builder = Unit("BUDOW", builder_x, builder_y, owner_obj)
+                self.add_unit(builder)
+                
+                print(f"Rozstawiono jednostki dla: {owner_obj.color_name} na ({builder_x}, {builder_y})")
 
     def add_player(self, player):
         self.players.append(player)
@@ -534,9 +547,16 @@ class World:
                         return True
                 return False
 
-        # 4. TEREN
-        walkable_chars = [".", "l", "p", "#", "$", "_", "g"]
-        if self.map[ny][nx] not in walkable_chars:
+        # 4. TEREN - Lista znaków, po których wolno chodzić
+        # Dodałem kropkę, l, g oraz znaki drogi
+        walkable_chars = [".", "l", "g", "p", "_", "#", "$", " "] 
+        
+        # Pobieramy co jest na mapie w miejscu docelowym
+        map_char = self.map[ny][nx]
+
+        if map_char not in walkable_chars:
+            # Jeśli to np. 'W' (Woda) lub 'M' (Góry), ruch jest zablokowany
+            print(f"DEBUG: Blokada! Teren '{map_char}' na ({nx}, {ny}) jest nieprzejezdny.")
             return False
 
         # 5. WALKA 
@@ -626,25 +646,33 @@ class World:
             return
 
         player = self.players[self.current_player]
-        unit_type = self.selected_recruit_unit
+        unit_code = self.selected_recruit_unit  # np. "INFL"
 
-        cost = Unit.UNIT_COSTS.get(unit_type, 0)
+        # 1. Pobieramy pełną nazwę, bo UNIT_STATS używa nazw (np. "Lekka piechota")
+        full_name = UNIT_NAMES.get(unit_code, "Nieznany")
+
+        # 2. Pobieramy statystyki dla tej nazwy
+        unit_data = UNIT_STATS.get(full_name, {})
+
+        # 3. Pobieramy koszt (w Twoim settings.py to "production_cost")
+        cost = unit_data.get("production_cost", 0)
 
         if player.gold < cost:
-            print("Za mało złota")
+            print(f"Za mało złota! Potrzeba {cost}, masz {player.gold}")
             return
 
+        # 4. Odejmowanie złota i tworzenie jednostki
         player.gold -= cost
 
         u = Unit(
-            unit_type,
+            unit_code,            # Zmieniono z unit_type na unit_code!            
             self.selected_castle.x,
             self.selected_castle.y,
             player
         )
 
         self.selected_castle.add_to_garrison(u)
-        print(f"Zrekrutowano {unit_type}")
+        print(f"Zrekrutowano {full_name}") # full_name ładniej wygląda w konsoli
 
     def get_castle(self, x, y):
         for c in self.castles:
@@ -1085,40 +1113,42 @@ class World:
             # Nie trzymaj logiki rysowania kafelków zamku w draw_map!
             self.draw_castle_on_map(screen, castle)
 
-        # =================================================================
-        # 4. WARSTWA JEDNOSTEK
+        # 4. WARSTWA JEDNOSTEK (Tylko kwadraciki i litery)
         # =================================================================
         unit_font = pygame.font.SysFont(None, 24)
 
         for u in self.units:
-            # Ignoruj jednostki widma (schowane w garnizonie)
+            # Ignoruj jednostki w garnizonach/ukryte
             if u.x < 0 or u.y < 0:
                 continue
 
-            # Oblicz pozycję na ekranie z uwzględnieniem kamery
+            # Pozycja na ekranie
             px = int(u.x) * TILE_SIZE - self.camera_x
             py = int(u.y) * TILE_SIZE - self.camera_y
             
-            # Kolor gracza
+            # Kolor gracza (np. czerwony/niebieski)
             owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
 
-            # Rysowanie grafiki (Animacja)
-            if hasattr(u, 'walk_frames') and u.walk_frames:
-                frame_idx = (pygame.time.get_ticks() // 150) % len(u.walk_frames)
-                screen.blit(u.walk_frames[frame_idx], (px, py))
-            else:
-                # Brak grafiki - rysujemy kwadrat i literki
-                pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
-                label = str(u.type)[:2].upper() 
-                txt_surface = unit_font.render(label, True, (255, 255, 255))
-                text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
-                pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
-                screen.blit(txt_surface, text_rect)
+            # --- USUNĘLIŚMY STĄD BLITOWANIE SPRITES ---
+            
+            # Rysujemy standardowy kwadrat jednostki
+            pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
+            
+            # Rysujemy skrót nazwy (np. "LE" dla Lekkiej Piechoty)
+            # Używamy short_name, który zdefiniowaliśmy w Unit.__init__
+            label = getattr(u, 'short_name', str(u.type)[:2].upper())
+            
+            txt_surface = unit_font.render(label, True, (255, 255, 255))
+            text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
+            
+            # Tło pod napisem dla lepszej czytelności
+            pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
+            screen.blit(txt_surface, text_rect)
 
             # Oznaczenie zaznaczenia (Biała ramka)
             if u == self.selected_unit:
-                pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 2)     
-            
+                pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 2)
+
         # =================================================================
         # 5. WARSTWA NAKŁADEK UI (Interfejs budowy, ruchu, planowania)
         # =================================================================
@@ -1506,79 +1536,29 @@ class World:
         screen.blit(font.render("▼", True, (255, 255, 255)), (self.scroll_down_button.x + 12, self.scroll_down_button.y + 8))
         
     def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
-        # Statystyki jednostki
         """
-        Rysuje tabelkę statystyk. 
-        unit_name: str (nazwa do wyświetlenia)
-        stats_source: słownik (z UNIT_STATS) LUB obiekt klasy Unit
+        Nowa wersja tabelki statystyk - używa grafik INFO_S32_0 / INFO_S32_1.
+        x, y: gdzie na ekranie ma się pojawić lewy górny róg tabelki.
+        stats_source: obiekt klasy Unit lub słownik ze statystykami.
         """
         if not stats_source:
             return
 
-        # Panel tła
-        panel_rect = pygame.Rect(x, y, 420, 220)
-        pygame.draw.rect(screen, (40, 30, 25), panel_rect) # Brązowe wypełnienie
-        pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3) # Złota ramka
+        # 1. Określamy tryb (SIMPLE dla chłopów/złota, COMBAT dla reszty)
+        # Sprawdzamy kod jednostki - z obiektu lub ze słownika
+        u_type = getattr(stats_source, 'type_code', None)
+        if not u_type and isinstance(stats_source, dict):
+            # Jeśli to słownik (np. z rekrutacji), szukamy klucza identyfikującego
+            u_type = stats_source.get('type_code') 
 
-        # Pomocnicza funkcja do pobierania danych (obsługuje słownik i obiekt)
-        def get_v(key, attr_name=None):
-            if isinstance(stats_source, dict):
-                return stats_source.get(key, 0)
-            return getattr(stats_source, attr_name if attr_name else key, 0)
+        mode = "COMBAT"
+        if u_type in ["GOLD", "PEAS", "SPECK", "SPECM"]:
+            mode = "SIMPLE"
 
-        # --- GEOMETRIA LINII (Twoja oryginalna) ---
-        section_w = panel_rect.width // 3 - 50 
-        section_h = panel_rect.height // 3 - 40
-
-        line1_x = panel_rect.x + section_w
-        line0_x = panel_rect.x + section_w - 20
-        line2_x = panel_rect.x + 2 * section_w + 15
-        line3_x = panel_rect.x + 3 * section_w + 30
-        line1_y = panel_rect.y + section_h
-        line2_y = panel_rect.y + 2 * section_h + 55
-        line3_y = panel_rect.y + 4 * section_h + 30
-
-        # Rysowanie Twoich linii
-        color = (200, 180, 100)
-        pygame.draw.line(screen, color, (line1_x, panel_rect.y), (line1_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, color, (line0_x, panel_rect.y), (line0_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, color, (line2_x, panel_rect.y + 33), (line2_x, panel_rect.bottom), 2)
-        pygame.draw.line(screen, color, (line3_x, panel_rect.y + 33), (line3_x, panel_rect.bottom), 2)
-        
-        pygame.draw.line(screen, color, (panel_rect.x + 93, line1_y), (panel_rect.right, line1_y), 2)
-        pygame.draw.line(screen, color, (panel_rect.x + 93, line2_y), (panel_rect.right, line2_y), 2)
-        pygame.draw.line(screen, color, (panel_rect.x, line3_y), (panel_rect.right - 350, line3_y), 2)
-
-        # --- WYŚWIETLANIE DANYCH ---
-        # Używamy czcionki, którą masz w klasie (np. self.font)
-        font = pygame.font.SysFont("Arial", 20, bold=True)
-        
-        # Nagłówek
-        screen.blit(font.render(f"Jednostka: {unit_name}", True, (255, 255, 255)), (panel_rect.x + 130, panel_rect.y + 10))
-        
-        # Statystyki - używamy get_v, żeby brało dane niezależnie od źródła
-        # 1. ATK i DEF
-        screen.blit(font.render(f"ATK: {get_v('attack')}", True, (255, 255, 255)), (panel_rect.x + 90, panel_rect.y + 60))
-        screen.blit(font.render(f"DEF: {get_v('defense')}", True, (255, 255, 255)), (panel_rect.x + 90, panel_rect.y + 140))
-        
-        # 2. HP i MORALE
-        screen.blit(font.render(f"HP: {get_v('hp')}", True, (255, 255, 255)), (panel_rect.x + 200, panel_rect.y + 60))
-        screen.blit(font.render(f"MOR: {get_v('morale')}", True, (255, 255, 255)), (panel_rect.x + 200, panel_rect.y + 140))
-        
-        # 3. MOVES i DODATKOWE
-        # Dodajemy int(), aby uciąć ułamki przy wyświetlaniu
-        moves_raw = get_v('moves', 'move_points') 
-        moves_val = int(moves_raw) if moves_raw is not None else 0
-
-        screen.blit(font.render(f"MOV: {moves_val}", True, (255, 255, 255)), (panel_rect.x + 310, panel_rect.y + 60))
+        # 2. Wywołujemy naszą profesjonalną tabelkę
+        # self.unit_info_window to instancja klasy UnitInfoWindow, którą stworzyliśmy wcześniej
+        self.unit_info_window.draw(screen, x, y, stats_source, mode)
                 
-        if not isinstance(stats_source, dict):
-            # Jeśli to obiekt Unit (np. w garnizonie), pokazujemy EXP
-            screen.blit(font.render(f"EXP: {get_v('experience')}", True, (255, 255, 0)), (panel_rect.x + 310, panel_rect.y + 140))
-        else:
-            # Jeśli to rekrutacja, powtarzamy ATK jako ATC wg Twojego kodu
-            screen.blit(font.render(f"ATC: {get_v('attack')}", True, (255, 255, 255)), (panel_rect.x + 310, panel_rect.y + 140))
-            
     def draw_peasants(self, screen):
         font = pygame.font.SysFont(None, 24)
 
@@ -2747,35 +2727,33 @@ class World:
             
             # Po puszczeniu myszki zawsze zamykamy menu
             self.active_dropdown = None
-
     def check_unit_info(self, mx, my):
-        castle = self.selected_castle
-        if not castle: return
+        self.inspected_unit = None # Reset na start
+        
+        # 1. Najpierw sprawdź garnizon (jeśli jesteś w zamku)
+        if self.screen == "garrison":
+            castle = self.selected_castle
+            if castle:
+                start_x, start_y = 100, 120
+                offset_x, offset_y = 130, 210
+                col = (mx - start_x) // offset_x
+                row = (my - start_y) // offset_y
+                if 0 <= col < 6 and 0 <= row < 2:
+                    idx = row * 6 + col
+                    if idx < len(castle.garrison):
+                        self.inspected_unit = castle.garrison[idx]
 
-        # MUSZĄ być identyczne jak w draw_garrison
-        start_x, start_y = 100, 120
-        offset_x, offset_y = 130, 210
-        cols = 6
+        # 2. Jeśli nie garnizon, sprawdź mapę
+        if not self.inspected_unit:
+            self.inspected_unit = self.find_unit_at(mx, my)
 
-        col = (mx - start_x) // offset_x
-        row = (my - start_y) // offset_y
-
-        if 0 <= col < cols and 0 <= row < 2:
-            index = row * cols + col
-            if index < len(castle.garrison):
-                # Przypisujemy jednostkę (może to być obiekt Unit ALBO None)
-                self.inspected_unit = castle.garrison[index]
-                
-                # POPRAWKA: Sprawdzamy, czy slot nie jest pusty zanim zrobimy print
-                if self.inspected_unit is not None:
-                    print(f"DEBUG: Znaleziono jednostkę: {self.inspected_unit.type}")
-                else:
-                    print("DEBUG: Kliknięto pusty slot")
+        # 3. Jeśli coś znalazłeś, ustal tryb
+        if self.inspected_unit:
+            if self.inspected_unit.type_code in ["GOLD", "PEAS", "SPECK", "SPECM"]:
+                self.info_mode = "SIMPLE"
             else:
-                self.inspected_unit = None
-        else:
-            self.inspected_unit = None
-            
+                self.info_mode = "COMBAT"
+
     def handle_recruitment_scroll(self, event):
         # Pobieramy aktualną listę dostępnych jednostek dla wybranego zamku
         castle = self.selected_castle
@@ -2907,20 +2885,28 @@ class World:
             if castle.x <= x < castle.x + size and castle.y <= y < castle.y + size:
                 return False
 
-        # 4. KLUCZOWE: Pobieramy dane z OBU warstw
+        # 4. Pobieramy dane z OBU warstw
         bg_tile = self.bg_map[y][x]
         obj_tile = self.map[y][x]
 
-        # Jeśli podłoże to twarda blokada (Góry Wysokie, Woda Głęboka, Wodospad) - odrzucamy
-        # (Zakładamy, że w TERRAIN_TYPES Woda (W) i Góry (G) nie mają klucza 'cost')
+        # --- NOWA LOGIKA OBSŁUGI SPACJI I DROGI ---
+
+        # Jeśli na warstwie obiektów jest droga, zawsze pozwól przejść
+        if obj_tile == "_":
+            return True
+
+        # Jeśli podłoże (trawa, piasek itp.) nie ma kosztu w TERRAIN_TYPES -> BLOKADA
         if "cost" not in TERRAIN_TYPES.get(bg_tile, {}):
             return False
 
-        # Jeśli na warstwie obiektów stoi coś, co blokuje ruch (np. Świątynia, Ruiny)
-        unwalkable_objects = ["S", "&", "R"] 
-        if obj_tile in unwalkable_objects:
+        # Jeśli na warstwie obiektów jest coś innego niż spacja i droga
+        # sprawdź, czy to nie jest przeszkoda
+        unwalkable_objects = ["S", "&", "R", "W", "G", "B", "M"] 
+        if obj_tile != " " and obj_tile in unwalkable_objects:
             return False
-        
+            
+        # Jeśli dotarliśmy tutaj, a obj_tile to spacja, 
+        # to znaczy, że decyduje tylko bg_tile (który sprawdziliśmy wyżej)
         return True
             
     def handle_tryb_mapy_button(self):
@@ -3216,32 +3202,15 @@ class World:
                             self.units.remove(army)
                     return
 
-    def spawn_test_builder(self):
-        if not self.players:
-            return
-        
-        # Wybieramy pierwszego gracza i nazywamy go 'current_p'
-        current_p = self.players[0] 
-        
-        from unit import Unit
-        # Tworzymy jednostkę i przypisujemy jej 'current_p'
-        new_builder = Unit("Budowniczy", 15, 15, self.players[self.current_player])
-        
-        # Dodajemy do systemu
-        self.add_unit(new_builder)
-        
-        # Teraz ta linia zadziała, bo 'current_p' już istnieje!
-        print(f"DEBUG: Stworzono budowniczego dla: {current_p.name}")
-
+    
     def spawn_unit(self, unit_type, x, y, owner):
         """Główna i jedyna funkcja do tworzenia jednostek w świecie."""
-        from unit import Unit  # Jeśli musisz tu mieć import, to ok, ale lepiej przenieś na górę pliku
+        from unit import Unit
         
+        # Tworzymy jednostkę: unit_type to kod (np. "INFL"), x, y to liczby, owner to obiekt
         new_unit = Unit(unit_type, x, y, owner)
         
-        # Użyj tylko jednej metody dodawania do gry (wybierz tę, która działa lepiej)
         self.add_unit(new_unit) 
-        
         print(f"Zrekrutowano: {unit_type} na pozycji ({x}, {y}) dla gracza {owner}")
         
         return new_unit # Zwracamy obiekt, żeby można go było przypisać np. do zmiennej

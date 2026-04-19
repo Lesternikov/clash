@@ -4,7 +4,8 @@ import random
 from unit import PeasantGroup
 from unit import GoldTransport
 # castle.py
-from unit import UNIT_STATS, Unit
+from unit import Unit
+from settings import UNIT_NAMES, UNIT_STATS
 
 BUILDING_TYPES = {
     "Zamek": {
@@ -296,9 +297,9 @@ class Castle:
 
             if free_slot != -1:
                 self.gold -= cost
+                full_name = UNIT_NAMES.get(self.production_unit_type, "Jednostka")
                 # Tworzymy jednostkę
-                unit = Unit(self.production_unit_type, self.x, self.y, self.owner)
-                
+                unit = Unit(self.production_unit_type, full_name, self.x, self.y, self.owner)                
                 # Wstawiamy w konkretny slot
                 self.garrison[free_slot] = unit 
 

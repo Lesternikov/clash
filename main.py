@@ -18,7 +18,6 @@ world.add_player(p2)
 # --- KLUCZOWA ZMIANA TUTAJ ---
 # Podajemy samą nazwę bazową ("final_map1") i plik FAC ("0.FAC")
 world.load("final_map1", "0.FAC") 
-world.spawn_test_builder()
 
 # Zakładam, że masz już tę funkcję w world.py, więc używamy jej zamiast Pikiniera
 world.setup_starting_units() 
