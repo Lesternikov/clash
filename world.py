@@ -1014,7 +1014,7 @@ class World:
                 return
         #=================wyślij wojsko======================
         
-        if self.button_send_army.collidepoint(mx, my):
+        if self.garrison_gfx.handle_release_click(mx, my, self.selected_units):
             self.release_selected_units()
             return
         
@@ -1063,29 +1063,6 @@ class World:
     
     def calculate_gold(self, player):
         return sum(castle.gold for castle in player.castles)
-
-    def draw_garrison(self, screen):
-        castle = self.selected_castle
-        if not castle: return
-
-        slot_rects = self.garrison_gfx.draw(
-            screen, castle,
-            self.selected_units,
-            self.inspected_unit
-        )
-        # Zapisujemy recty do obsługi kliknięć
-        self.garrison_slot_rects = slot_rects
-
-        # Przyciski funkcyjne
-        built = [b.lower() for b in castle.buildings]
-        if "koszary" in built:
-            self.draw_button(screen, "RECRUIT", self.recruit_button, (240, 120, 20))
-        if "hospital" in built:
-            self.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
-        if "school" in built:
-            self.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
-        self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
-        self.draw_building_footer(screen)
 
     def draw_map(self, screen):
         # =================================================================
@@ -2473,6 +2450,28 @@ class World:
             y += 28
 
         # 6. Stopka (Twoje przyciski)
+        self.draw_building_footer(screen)
+
+    def draw_garrison(self, screen):
+        castle = self.selected_castle
+        if not castle: return
+
+        slot_rects = self.garrison_gfx.draw(
+            screen, castle,
+            self.selected_units,
+            self.inspected_unit
+        )
+        # Zapisujemy recty do obsługi kliknięć
+        self.garrison_slot_rects = slot_rects
+
+        # Przyciski funkcyjne
+        built = [b.lower() for b in castle.buildings]
+        if "koszary" in built:
+            self.draw_button(screen, "RECRUIT", self.recruit_button, (240, 120, 20))
+        if "hospital" in built:
+            self.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
+        if "school" in built:
+            self.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
         self.draw_building_footer(screen)
 
     def draw_forge(self, screen):

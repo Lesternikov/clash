@@ -81,6 +81,16 @@ class GarrisonGraphics:
             int(ORIG_TABLE_H * self.sy)
         )
  
+        self.btn_release_normal  = self._load_raw("assets/wyrzut.png")
+        self.btn_release_pressed = self._load_raw("assets/wyrzutp.png")
+        self.btn_release_rect    = pygame.Rect(790, 670, 200, 600)
+        self.btn_release_anim_timer = 0
+
+        BTN_W, BTN_H = 212, 83
+        self.btn_release_normal  = self._load("assets/wyrzut.png",  BTN_W, BTN_H)
+        self.btn_release_pressed = self._load("assets/wyrzutp.png", BTN_W, BTN_H)
+        self.btn_release_rect    = pygame.Rect(805, 690, BTN_W, BTN_H)
+
     # --------------------------------------------------
     # ŁADOWANIE
     # --------------------------------------------------
@@ -91,7 +101,13 @@ class GarrisonGraphics:
             return None
         img = pygame.image.load(path).convert_alpha()
         return pygame.transform.scale(img, (w, h))
- 
+    
+    def _load_raw(self, path: str):
+        if not os.path.exists(path):
+            print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
+            return None
+        return pygame.image.load(path).convert_alpha()
+
     # --------------------------------------------------
     # BUDOWANIE RECTÓW SLOTÓW
     # --------------------------------------------------
@@ -174,7 +190,15 @@ class GarrisonGraphics:
         # 3. Tabelka informacyjna (gdy jednostka jest podglądana)
         if inspected_unit is not None:
             self._draw_unit_table(screen, inspected_unit)
- 
+        
+        # Przycisk WYPUŚĆ - zawsze widoczny
+        elapsed = pygame.time.get_ticks() - self.btn_release_anim_timer
+        is_pressed = self.btn_release_anim_timer > 0 and elapsed < 400
+
+        img = self.btn_release_pressed if is_pressed else self.btn_release_normal
+        if img:
+            screen.blit(img, self.btn_release_rect.topleft)
+
         return self.slot_rects
  
     # --------------------------------------------------
@@ -217,3 +241,12 @@ class GarrisonGraphics:
             y = r.y + 35 + row * 22
             txt = font2.render(f"{label}: {val}", True, (255, 255, 255))
             screen.blit(txt, (x, y))
+
+    def handle_release_click(self, mx, my, selected_units: list) -> bool:
+        if not self.btn_release_rect.collidepoint(mx, my):
+            return False
+        # Klikalne tylko gdy coś zaznaczone
+        if not selected_units:
+            return False
+        self.btn_release_anim_timer = pygame.time.get_ticks()
+        return True
