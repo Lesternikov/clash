@@ -39,9 +39,10 @@ class UnitInfoWindow:
     def draw_simple_info(self, screen, x, y, unit):
         screen.blit(self.bg_simple, (x, y))
         
-        # Nazwa
+        # POPRAWKA: Obsługa słownika i obiektu
         u_code = unit.get('type_code') if isinstance(unit, dict) else getattr(unit, 'type_code', "Unknown")
         name_str = UNIT_NAMES.get(u_code, "Nieznany")
+        
         name_txt = self.font_main.render(name_str, True, (255, 255, 255))
         screen.blit(name_txt, (x + 100, y + 5))
 
@@ -156,7 +157,7 @@ class UnitInfoWindow:
         if u_code in ranged_only:
             screen.blit(self.icon_ranged, (x + 120, y + 45))
         elif u_code in melee_only:
-            screen.blit(self.icon_melee, (x + 120, y + 45))
+            screen.blit(self.icon_melee, (x + 71, y + 75))
         # else: nic nie blitujemy, tło robi robotę!
 
         # --- MORALE ---
