@@ -1359,17 +1359,15 @@ class World(BuildingsMixin):
             return
 
         
-        if self.start_prod_button.collidepoint(mx, my):
-            # Przycisk zadziała TYLKO jeśli masz wybraną złotą ramkę (index nie jest None)
+        if self.garrison_gfx.handle_prod_click(mx, my, castle):
             if self.selected_patent_index is not None:
                 p = castle.patents[self.selected_patent_index]
                 u_name = p["unit_type"] if isinstance(p, dict) else p
-                
                 if u_name:
                     castle.start_production(u_name)
-                    print(f"Ręcznie uruchomiono produkcję: {u_name}")
+                    print(f"Uruchomiono produkcję: {u_name}")
             else:
-                print("BŁĄD: Musisz najpierw kliknąć w patent, aby go podświetlić!")
+                print("Najpierw zaznacz patent!")
             return
 
         if self.stop_prod_button.collidepoint(mx, my):
@@ -1975,9 +1973,12 @@ class World(BuildingsMixin):
         else:
             self.draw_button(screen, "", self.back_button_bldg, style="bldg")
 
-        if self.screen == "garrison":
-            self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
+        if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
+            self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
+        if self.screen == "garrison":                          # ← DODAJ TO
+            pass  # przycisk wypuść jest w garrison_gfx.draw()
+ 
         if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
             self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
