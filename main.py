@@ -2,14 +2,27 @@ import pygame
 import sys
 from world import World
 from player import Player
-
+from controls import ControlsHandler
+from renderer import Renderer
+from pathfinding import Pathfinder
+from map_graphics import MapGraphics
 pygame.init()
 screen = pygame.display.set_mode((1024, 768))
 pygame.display.set_caption("Clash Reverse")
 clock = pygame.time.Clock()
 
 # --- INICJALIZACJA GRY ---
+# 1. Tworzysz świat
 world = World()
+# 2. Tworzysz grafikę i WSTRZYKUJESZ do niej świat
+gfx = MapGraphics(world)
+# 2. Tworzysz renderer i dajesz mu dostęp do świata
+renderer = Renderer(world, gfx) # Dodajemy gfx jako drugi argument
+pathfinding = Pathfinder(world)
+world.pathfinder = pathfinding
+# 3. Tworzysz kontroler
+controls = ControlsHandler(world)
+world.map_gfx= gfx
 p1 = Player(1, "Gracz 1", (255, 50, 50))
 p2 = Player(2, "Gracz 2", (50, 150, 255))
 world.add_player(p1)
@@ -17,7 +30,7 @@ world.add_player(p2)
 
 # --- KLUCZOWA ZMIANA TUTAJ ---
 # Podajemy samą nazwę bazową ("final_map1") i plik FAC ("0.FAC")
-world.load("final_map1", "0.FAC") 
+pathfinding.load("final_map1", "0.FAC") 
 
 # Zakładam, że masz już tę funkcję w world.py, więc używamy jej zamiast Pikiniera
 world.setup_starting_units() 
@@ -36,12 +49,12 @@ while running:
     # UWAGA: Te funkcje są teraz WYCIĄGNIĘTE z pętli 'for'!
     # Wykonają się dokładnie JEDEN RAZ na klatkę obrazu.
     # =========================================================
-    world.handle_events(events) 
+    controls.handle_events(events) 
     world.handle_camera()
 
     # Rysowanie
     screen.fill((0, 0, 0))
-    world.draw(screen)
+    renderer.draw(screen)
         
     pygame.display.flip()
     clock.tick(30)

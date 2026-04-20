@@ -34,7 +34,8 @@ class Unit:
         self.experience = stats.get("exp", 0)
         self.morale = stats.get("morale", 100)
         self.fatigue = stats.get("fatigue", 0)
-        
+        self.attack = 1 if UNIT_STATS == "Budowniczy" else 5 # Przykład
+        self.defense = 1
         # Inne atrybuty
         self.carried_peasants = 0
         self.carried_gold = 0

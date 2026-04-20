@@ -1,3 +1,11 @@
+TILE_SIZE = 32
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 800
+# Rozmiar Twojej logicznej mapy (listy w self.map)
+
+MAP_WIDTH = 100 
+MAP_HEIGHT = 100
+
 UNIT_NAMES = {
     "PEON": "Pospolite ruszenie",
     "INFL": "Lekka piechota",
@@ -414,3 +422,24 @@ UNIT_STATS = {
         równych przeciwników zarów-
         no w powietrzu, jak i na ziemi.""" },
    }
+
+TERRAIN_TYPES = {
+    # --- NIEPRZEJEZDNE (Brak klucza 'cost' = blokada) ---
+    "W": {"name": "woda", "color": (0, 199, 255)},
+    "M": {"name": "morze", "color": (0, 0, 128)},
+    "G": {"name": "góry wysokie", "color": (85, 85, 85)},
+    "B": {"name": "bagna", "color": (139, 0, 0)},
+    "&": {"name": "kult", "color": (139, 69, 19)},
+    "S": {"name": "świątynia", "color": (255, 255, 255)},
+
+    # --- PRZEJEZDNE (Mają 'cost') ---
+    ".": {"name": "trawa", "color": (34, 139, 34), "cost": 4},
+    "l": {"name": "las", "color": (0, 100, 0), "cost": 6},
+    "p": {"name": "pustynia", "color": (210, 105, 30), "cost": 5},
+    "P": {"name": "pustynia sucha", "color": (237, 201, 175), "cost": 5},
+    "g": {"name": "góry niskie", "color": (119, 119, 119), "cost": 8},
+    "_": {"name": "droga", "color": (185, 185, 185), "cost": 3},
+    "$": {"name": "złoto", "color": (255, 215, 0), "cost": 4},
+    "#": {"name": "zamek", "color": (34, 139, 34), "cost": 4},
+}
+
