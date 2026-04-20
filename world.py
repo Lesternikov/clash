@@ -49,12 +49,6 @@ def draw_text(screen, text, x, y, color=(0, 0, 0)):
     screen.blit(img, (x, y))
 
         # Uniwersalny alias - wskazuje na właściwy w zależności od ekranu
-@property
-def back_button(self):
-    if self.screen == "castle":
-        return self.back_button_castle
-    return self.back_button_bldg
-
 class PrisonSlot:
     def __init__(self, general=None):
         self.general = general
@@ -896,6 +890,91 @@ class World:
         info_screens = ["forge", "hospital", "school", "workshop", "court"]
         if self.screen in info_screens:
             return
+
+    def handle_garrison_click(self, mx, my, button):
+
+        castle = self.selected_castle
+        if not castle:
+            return
+
+        # ================= BACK =================
+        if self.back_button.collidepoint(mx, my):
+            self.selected_units.clear()
+            self.screen = "castle"
+            return
+
+        # ================= RECRUITMENT =================
+        if ("koszary" in castle.buildings
+            and self.recruit_button.collidepoint(mx, my)):
+            self.screen = "recruitment"
+            self.recruitment_open = True
+            self.recruitment_scroll = -2  # To sprawi, że pierwsza jednostka będzie na środku
+            self.selected_unit_type = 0   # Od razu zaznacza pierwszą jednostkę
+            self.selected_patent_index = None
+
+            return
+
+        # ================= HEAL =================
+        if "hospital" in castle.buildings:
+            if self.heal_button.collidepoint(mx, my):
+                for unit in self.selected_units:
+                    castle.start_healing_unit(unit)
+                return
+
+        # ================= TRAIN ================= 
+        if "school" in castle.buildings:
+            if self.train_button.collidepoint(mx, my):
+                if self.selected_units:
+                    # Używamy pętli, aby przeszkolić każdą zaznaczoną jednostkę z osobna
+                    if self.selected_units:
+                        castle.start_training_group(self.selected_units) # Jedno wywołanie, Castle zajmie się resztą
+                    self.selected_units.clear() # Czyścimy dopiero PO przeszkoleniu wszystkich
+                    print("Zakończono wydawanie rozkazów szkolenia")
+                else:
+                    print("Brak zaznaczonych jednostek do szkolenia")
+                return
+        #=================wyślij wojsko======================
+        
+        if self.garrison_gfx.handle_release_click(mx, my, self.selected_units):
+            self.release_selected_units()
+            return
+        
+        # =====================================================
+        # POPRAWIONA LOGIKA SELEKCJI I STATYSTYK
+        # =====================================================
+        index = self.click_on_garrison(mx, my,)
+        print(f"DEBUG: Kliknięto w slot {index} przyciskiem {button}") # DODAJ TO
+        if index is None or index >= len(self.selected_castle.garrison):
+            return
+
+        unit = self.selected_castle.garrison[index]
+
+        # --- PRAWY PRZYCISK: Statystyki ---
+        if button == 3: 
+            if unit is not None:
+                self.inspected_unit = unit  # ZMIANA: z show_unit_stats na inspected_unit
+                print(f"DEBUG: Podglądam {unit.type}")
+            else:
+                self.inspected_unit = None
+            return
+
+        # --- LEWY PRZYCISK: Zaznaczanie ---
+        if button == 1:
+            self.inspected_unit = None
+            if unit is None:
+                return
+
+            # ZMIANA: Używamy listy, bo garrison używa selected_units
+            if unit in self.selected_units:
+                self.selected_units.remove(unit)
+                print(f"DEBUG: Odznaczono: {unit.type}")
+            else:
+                if len(self.selected_units) < self.selected_castle.garrison_limit:
+                    # DODAJEMY DOKŁADNIE TEN OBIEKT Z GARNIZONU
+                    self.selected_units.append(unit)
+                    print(f"DEBUG: Zaznaczono: {unit.type}")
+                else:
+                    print("DEBUG: Garnizon jest pełen!")
                 
     def handle_trap_info_click(self, mx, my):
         # działanie pułapki
@@ -997,91 +1076,6 @@ class World:
         else:
             # Jeśli gracz kliknął za daleko, wyłączamy tryb
             self.road_build_mode = False        
-
-    def handle_garrison_click(self, mx, my, button):
-
-        castle = self.selected_castle
-        if not castle:
-            return
-
-        # ================= BACK =================
-        if self.back_button.collidepoint(mx, my):
-            self.selected_units.clear()
-            self.screen = "castle"
-            return
-
-        # ================= RECRUITMENT =================
-        if ("koszary" in castle.buildings
-            and self.recruit_button.collidepoint(mx, my)):
-            self.screen = "recruitment"
-            self.recruitment_open = True
-            self.recruitment_scroll = -2  # To sprawi, że pierwsza jednostka będzie na środku
-            self.selected_unit_type = 0   # Od razu zaznacza pierwszą jednostkę
-            self.selected_patent_index = None
-
-            return
-
-        # ================= HEAL =================
-        if "hospital" in castle.buildings:
-            if self.heal_button.collidepoint(mx, my):
-                for unit in self.selected_units:
-                    castle.start_healing_unit(unit)
-                return
-
-        # ================= TRAIN ================= 
-        if "school" in castle.buildings:
-            if self.train_button.collidepoint(mx, my):
-                if self.selected_units:
-                    # Używamy pętli, aby przeszkolić każdą zaznaczoną jednostkę z osobna
-                    if self.selected_units:
-                        castle.start_training_group(self.selected_units) # Jedno wywołanie, Castle zajmie się resztą
-                    self.selected_units.clear() # Czyścimy dopiero PO przeszkoleniu wszystkich
-                    print("Zakończono wydawanie rozkazów szkolenia")
-                else:
-                    print("Brak zaznaczonych jednostek do szkolenia")
-                return
-        #=================wyślij wojsko======================
-        
-        if self.garrison_gfx.handle_release_click(mx, my, self.selected_units):
-            self.release_selected_units()
-            return
-        
-        # =====================================================
-        # POPRAWIONA LOGIKA SELEKCJI I STATYSTYK
-        # =====================================================
-        index = self.click_on_garrison(mx, my,)
-        print(f"DEBUG: Kliknięto w slot {index} przyciskiem {button}") # DODAJ TO
-        if index is None or index >= len(self.selected_castle.garrison):
-            return
-
-        unit = self.selected_castle.garrison[index]
-
-        # --- PRAWY PRZYCISK: Statystyki ---
-        if button == 3: 
-            if unit is not None:
-                self.inspected_unit = unit  # ZMIANA: z show_unit_stats na inspected_unit
-                print(f"DEBUG: Podglądam {unit.type}")
-            else:
-                self.inspected_unit = None
-            return
-
-        # --- LEWY PRZYCISK: Zaznaczanie ---
-        if button == 1:
-            self.inspected_unit = None
-            if unit is None:
-                return
-
-            # ZMIANA: Używamy listy, bo garrison używa selected_units
-            if unit in self.selected_units:
-                self.selected_units.remove(unit)
-                print(f"DEBUG: Odznaczono: {unit.type}")
-            else:
-                if len(self.selected_units) < self.selected_castle.garrison_limit:
-                    # DODAJEMY DOKŁADNIE TEN OBIEKT Z GARNIZONU
-                    self.selected_units.append(unit)
-                    print(f"DEBUG: Zaznaczono: {unit.type}")
-                else:
-                    print("DEBUG: Garnizon jest pełen!")
 
     def calculate_army_power(self, player):
         power = 0
@@ -2227,17 +2221,15 @@ class World:
             return
 
         
-        if self.start_prod_button.collidepoint(mx, my):
-            # Przycisk zadziała TYLKO jeśli masz wybraną złotą ramkę (index nie jest None)
+        if self.garrison_gfx.handle_prod_click(mx, my, castle):
             if self.selected_patent_index is not None:
                 p = castle.patents[self.selected_patent_index]
                 u_name = p["unit_type"] if isinstance(p, dict) else p
-                
                 if u_name:
                     castle.start_production(u_name)
-                    print(f"Ręcznie uruchomiono produkcję: {u_name}")
+                    print(f"Uruchomiono produkcję: {u_name}")
             else:
-                print("BŁĄD: Musisz najpierw kliknąć w patent, aby go podświetlić!")
+                print("Najpierw zaznacz patent!")
             return
 
         if self.stop_prod_button.collidepoint(mx, my):
@@ -2727,6 +2719,7 @@ class World:
             
             # Po puszczeniu myszki zawsze zamykamy menu
             self.active_dropdown = None
+
     def check_unit_info(self, mx, my):
         self.inspected_unit = None # Reset na start
         
@@ -3202,7 +3195,6 @@ class World:
                             self.units.remove(army)
                     return
 
-    
     def spawn_unit(self, unit_type, x, y, owner):
         """Główna i jedyna funkcja do tworzenia jednostek w świecie."""
         from unit import Unit
@@ -3504,9 +3496,12 @@ class World:
         else:
             self.draw_button(screen, "", self.back_button_bldg, style="bldg")
 
-        if self.screen == "garrison":
-            self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
+        if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
+            self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
+        if self.screen == "garrison":                          # ← DODAJ TO
+            pass  # przycisk wypuść jest w garrison_gfx.draw()
+ 
         if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
             self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
