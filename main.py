@@ -11,6 +11,12 @@ screen = pygame.display.set_mode((1024, 768))
 pygame.display.set_caption("Clash Reverse")
 clock = pygame.time.Clock()
 
+if __name__ == "__main__":
+    # cała logika startowa tutaj
+    pygame.init()
+    screen = pygame.display.set_mode((1280, 800))
+    # itd.
+
 # --- INICJALIZACJA GRY ---
 # 1. Tworzysz świat
 world = World()

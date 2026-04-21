@@ -1,4 +1,3 @@
-import main
 from unit import Unit
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player
@@ -10,7 +9,10 @@ from UI_components import UnitInfoWindow
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
 from court import CourtHandler
 from controls import ControlsHandler
-@property
+from garrison_graphics import GarrisonGraphics
+from castle_graphics import CastleGraphics
+import map_graphics
+
 def back_button(self):
     if self.screen == "castle":
         return self.back_button_castle
@@ -781,7 +783,6 @@ class World(BuildingsMixin):
             self.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
         if "school" in built:
             self.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
-        self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
         self.draw_building_footer(screen)
   
     def draw_castle_on_map(self, screen, castle):
@@ -1920,7 +1921,6 @@ class World(BuildingsMixin):
 
         # Przycisk POWRÓT (już masz)
         # TYLKO w __init__:
-        self.back_button = pygame.Rect(45, 680, 130, 74)
         self.draw_building_footer(screen)
 
         # Przycisk RELEASE
@@ -1991,9 +1991,6 @@ class World(BuildingsMixin):
 
         if self.screen == "garrison":                          # ← DODAJ TO
             pass  # przycisk wypuść jest w garrison_gfx.draw()
- 
-        if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
-            self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
     def release_selected_units(self, stay_in_menu=True):        
         target = self.selected_castle or getattr(self, 'active_building', None)
@@ -2192,8 +2189,6 @@ class World(BuildingsMixin):
                     return True
         return False
 
-    
-
 # --- URUCHOMIENIE ---
 # generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")
 
@@ -2221,3 +2216,8 @@ class World(BuildingsMixin):
                # if self.screen == "garrison":
                     # Tutaj tylko podświetlamy ramkę (jeśli masz taką logikę)
                     #self.handle_mouse_hover(mx, my)
+
+if __name__ == "__main__":
+    import subprocess, sys, os
+    main_path = os.path.join(os.path.dirname(__file__), "main.py")
+    subprocess.run([sys.executable, main_path])
