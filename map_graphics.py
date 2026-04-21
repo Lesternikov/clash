@@ -8,7 +8,7 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 800
 
 class MapGraphics:
-    def __init__(self, world_instance): # Nie tworzymy świata tutaj! Dostajemy go.
+    def __init__(self, world_instance):
         self.world = world_instance
         self.water_layers = [[] for _ in range(13)]
         self.water_frame_index = 0
@@ -22,13 +22,42 @@ class MapGraphics:
         self.waterfall_gfx = {"N": {}, "S": {}, "W": {}, "E": {}}
         self.river_overlays = {}
         self.treasure_imgs = {}
-        # Wczytywanie całej grafiki terenu przy starcie
+
+        # --- NOWE: Grafiki interfejsu ---
+        self.button_images = []
+        self.load_ui_assets() # Ładujemy przyciski na starcie
+        # -------------------------------
+
         self.load_additional_tiles()
         self.load_all_assets()
         self.load_road_graphics()
         self.load_all_water_assets()
         self.pathfinder = Pathfinder(self.world)        
 
+    def load_ui_assets(self):
+        """Ładuje 6 grafik przycisków akcji i skaluje je do rozmiaru UI (np. 70x70)"""
+        button_files = [
+            "MAP_BUTT_S32_0.png", "MAP_BUTT_S32_2.png", "MAP_BUTT_S32_4.png",
+            "MAP_BUTT_S32_6.png", "MAP_BUTT_S32_8.png", "MAP_BUTT_S32_10.png"
+        ]
+        # Zakładam, że pliki są w folderze 'assets' (tak jak inne Twoje grafiki)
+        path_ui = "assets/minimum/MAP_BUTT_S32" 
+        
+        self.button_images = []
+        for filename in button_files:
+            full_path = os.path.join(path_ui, filename)
+            if os.path.exists(full_path):
+                img = pygame.image.load(full_path).convert_alpha()
+                # Skalujemy przyciski do 70x70 (rozmiar standardowy dla Twojego UI)
+                img = pygame.transform.scale(img, (70, 70))
+                self.button_images.append(img)
+            else:
+                print(f"Błąd: Nie znaleziono grafiki interfejsu: {full_path}")
+                # Tworzymy zastępczy szary kwadrat, żeby kod się nie wywalił
+                fallback = pygame.Surface((70, 70))
+                fallback.fill((100, 100, 100))
+                self.button_images.append(fallback)
+                
     def load_additional_tiles(self):
         base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
         try:

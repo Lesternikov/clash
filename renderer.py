@@ -22,6 +22,7 @@ class Renderer:
         self.active_dropdown = None
         self.show_top_ui = False
         self.top_ui_full_area = pygame.Rect(0, 0, 1024, 55)
+
     def draw(self, screen):
         w = self.world
         b = self.buildings
@@ -263,43 +264,6 @@ class Renderer:
                     txt_opt = self.font.render(opt, True, (255, 255, 255))
                     screen.blit(txt_opt, (rect.x + 10, rect.y + 5))
 
-    def draw_ui(self, screen):
-        # 1. Pobieramy wybraną jednostkę ze ŚWIATA
-        u = self.world.selected_unit 
-        
-        if u:
-            # Używamy getattr, żeby uniknąć błędów jeśli jednostka nie ma garnizonu
-            garrison = getattr(u, 'garrison', [])
-            display_units = [unit for unit in ([u] + garrison) if unit is not None]
-
-            # Rysujemy sloty armii TYLKO jeśli jest grupa (2 lub więcej)
-            if len(display_units) >= 2:
-                panel_rect = pygame.Rect(0, 610, 1024, 158)
-                pygame.draw.rect(screen, (30, 20, 10), panel_rect) 
-                pygame.draw.rect(screen, (100, 80, 60), panel_rect, 2)
-
-                # Tworzymy recty slotów jeśli ich nie ma (lepiej dać to do __init__, ale tutaj też zadziała)
-                if not hasattr(self, 'army_slot_rects'):
-                    self.army_slot_rects = [pygame.Rect(10 + i * 75, 620, 70, 140) for i in range(10)]
-
-                for i in range(10):
-                    rect = self.army_slot_rects[i]
-                    pygame.draw.rect(screen, (60, 40, 30), rect)
-                    pygame.draw.rect(screen, (150, 130, 100), rect, 1)
-
-                    if i < len(display_units):
-                        unit = display_units[i]
-                        # Używamy czcionki Renderera (self.font_small)
-                        name_txt = self.font_small.render(str(unit.type), True, (255, 255, 255))
-                        count = getattr(unit, 'count', 1)
-                        count_txt = self.font_small.render(str(count), True, (255, 255, 0))
-                        
-                        screen.blit(name_txt, (rect.x + 5, rect.y + 120))
-                        screen.blit(count_txt, (rect.x + 5, rect.y + 100))
-
-        # 3. PRZYCISKI AKCJI
-        if u: # Rysuj tylko, gdy wybrana jednostka
-            self.draw_bottom_bar(screen)
             
     def draw_button(self, screen, text, rect, color=(90, 90, 90), style=None):
         """
@@ -331,31 +295,38 @@ class Renderer:
         pygame.draw.rect(screen, (200, 200, 200), rect, 1)
         txt_surface = pygame.font.SysFont(None, 20).render(text, True, (255, 255, 255))
         screen.blit(txt_surface, txt_surface.get_rect(center=rect.center))
-    def draw_bottom_bar(self, screen):
 
-        # Wybór napisów w zależności od stanu
-        if self.world.build_menu_open:
-            labels = ["DROGA", "PUŁAPKA", "SKARB", "WIEŻA", "TWIERDZA", "ZAMEK"]
-            header_text = "BUDOWANIE:"
-        else:
-            labels = ["TRYB MAPY", "ATK", "SPL", "WAIT", "BUILD", "REC"]
+    def draw_bottom_bar(self, screen):
+        # FIX dla NameError: Pobieramy pozycję myszy
+        mx, my = pygame.mouse.get_pos()
+        
+        # PADDING: O ile pikseli zmniejszyć grafikę z każdej strony wewnątrz ramki
+        # Zwiększ tę wartość, jeśli ikony nadal wydają się za duże
+        icon_padding = 14
 
         for i, rect in enumerate(self.world.action_buttons):
-            mx, my = pygame.mouse.get_pos()
+            # 1. Rysujemy grafikę przycisku z MapGraphics
+            if i < len(self.gfx.button_images):
+                image = self.gfx.button_images[i]
+                
+                # Obliczamy nową pozycję, aby wyśrodkować ikonę z marginesem
+                # (Zakładamy, że ikona ma 70x70, a rect jest teraz szerszy)
+                icon_x = rect.x + icon_padding
+                icon_y = rect.y + icon_padding
+                
+                # Jeśli rect jest dużo szerszy, możemy chcieć wyśrodkować ikonę:
+                # icon_x = rect.x + (rect.width - 70) // 2
+                
+                # Rysujemy ikonę z przesunięciem (padding)
+                screen.blit(image, (icon_x, icon_y))
             
-            # Inny kolor dla menu budowania, żeby gracz wiedział, że coś się zmieniło
-            if self.world.build_menu_open:
-                color = (34, 139, 34) if not rect.collidepoint(mx, my) else (50, 205, 50) # Zielenie
-            else:
-                color = (139, 69, 19) if not rect.collidepoint(mx, my) else (160, 82, 45) # Brązy
-            
-            pygame.draw.rect(screen, color, rect)
-            pygame.draw.rect(screen, (212, 175, 55), rect, 2)
-            
-            txt = self.font.render(labels[i], True, (255, 255, 255))
-            text_rect = txt.get_rect(center=rect.center)
-            screen.blit(txt, text_rect)
+       
 
+            # 3. Efekt najechania (podświetlenie krawędzi)
+            if rect.collidepoint(mx, my):
+                pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+                
+            # --- SEKCJA RYSOWANIA TEKSTU ZOSTAŁA USUNIĘTA ---
     def draw_unit_info(self, screen):
         # Historyczne informacje o jednostce w koszarach.
         screen.fill((20,20,20))
@@ -411,4 +382,39 @@ class Renderer:
             y += 28
 
         # 6. Stopka (Twoje przyciski)
-        self.draw_building_footer(screen)
+        self.world.draw_building_footer(screen)
+
+    def draw_ui(self, screen):
+
+        # 2. DOLNY PANEL ARMII (Tylko dla 2+ jednostek)
+        u = self.world.selected_unit
+        if u:
+            garrison = getattr(u, 'garrison', [])
+            display_units = [unit for unit in ([u] + garrison) if unit is not None]
+
+            # Rysujemy sloty armii TYLKO jeśli jest grupa
+            if len(display_units) >= 2:
+                panel_rect = pygame.Rect(0, 610, 1024, 158)
+                pygame.draw.rect(screen, (30, 20, 10), panel_rect) 
+                pygame.draw.rect(screen, (100, 80, 60), panel_rect, 2)
+
+                if not hasattr(self, 'army_slot_rects'):
+                    self.army_slot_rects = [pygame.Rect(10 + i * 75, 620, 70, 140) for i in range(10)]
+
+                for i in range(10):
+                    rect = self.army_slot_rects[i]
+                    pygame.draw.rect(screen, (60, 40, 30), rect)
+                    pygame.draw.rect(screen, (150, 130, 100), rect, 1)
+
+                    if i < len(display_units):
+                        unit = display_units[i]
+                        name_txt = self.font_small.render(str(unit.type), True, (255, 255, 255))
+                        count = getattr(unit, 'count', 1)
+                        count_txt = self.font_small.render(str(count), True, (255, 255, 0))
+                        screen.blit(name_txt, (rect.x + 5, rect.y + 120))
+                        screen.blit(count_txt, (rect.x + 5, rect.y + 100))
+
+        # 3. PRZYCISKI AKCJI (Zawsze widoczne na ekranie)
+        # Wyciągnięte poza "if u:", więc będą widoczne od startu gry
+        self.draw_bottom_bar(screen)
+    

@@ -451,3 +451,62 @@ def draw_grid_lines(self, screen):
 
 def draw_road_arrows(self, screen):
 def handle_mouse_motion(self, mx, my):
+
+
+1. Moduł Systemu Wizualnego i UI (ui.py lub renderer.py)
+Zabierz z world.py absolutnie wszystko, co ma w nazwie draw_ i zajmuje się wyrzucaniem pikseli na ekran. Klasa świata powinna wiedzieć gdzie stoi zamek, ale nie musi wiedzieć, jak go narysować.
+
+draw_text, draw_map, draw_castle, draw_unit
+
+draw_top_bar, draw_bottom_bar, draw_ui, draw_button
+
+draw_unit_info, draw_building_template, draw_grid_lines
+
+2. Moduł Obsługi Wejścia (input_handler.py lub controls.py)
+Tutaj wrzucasz wszystko, co reaguje na klawiaturę i myszkę. Zamiast zapychać klasę świata, ten moduł odbiera kliknięcie, dekoduje je i wysyła prostą komendę do world.
+
+handle_events, handle_mouse_click, handle_mouse_up, handle_mouse_motion
+
+handle_map_click, handle_castle_click, handle_ui_click
+
+handle_camera, handle_recruitment_scroll
+
+3. Moduł Mapy i Poruszania się (map_logic.py i pathfinding.py)
+To będzie mózg operacji na kafelkach.
+
+Wczytywanie i sprawdzanie: load_map, load, get_tile_at, get_bg_tile_at, is_tile_passable, check_collision
+
+Pathfinding (osobny plik!): find_path, is_walkable, draw_path_dots, draw_road_arrows
+
+4. Moduł Budownictwa i Zamków (buildings.py)
+Wszystko, co dotyczy wznoszenia budynków, rozbudowy i rekrutacji w zamku.
+
+load_castles_from_fac, load_castle_and_tower, demolish_castle
+
+start_building, process_construction, execute_build_action
+
+draw_forge, draw_workshop, draw_hospital, draw_school (tu można połączyć logikę z rysowaniem wnętrza zamku)
+
+train_selected, start_recruitment
+
+5. Moduł Dworu i Więzienia (court.py)
+Dwór to w zasadzie osobna "mini-gra" z własnymi zasadami, więc idealnie nadaje się na własny plik.
+
+class PrisonSlot
+
+draw_court, draw_queen_panel, draw_prison_sections
+
+execute_general, torture_general, bribe_general
+
+calculate_army_power, calculate_gold
+
+Co zostanie w world.py?
+Tylko rdzeń gry. Rdzeń ten będzie inicjował powyższe moduły i zarządzał pętlą tur:
+
+Zmienne globalne (TILE_SIZE, szerokość ekranu)
+
+__init__ (tworzenie instancji mapy, graczy, UI)
+
+update i next_turn
+
+Główne metody łączące zarządzanie jednostkami (np. add_player, next_turn)

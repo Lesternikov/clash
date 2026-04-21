@@ -186,16 +186,29 @@ class World(BuildingsMixin):
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
         # --- DOLNY PANEL AKCJI (MAPA) ---
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
-        self.action_buttons = []
+        
         self.unit_info_window = UnitInfoWindow()
-        # Tworzymy 6 przycisków w siatce 2x3 (tak jak miałeś wcześniej)
-        panel_x = 800
-        panel_y = 640
+        self.action_buttons = []
+        
+        
+        # Odstępy między przyciskami (muszą być większe niż szerokość/wysokość)
+        # column_spacing = 130 # 120 szerokości + 10 przerwy
+        # row_spacing = 90    # 82 wysokości + 8 przerwy
+        
+        # Jeśli używałeś siatki 2x3 po prawej stronie:
+        panel_x = 800 # Startowa pozycja X
+        panel_y = 620 # Startowa pozycja Y
+
         for row in range(2):
             for col in range(3):
-                # 70x70 to rozmiar, 65 i 55 to odstępy - dopasuj pod swoją grafikę
-                rect = pygame.Rect(panel_x + col * 65, panel_y + row * 55, 70, 70)
+                # Tworzymy szersze prostokąty
+                # Używamy kol * odstęp, żeby się nie nakładały
+                rect = pygame.Rect(panel_x + col * 70, panel_y + row * 70, button_width, button_height)
                 self.action_buttons.append(rect)
+                
+        # Aktualizujemy też tło panelu, żeby pasowało do nowych, szerszych przycisków
+        # (3 kolumny * 130 + margines)
+        self.ui_panel_rect = pygame.Rect(790, 610, 400, 190)
         self.show_grid = False
         self.traps = []
         self.trap_backgrounds = {}    # Słownik: (x, y) -> "oryginalny_znak_terenu"
