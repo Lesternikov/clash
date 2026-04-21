@@ -1,3 +1,4 @@
+import main
 from unit import Unit
 from castle import Castle, UNIT_REQUIREMENTS
 from player import Player
@@ -9,10 +10,7 @@ from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDT
 from UI_components import UnitInfoWindow
 from court import CourtHandler
 from controls import ControlsHandler
-from garrison_graphics import GarrisonGraphics
-from castle_graphics import CastleGraphics
-import map_graphics
-
+@property
 def back_button(self):
     if self.screen == "castle":
         return self.back_button_castle
@@ -191,7 +189,8 @@ class World(BuildingsMixin):
         
         self.unit_info_window = UnitInfoWindow()
         self.action_buttons = []
-        
+        button_width = 100  # Zwiększone z 70 (wydłużenie w prawo)
+        button_height = 100 # Zwiększone z 70 (żeby padding w rendererze ładnie wyglądał)
         
         # Odstępy między przyciskami (muszą być większe niż szerokość/wysokość)
         # column_spacing = 130 # 120 szerokości + 10 przerwy
@@ -262,9 +261,13 @@ class World(BuildingsMixin):
             self.players.append(new_player)
 
             self.back_destination = "map" # Cel powrotu
+<<<<<<< HEAD
     
         self.unit_info_window = None
 
+=======
+            self.unit_info_window = None
+>>>>>>> a5a8b978fdfb3aa73b8307bb1bb3b02952fb5088
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
         for radius in range(1, 4): # Szuka w promieniu 1, 2, 3 kratek
@@ -785,6 +788,7 @@ class World(BuildingsMixin):
             self.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
         if "school" in built:
             self.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
+        self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
         self.draw_building_footer(screen)
   
     def draw_castle_on_map(self, screen, castle):
@@ -1923,6 +1927,7 @@ class World(BuildingsMixin):
 
         # Przycisk POWRÓT (już masz)
         # TYLKO w __init__:
+        self.back_button = pygame.Rect(45, 680, 130, 74)
         self.draw_building_footer(screen)
 
         # Przycisk RELEASE
@@ -1993,6 +1998,9 @@ class World(BuildingsMixin):
 
         if self.screen == "garrison":                          # ← DODAJ TO
             pass  # przycisk wypuść jest w garrison_gfx.draw()
+ 
+        if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
+            self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
     def release_selected_units(self, stay_in_menu=True):        
         target = self.selected_castle or getattr(self, 'active_building', None)
@@ -2102,6 +2110,11 @@ class World(BuildingsMixin):
     def show_foundation_menu(self, gx, gy):
         self.screen = "foundation_selection"
         self.construction_target = (gx, gy) # Zapamiętujemy, gdzie budujemy
+    def show_unit_details(self, unit):
+        # ZAMIAST importu na górze pliku, robimy go tutaj:
+        from UI_components import UnitInfoWindow
+        
+        self.unit_info_window = UnitInfoWindow(unit)
 
     def show_unit_info_window(self):
         from UI_components import UnitInfoWindow
@@ -2194,6 +2207,8 @@ class World(BuildingsMixin):
                     return True
         return False
 
+    
+
 # --- URUCHOMIENIE ---
 # generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")
 
@@ -2221,8 +2236,3 @@ class World(BuildingsMixin):
                # if self.screen == "garrison":
                     # Tutaj tylko podświetlamy ramkę (jeśli masz taką logikę)
                     #self.handle_mouse_hover(mx, my)
-
-if __name__ == "__main__":
-    import subprocess, sys, os
-    main_path = os.path.join(os.path.dirname(__file__), "main.py")
-    subprocess.run([sys.executable, main_path])
