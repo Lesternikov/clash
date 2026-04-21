@@ -5,8 +5,8 @@ from buildings import BuildingsMixin
 from castle import BUILDING_TYPES
 import random  # Do losowania drzew (żeby las nie był nudny)
 import pygame  # Silnik gry
-from UI_components import UnitInfoWindow
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
+from UI_components import UnitInfoWindow
 from court import CourtHandler
 from controls import ControlsHandler
 from garrison_graphics import GarrisonGraphics
@@ -263,6 +263,8 @@ class World(BuildingsMixin):
 
             self.back_destination = "map" # Cel powrotu
     
+        self.unit_info_window = None
+
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
         for radius in range(1, 4): # Szuka w promieniu 1, 2, 3 kratek
@@ -2101,6 +2103,9 @@ class World(BuildingsMixin):
         self.screen = "foundation_selection"
         self.construction_target = (gx, gy) # Zapamiętujemy, gdzie budujemy
 
+    def show_unit_info_window(self):
+        from UI_components import UnitInfoWindow
+        self.unit_info_window = UnitInfoWindow(unit)
     def draw_build_system(self, screen):
     # 1. Rysuj siatkę (opcjonalnie, tylko gdy budowniczy jest wybrany)
         if self.selected_unit and self.selected_unit.type == "Budowniczy":
