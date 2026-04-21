@@ -1,13 +1,15 @@
 import os
 import random
 import pygame
+from pathfinding import Pathfinder
 
 TILE_SIZE = 32
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 800
 
 class MapGraphics:
-    def __init__(self):
+    def __init__(self, world_instance): # Nie tworzymy świata tutaj! Dostajemy go.
+        self.world = world_instance
         self.water_layers = [[] for _ in range(13)]
         self.water_frame_index = 0
         self.grass_frame_index = 0
@@ -20,12 +22,12 @@ class MapGraphics:
         self.waterfall_gfx = {"N": {}, "S": {}, "W": {}, "E": {}}
         self.river_overlays = {}
         self.treasure_imgs = {}
-        
         # Wczytywanie całej grafiki terenu przy starcie
         self.load_additional_tiles()
         self.load_all_assets()
         self.load_road_graphics()
         self.load_all_water_assets()
+        self.pathfinder = Pathfinder(self.world)        
 
     def load_additional_tiles(self):
         base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
@@ -232,7 +234,7 @@ class MapGraphics:
         current_friends = friends.get(target_type, [target_type])
 
         def is_friendly(tx, ty):
-            neighbor = world.get_bg_tile_at(tx, ty)
+            neighbor = self.pathfinder.get_bg_tile_at(tx, ty)
             return neighbor in current_friends
 
         U, D, L, R = is_friendly(x, y-1), is_friendly(x, y+1), is_friendly(x-1, y), is_friendly(x+1, y)
@@ -256,17 +258,17 @@ class MapGraphics:
         return 12
 
     def get_road_tile(self, world, x, y):
-        n = 1 if world.get_tile_at(x, y-1) == "_" else 0
-        e = 2 if world.get_tile_at(x+1, y) == "_" else 0
-        s = 4 if world.get_tile_at(x, y+1) == "_" else 0
-        w = 8 if world.get_tile_at(x-1, y) == "_" else 0
+        n = 1 if self.pathfinder.get_tile_at(x, y-1) == "_" else 0
+        e = 2 if self.pathfinder.get_tile_at(x+1, y) == "_" else 0
+        s = 4 if self.pathfinder.get_tile_at(x, y+1) == "_" else 0
+        w = 8 if self.pathfinder.get_tile_at(x-1, y) == "_" else 0
         connections = n + e + s + w
 
-        bg_left   = world.get_bg_tile_at(x-1, y)
-        bg_right  = world.get_bg_tile_at(x+1, y)
-        bg_up     = world.get_bg_tile_at(x, y-1)
-        bg_down   = world.get_bg_tile_at(x, y+1)
-        bg_center = world.get_bg_tile_at(x, y)
+        bg_left   = self.pathfinder.get_bg_tile_at(x-1, y)
+        bg_right  = self.pathfinder.get_bg_tile_at(x+1, y)
+        bg_up     = self.pathfinder.get_bg_tile_at(x, y-1)
+        bg_down   = self.pathfinder.get_bg_tile_at(x, y+1)
+        bg_center = self.pathfinder.get_bg_tile_at(x, y)
 
         pustynia_warianty = ["p", "P", "s"]
         trawa_warianty = ["."]
@@ -288,11 +290,11 @@ class MapGraphics:
         terrain_dict = self.road_gfx.get(logical_terrain, self.road_gfx["."])
         return terrain_dict.get(connections, terrain_dict.get(10))
 
-    def get_waterfall_context(self, world, x, y):
-        v_up = world.get_bg_tile_at(x, y-1) == "V"
-        v_down = world.get_bg_tile_at(x, y+1) == "V"
-        v_left = world.get_bg_tile_at(x-1, y) == "V"
-        v_right = world.get_bg_tile_at(x+1, y) == "V"
+    def get_waterfall_context(self, pathfinder, x, y):
+        v_up = self.pathfinder.get_bg_tile_at(x, y-1) == "V"
+        v_down = self.pathfinder.get_bg_tile_at(x, y+1) == "V"
+        v_left = self.pathfinder.get_bg_tile_at(x-1, y) == "V"
+        v_right = self.pathfinder.get_bg_tile_at(x+1, y) == "V"
 
         if v_left or v_right:
             if not v_left: return "S", "TOP_L"
@@ -304,16 +306,16 @@ class MapGraphics:
             return "S", "MID_C" 
         return "S", "TOP_C"
 
-    def get_bridge_tile(self, world, x, y):
+    def get_bridge_tile(self, pathfinder, x, y):
         def is_bridge(nx, ny):
-            has_road = world.get_tile_at(nx, ny) == "_"
-            has_water = world.get_bg_tile_at(nx, ny) in ["W", "V"]
+            has_road = self.pathfinder.get_tile_at(nx, ny) == "_"
+            has_water = self.pathfinder.get_bg_tile_at(nx, ny) in ["W", "V"]
             return has_road and has_water
 
         bridge_up, bridge_down = is_bridge(x, y-1), is_bridge(x, y+1)
         bridge_left, bridge_right = is_bridge(x-1, y), is_bridge(x+1, y)
-        road_up, road_down = world.get_tile_at(x, y-1) == "_", world.get_tile_at(x, y+1) == "_"
-        road_left, road_right = world.get_tile_at(x-1, y) == "_", world.get_tile_at(x+1, y) == "_"
+        road_up, road_down = self.pathfinder.get_tile_at(x, y-1) == "_", self.pathfinder.get_tile_at(x, y+1) == "_"
+        road_left, road_right = self.pathfinder.get_tile_at(x-1, y) == "_", self.pathfinder.get_tile_at(x+1, y) == "_"
 
         if road_up or road_down:
             if road_up and not bridge_up: return "V_T"     
@@ -327,12 +329,12 @@ class MapGraphics:
 
         return "H_C"
 
-    def get_dominant_land_neighbor(self, world, x, y, tile_type):
+    def get_dominant_land_neighbor(self, pathfinder, x, y, tile_type):
         priority = ["B", "b", "p", "P", "s", "l", ".", "g", "G"] 
         for terrain in priority:
             if tile_type == terrain: continue
             for dx, dy in [(0,-1), (0,1), (-1,0), (1,0), (-1,-1), (1,-1), (-1,1), (1,1)]:
-                if world.get_bg_tile_at(x + dx, y + dy) == terrain:
+                if self.pathfinder.get_bg_tile_at(x + dx, y + dy) == terrain:
                     return terrain
         return "."
 
@@ -374,7 +376,7 @@ class MapGraphics:
                     overlay_img = self.river_overlays[neighbor_land][edge_id]
                     screen.blit(overlay_img, pos)
 
-        if world.get_tile_at(x, y) == "_":
+        if self.pathfinder.get_tile_at(x, y) == "_":
             bridge_part_key = self.get_bridge_tile(world, x, y)
             bridge_img = self.bridge_gfx.get(bridge_part_key)
             if bridge_img:
@@ -399,8 +401,8 @@ class MapGraphics:
             for x in range(start_x, end_x):
                 pos = ((x * TILE_SIZE) - world.camera_x, (y * TILE_SIZE) - world.camera_y)
                 
-                bg_tile = world.get_bg_tile_at(x, y)
-                obj_tile = world.get_tile_at(x, y) 
+                bg_tile = self.pathfinder.get_bg_tile_at(x, y)
+                obj_tile = self.pathfinder.get_tile_at(x, y) 
 
                 # --- TRYB DEBUGOWANIA (Widok samego biomu) ---
                 if getattr(world, 'show_only_biome', False):
