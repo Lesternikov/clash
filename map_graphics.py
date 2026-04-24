@@ -35,29 +35,50 @@ class MapGraphics:
         self.pathfinder = Pathfinder(self.world)        
 
     def load_ui_assets(self):
-        """Ładuje 6 grafik przycisków akcji i skaluje je do rozmiaru UI (np. 70x70)"""
-        button_files = [
-            "MAP_BUTT_S32_0.png", "MAP_BUTT_S32_2.png", "MAP_BUTT_S32_4.png",
-            "MAP_BUTT_S32_6.png", "MAP_BUTT_S32_8.png", "MAP_BUTT_S32_10.png"
-        ]
-        # Zakładam, że pliki są w folderze 'assets' (tak jak inne Twoje grafiki)
-        path_ui = "assets/minimum/MAP_BUTT_S32" 
+        """Ładuje wszystkie grafiki interfejsu"""
+        path_ui = "assets/minimum/MAP_BUTT_S32"
         
-        self.button_images = []
-        for filename in button_files:
-            full_path = os.path.join(path_ui, filename)
+        # 1. Standardowe przyciski (0-11)
+        button_files = [f"MAP_BUTT_S32_{i}.png" for i in range(12)]
+        self.button_images = self._load_button_set(path_ui, button_files)
+
+        # 2. PRZYCISKI BUDOWANIA (15-23) - Twoja nowa sekcja
+        # 15,16=Droga, 17,18=Pułapka, 19,20=Wieża(?), 21=Puste(?), 22,23=Wyjście
+        build_files = [
+            "MAP_BUTT_S32_15.png", "MAP_BUTT_S32_16.png",
+            "MAP_BUTT_S32_17.png", "MAP_BUTT_S32_18.png",
+            "MAP_BUTT_S32_19.png", "MAP_BUTT_S32_20.png",
+            "MAP_BUTT_S32_21.png", "MAP_BUTT_S32_22.png", # Powtórka jako placeholder
+            "MAP_BUTT_S32_23.png", "MAP_BUTT_S32_24.png",
+            "MAP_BUTT_S32_26.png", "MAP_BUTT_S32_26.png",
+
+        ]
+        self.build_button_images = self._load_button_set(path_ui, build_files)
+
+        # 3. Tło panelu armii
+        army_bg_path = "assets/minimum/MARKS_S32_35.png" 
+        if os.path.exists(army_bg_path):
+            self.army_panel_bg = pygame.image.load(army_bg_path).convert_alpha()
+        else:
+            print(f"Błąd: Nie znaleziono tła armii: {army_bg_path}")
+            self.army_panel_bg = pygame.Surface((32, 32))
+            self.army_panel_bg.fill((101, 67, 33))
+
+    def _load_button_set(self, path, files):
+        """Pomocnicza funkcja, żeby nie powtarzać kodu ładowania"""
+        images = []
+        for filename in files:
+            full_path = os.path.join(path, filename)
             if os.path.exists(full_path):
                 img = pygame.image.load(full_path).convert_alpha()
-                # Skalujemy przyciski do 70x70 (rozmiar standardowy dla Twojego UI)
-                img = pygame.transform.scale(img, (70, 70))
-                self.button_images.append(img)
+                images.append(img)
             else:
-                print(f"Błąd: Nie znaleziono grafiki interfejsu: {full_path}")
-                # Tworzymy zastępczy szary kwadrat, żeby kod się nie wywalił
-                fallback = pygame.Surface((70, 70))
+                print(f"Błąd: Brak pliku {filename}")
+                fallback = pygame.Surface((32, 32))
                 fallback.fill((100, 100, 100))
-                self.button_images.append(fallback)
-                
+                images.append(fallback)
+        return images
+
     def load_additional_tiles(self):
         base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
         try:

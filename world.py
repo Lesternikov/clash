@@ -10,6 +10,7 @@ from UI_components import UnitInfoWindow
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
 from court import CourtHandler
 from controls import ControlsHandler
+
 @property
 def back_button(self):
     if self.screen == "castle":
@@ -186,25 +187,24 @@ class World(BuildingsMixin):
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
         # --- DOLNY PANEL AKCJI (MAPA) ---
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
-        
         self.unit_info_window = UnitInfoWindow()
         self.action_buttons = []
-        button_width = 100  # Zwiększone z 70 (wydłużenie w prawo)
-        button_height = 100 # Zwiększone z 70 (żeby padding w rendererze ładnie wyglądał)
+        button_width = 120  # Zwiększone z 70 (wydłużenie w prawo)
+        button_height = 60 # Zwiększone z 70 (żeby padding w rendererze ładnie wyglądał)
         
         # Odstępy między przyciskami (muszą być większe niż szerokość/wysokość)
         # column_spacing = 130 # 120 szerokości + 10 przerwy
         # row_spacing = 90    # 82 wysokości + 8 przerwy
         
         # Jeśli używałeś siatki 2x3 po prawej stronie:
-        panel_x = 800 # Startowa pozycja X
-        panel_y = 620 # Startowa pozycja Y
+        panel_x = 664 # Startowa pozycja X
+        panel_y = 650 # Startowa pozycja Y
 
         for row in range(2):
             for col in range(3):
                 # Tworzymy szersze prostokąty
                 # Używamy kol * odstęp, żeby się nie nakładały
-                rect = pygame.Rect(panel_x + col * 70, panel_y + row * 70, button_width, button_height)
+                rect = pygame.Rect(panel_x + col * 120, panel_y + row * 60, button_width, button_height)
                 self.action_buttons.append(rect)
                 
         # Aktualizujemy też tło panelu, żeby pasowało do nowych, szerszych przycisków
@@ -777,12 +777,12 @@ class World(BuildingsMixin):
         # Przyciski funkcyjne
         built = [b.lower() for b in castle.buildings]
         if "koszary" in built:
-            self.draw_button(screen, "RECRUIT", self.recruit_button, (240, 120, 20))
+            self.renderer.draw_button(screen, "RECRUIT", self.recruit_button, (240, 120, 20))
         if "hospital" in built:
-            self.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
+            self.renderer.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
         if "school" in built:
-            self.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
-        self.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
+            self.renderer.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
+        self.renderer.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
         self.draw_building_footer(screen)
   
     def draw_castle_on_map(self, screen, castle):
@@ -834,73 +834,6 @@ class World(BuildingsMixin):
                     return True
         return False
             
-    def draw_castle_interface(self, screen):
-        castle = self.selected_castle
-        if not castle: 
-            return
-        
-        # Pobieramy aktualną pozycję myszy dla całego interfejsu
-        mx, my = pygame.mouse.get_pos()
-
-        # --- WARSTWA 1: DYNAMICZNA GRAFIKA ZAMKU (Tło i mury) ---
-        # To rysujemy ZAWSZE jako pierwsze. Plik castle_graphics sam nałoży warstwy.
-        if hasattr(self, 'castle_gfx'):
-            self.castle_gfx.draw(screen, castle)
-        else:
-            screen.fill((60, 50, 40)) # Rezerwowy brąz, jeśli grafika zawiedzie
-
-        # --- WARSTWA 2: WOJSKO (Garnizon) ---
-        # Jeśli masz już gotową funkcję do rysowania jednostek w zamku, odkomentuj poniżej:
-        # self.draw_garrison_units_on_screen(screen, castle)
-
-        # --- WARSTWA 3: STAŁY INTERFEJS (Tytuł i przyciski budynków) ---
-        font = pygame.font.SysFont(None, 28)
-        title = font.render(f"{castle.building_type.upper()}", True, (255, 255, 255))
-        screen.blit(title, (40, 40))
-
-        # Przyciski funkcyjne
-
-        if castle.building_type == "Zamek":
-            self.peasant_button = pygame.Rect(screen.get_width() - 200, screen.get_height() - 110, 160, 40)
-            self.draw_button(screen, "CHŁOPI", self.peasant_button, (160, 140, 60))
-
-        # Przyciski konkretnych wybudowanych budynków (Ich stałe pozycje na ekranie)
-        if hasattr(self, 'castle_gfx'):
-            # Przekazujemy naszą flagę do funkcji draw
-            self.castle_gfx.draw(screen, self.selected_castle, debug_mode=self.debug_show_masks)
-        # --- WARSTWA 4: SYSTEM ROZWIJANEGO MENU (Na samym wierzchu) ---
-        
-        # Sprawdzamy, czy mysz jest nad przyciskiem MENU lub nad otwartym menu
-        mouse_over_ui = False
-        if self.menu_button.collidepoint(mx, my):
-            self.menu_open = True
-            mouse_over_ui = True
-
-        if getattr(self, 'menu_open', False):
-            # Rysujemy Twoje menu z opcjami "Buduj", "Zburz" itp.
-            self.draw_castle_menu(screen, mx, my)
-            
-            # Sprawdzamy czy mysz jest nad opcjami menu, żeby go nie zamknąć
-            for rect in self.menu_rects.values():
-                if rect.collidepoint(mx, my): mouse_over_ui = True
-            if getattr(self, 'build_open', False):
-                for rect in self.build_rects.values():
-                    if rect.collidepoint(mx, my): mouse_over_ui = True
-            
-            # Mostek bezpieczeństwa
-            bridge_rect = pygame.Rect(self.menu_button.x - 20, self.menu_button.y, 30, 200)
-            if bridge_rect.collidepoint(mx, my): mouse_over_ui = True
-
-        # Jeśli mysz ucieknie poza UI, zamykamy menu
-        if not mouse_over_ui:
-            self.menu_open = False
-            self.build_open = False
-
-        # Rysujemy sam przycisk MENU
-        self.draw_button(screen, "MENU", self.menu_button)
-
-        # 6. STOPKA (Przycisk POWRÓT na mapę)
-        self.draw_building_footer(screen)
      
     def castle_has_patent(self, castle, unit_name):
         for p in castle.patents:
@@ -1278,7 +1211,7 @@ class World(BuildingsMixin):
         for i, opt in enumerate(options):
             # i * menu_h sprawia, że przyciski idealnie do siebie przylegają
             rect = pygame.Rect(menu_x, menu_y + i * menu_h, menu_w, menu_h)
-            self.draw_button(screen, opt, rect)
+            self.renderer.draw_button(screen, opt, rect)
             self.menu_rects[opt] = rect
 
         # --- PRZYPISANIE PRZYCISKÓW DLA handle_mouse (To czego brakowało) ---
@@ -1329,7 +1262,7 @@ class World(BuildingsMixin):
             else:
                 # WERSJA AKTYWNA:
                 # Twoja standardowa funkcja z efektem hover
-                self.draw_button(screen, b, rect)
+                self.renderer.draw_button(screen, b, rect)
 
             self.build_rects[b] = rect
          
@@ -1717,35 +1650,7 @@ class World(BuildingsMixin):
         print("DEBUG: Brak wolnych slotów!")
         return False
     
-    def handle_action_button_click(self, button_index):
-        """button_index: od 0 do 5 (odpowiada self.action_buttons po prawej stronie)"""
-        u = self.selected_unit
-        if not u: return
-
-        # Sprawdzamy, czy w armii jest budowniczy (jeśli u to armia)
-        has_builder = False
-        if u.type == "Budowniczy":
-            has_builder = True
-        elif hasattr(u, 'garrison'):
-            has_builder = any(slot is not None and slot.type == "Budowniczy" for slot in u.garrison)
-
-        if self.build_menu_open:
-            # MENU BUDOWANIA: ["DROGA", "PUŁAPKA", "SKARB", "WIEŻA", "TWIERDZA", "ZAMEK"]
-            self.execute_build_action(button_index, u)
-        else:
-            # MENU GŁÓWNE: ["TRYB MAPY", "ATK", "SPL", "WAIT", "BUILD", "REC"]
-            if button_index == 0:
-                self.handle_tryb_mapy_button()
-                
-            elif button_index == 4: # Przycisk BUILD
-                if has_builder:
-                    self.build_menu_open = True
-                    print(f"Otwarto menu budowania dla {u.type}.")
-                else:
-                    print("Ta jednostka/armia nie posiada Budowniczego!")
-                    
-            elif button_index == 5: # Przycisk REC (możesz tu dać np. ROZFORMOWANIE)
-                self.execute_disband_army(u)
+   
  
     def remove_unit_or_builder(self, army, builder):
         # Jeśli armia to po prostu jeden budowniczy
@@ -1926,7 +1831,7 @@ class World(BuildingsMixin):
 
         # Przycisk RELEASE
         self.release_tower = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)
-        self.draw_button(screen, "RELEASE", self.release_tower)
+        self.renderer.draw_button(screen, "RELEASE", self.release_tower)
 
         
         # Przycisk ZNISZCZ
@@ -1983,18 +1888,18 @@ class World(BuildingsMixin):
 
     def draw_building_footer(self, screen):
         if self.screen == "castle":
-            self.draw_button(screen, "", self.back_button_castle, style="castle")
+            self.renderer.draw_button(screen, "", self.back_button_castle, style="castle")
         else:
-            self.draw_button(screen, "", self.back_button_bldg, style="bldg")
+            self.renderer.draw_button(screen, "", self.back_button_bldg, style="bldg")
 
         if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
-            self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
+            self.renderer.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
         if self.screen == "garrison":                          # ← DODAJ TO
             pass  # przycisk wypuść jest w garrison_gfx.draw()
  
         if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
-            self.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
+            self.renderer.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
 
     def release_selected_units(self, stay_in_menu=True):        
         target = self.selected_castle or getattr(self, 'active_building', None)
@@ -2197,6 +2102,36 @@ class World(BuildingsMixin):
                 if self.map[cy][cx] == "#":
                     return True
         return False
+#DO POPRAWY 
+
+# Dodaj te funkcje do klasy World:
+
+    def is_far_from_enemies(self, unit, min_dist):
+        """Sprawdza, czy w promieniu min_dist nie ma jednostek przeciwnika."""
+        for other in self.units:
+            if other.owner != unit.owner: # To jest wróg
+                # Proste obliczenie dystansu (Euklidesowe lub Manhattan)
+                dist = ((unit.x - other.x)**2 + (unit.y - other.y)**2)**0.5
+                if dist < min_dist:
+                    return False
+        return True
+
+    def has_builder(self, u):
+        """Sprawdza, czy w oddziale/armii jest budowniczy."""
+        if not u: return False
+        if u.type == "BUDOW" or u.type == "Budowniczy":
+            return True
+        if hasattr(u, 'garrison'):
+            return any(slot and (slot.type == "BUDOW" or slot.type == "Budowniczy") for slot in u.garrison)
+        return False
+
+    def handle_tryb_mapy_button(self):
+        """Resetuje interfejs do stanu 'Globus'."""
+        self.selected_unit = None
+        self.selected_castle = None
+        self.build_menu_open = False
+        self.merge_mode = False
+        print("Tryb mapy: Odznaczono wszystko.")
 
     
 

@@ -54,10 +54,11 @@ class Renderer:
             w.draw_trap_popup(screen)
 
         elif w.screen == "castle":
-            w.draw_castle_interface(screen)
-            if getattr(w, "menu_open", False):
-                mx, my = pygame.mouse.get_pos()
-                w.draw_castle_menu(screen, mx, my)
+            if getattr(self.world, 'castle_menu_open', False):
+                self.draw_castle_interface(screen, self.world)
+                if getattr(w, "menu_open", False):
+                    mx, my = pygame.mouse.get_pos()
+                    w.draw_castle_menu(screen, mx, my)
 
         elif b.screen in ("garrison", "Strażnica"):
             if b.selected_castle and getattr(b.selected_castle, 'building_type', "") == "Strażnica":
@@ -151,7 +152,74 @@ class Renderer:
         for y in range(0, SCREEN_HEIGHT + TILE_SIZE, TILE_SIZE):
             pygame.draw.line(screen, (50, 50, 50),
                              (0, y + offset_y), (SCREEN_WIDTH, y + offset_y))
+    
+    def draw_castle_interface(self, screen, world):
+        """Rysuje interfejs zamku. Wywoływane z Renderera, dane pobiera z world."""
+        castle = world.selected_castle
+        if not castle: 
+            return
+        
+        # Pobieramy aktualną pozycję myszy
+        mx, my = pygame.mouse.get_pos()
+
+        # --- WARSTWA 1: DYNAMICZNA GRAFIKA ZAMKU ---
+        # Zmieniamy self na world, bo tam siedzi castle_gfx
+        if hasattr(world, 'castle_gfx'):
+            world.castle_gfx.draw(screen, castle)
+        else:
+            screen.fill((60, 50, 40))
+
+        # --- WARSTWA 3: STAŁY INTERFEJS ---
+        font = pygame.font.SysFont(None, 28)
+        title = font.render(f"{castle.building_type.upper()}", True, (255, 255, 255))
+        screen.blit(title, (40, 40))
+
+        # Przyciski funkcyjne
+        if castle.building_type == "Zamek":
+            # Definiujemy rect (możesz go trzymać w world lub rendererze, tutaj zakładam world)
+            world.peasant_button = pygame.Rect(screen.get_width() - 200, screen.get_height() - 110, 160, 40)
+            # Używamy self.draw_button, bo jesteśmy w Rendererze!
+            self.draw_button(screen, "CHŁOPI", world.peasant_button, (160, 140, 60))
+
+        # Debugowanie masek (world.castle_gfx i flaga z world)
+        if hasattr(world, 'castle_gfx'):
+            world.castle_gfx.draw(screen, castle, debug_mode=getattr(world, 'debug_show_masks', False))
+
+        # --- WARSTWA 4: SYSTEM MENU ---
+        mouse_over_ui = False
+        
+        # Sprawdzamy kolizję z przyciskiem (wszystkie recty są w world)
+        if world.menu_button.collidepoint(mx, my):
+            world.menu_open = True
+            mouse_over_ui = True
+
+        if getattr(world, 'menu_open', False):
+            # Wywołujemy rysowanie menu (zakładam, że draw_castle_menu też jest w Rendererze)
+            self.draw_castle_menu(screen, world, mx, my)
             
+            # Sprawdzamy czy mysz jest nad opcjami menu
+            for rect in world.menu_rects.values():
+                if rect.collidepoint(mx, my): mouse_over_ui = True
+            
+            if getattr(world, 'build_open', False):
+                for rect in world.build_rects.values():
+                    if rect.collidepoint(mx, my): mouse_over_ui = True
+            
+            # Mostek bezpieczeństwa
+            bridge_rect = pygame.Rect(world.menu_button.x - 20, world.menu_button.y, 30, 200)
+            if bridge_rect.collidepoint(mx, my): mouse_over_ui = True
+
+        # Logika zamykania menu (zmienia stan w world)
+        if not mouse_over_ui:
+            world.menu_open = False
+            world.build_open = False
+
+        # Rysujemy sam przycisk MENU
+        self.draw_button(screen, "MENU", world.menu_button)
+
+        # 6. STOPKA (zakładam, że ta funkcja też jest w Rendererze)
+        self.draw_building_footer(screen, world)
+
     def draw_castle(self, screen, castle):
         """Ta funkcja rysuje tylko OBIEKT na mapie świata."""
         # Obliczamy pozycję na ekranie względem kamery
@@ -297,36 +365,84 @@ class Renderer:
         screen.blit(txt_surface, txt_surface.get_rect(center=rect.center))
 
     def draw_bottom_bar(self, screen):
-        # FIX dla NameError: Pobieramy pozycję myszy
+        # 1. Pobieramy pozycję myszy
         mx, my = pygame.mouse.get_pos()
         
-        # PADDING: O ile pikseli zmniejszyć grafikę z każdej strony wewnątrz ramki
-        # Zwiększ tę wartość, jeśli ikony nadal wydają się za duże
-        icon_padding = 14
+        # 2. Pobieramy stan przycisków myszy. 
+        # m_pressed będzie True TYLKO wtedy, gdy lewy przycisk jest w danej chwili TRZYMANY.
+        m_pressed = pygame.mouse.get_pressed()[0] 
+
+        # Decydujemy o zestawie ikon
+        is_building = getattr(self.world, 'build_menu_open', False)
+        current_icons = self.gfx.build_button_images if is_building else self.gfx.button_images
 
         for i, rect in enumerate(self.world.action_buttons):
-            # 1. Rysujemy grafikę przycisku z MapGraphics
-            if i < len(self.gfx.button_images):
-                image = self.gfx.button_images[i]
-                
-                # Obliczamy nową pozycję, aby wyśrodkować ikonę z marginesem
-                # (Zakładamy, że ikona ma 70x70, a rect jest teraz szerszy)
-                icon_x = rect.x + icon_padding
-                icon_y = rect.y + icon_padding
-                
-                # Jeśli rect jest dużo szerszy, możemy chcieć wyśrodkować ikonę:
-                # icon_x = rect.x + (rect.width - 70) // 2
-                
-                # Rysujemy ikonę z przesunięciem (padding)
-                screen.blit(image, (icon_x, icon_y))
+            base_index = i * 2 
             
-       
-
-            # 3. Efekt najechania (podświetlenie krawędzi)
-            if rect.collidepoint(mx, my):
-                pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+            if base_index < len(current_icons):
+                # KLUCZOWA POPRAWKA LOGIKI:
+                # Obrazek wciśnięty (img_index = base_index + 1) rysujemy TYLKO,
+                # gdy mysz jest nad przyciskiem I lewy przycisk jest trzymany.
                 
-            # --- SEKCJA RYSOWANIA TEKSTU ZOSTAŁA USUNIĘTA ---
+                is_hover = rect.collidepoint(mx, my)
+                
+                if is_hover and m_pressed:
+                    img_index = base_index + 1  # Grafika WCIŚNIĘTA (np. 23 dla Zamku)
+                else:
+                    img_index = base_index      # Grafika NORMALNA (np. 22 dla Zamku)
+                
+                # Zabezpieczenie przed wyjściem poza listę (np. gdy brak wciśniętej ramki)
+                if img_index >= len(current_icons):
+                    img_index = base_index
+                
+                image = current_icons[img_index]
+                scaled_img = pygame.transform.scale(image, (rect.width, rect.height))
+                screen.blit(scaled_img, rect.topleft)
+
+    def draw_army_panel(self, screen):
+        u = self.world.selected_unit
+        if not u:
+            return # Nie rysujemy, jeśli nic nie jest wybrane
+
+        # Zbieramy jednostki do jednej listy
+        garrison = getattr(u, 'garrison', [])
+        display_units = [unit for unit in ([u] + garrison) if unit is not None]
+
+        # Pokazujemy panel TYLKO jeśli to armia (minimum 2 oddziały)
+        if len(display_units) >= 2:
+            # Zakładam, że Twoje przyciski akcji zaczynają się od x=800
+            # Więc panel armii zajmuje lewą stronę: od x=0 do x=800, od y=620 w dół
+            panel_rect = pygame.Rect(0, 620, 800, 148) 
+            
+            # 1. Rysowanie drewnianego tła (Kafelkowanie MARKS_S32_35)
+            bg_w = self.gfx.army_panel_bg.get_width()
+            bg_h = self.gfx.army_panel_bg.get_height()
+            
+            for x in range(panel_rect.x, panel_rect.right, bg_w):
+                for y in range(panel_rect.y, panel_rect.bottom, bg_h):
+                    screen.blit(self.gfx.army_panel_bg, (x, y))
+
+            # 2. Rysowanie slotów i ikon jednostek
+            self.world.army_slot_rects = [] # Zapisujemy recty, żeby można było w nie klikać
+            margin_x, margin_y = 20, 20
+            slot_size = 50 # Przykładowy rozmiar ikony jednostki
+            
+            for i, unit in enumerate(display_units):
+                # Obliczanie pozycji (np. w dwóch rzędach, tak jak na zdjęciu)
+                col = i % 10 # Maksymalnie 10 jednostek w rzędzie
+                row = i // 10
+                
+                slot_x = panel_rect.x + margin_x + col * (slot_size + 15)
+                slot_y = panel_rect.y + margin_y + row * (slot_size + 20)
+                
+                slot_rect = pygame.Rect(slot_x, slot_y, slot_size, slot_size)
+                self.world.army_slot_rects.append(slot_rect) # Zapisujemy dla handle_ui_click
+
+                # Tutaj wywołujesz swoją funkcję rysującą ikonkę jednostki
+                # np.: screen.blit(unit.image, (slot_x, slot_y))
+                # Zastąp to tym, czego używasz do rysowania ikonek!
+                pygame.draw.rect(screen, (100, 100, 100), slot_rect, 2) # Pomocnicza ramka                
+
     def draw_unit_info(self, screen):
         # Historyczne informacje o jednostce w koszarach.
         screen.fill((20,20,20))

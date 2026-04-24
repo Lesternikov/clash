@@ -314,79 +314,101 @@ class ControlsHandler:
                 print(f"Budynek '{clicked_id}' nie jest jeszcze zbudowany.")
 
     def handle_ui_click(self, mx, my, button=1):
-        # 1. SPRAWDZANIE GÓRNEGO PASKA
+        # 1. SPRAWDZANIE GÓRNEGO PASKA (System/Mapa/Tura)
         if self.world.show_top_ui:
-            # Dropdowny (System/Mapa)
-            if self.world.handle_dropdown_clicks(mx, my):
-                return True
-            
-            # Przyciski na pasku
+            if self.world.handle_dropdown_clicks(mx, my): return True
             if self.world.top_ui_full_area.collidepoint(mx, my):
-                if self.world.btn_system.collidepoint(mx, my):
-                    self.active_dropdown = "System" if self.active_dropdown != "System" else None
-                elif self.world.btn_mapa.collidepoint(mx, my):
-                    self.active_dropdown = "Mapa" if self.active_dropdown != "Mapa" else None
-                elif self.world.next_turn_button.collidepoint(mx, my):
-                    self.world.next_turn()
+                if self.world.btn_system.collidepoint(mx, my): self.active_dropdown = "System"
+                elif self.world.btn_mapa.collidepoint(mx, my): self.active_dropdown = "Mapa"
+                elif self.world.next_turn_button.collidepoint(mx, my): self.world.next_turn()
                 return True
 
-        # 2. SPRAWDZANIE DOLNEJ STREFY (y >= 610)
-        if my >= 610:
-            u = self.world.selected_unit
-            if not u:
-                return False # Brak jednostki = dół wolny dla mapy
-
-            # --- A. PRZYCISKI AKCJI (zawsze aktywne gdy jednostka wybrana) ---
-            # Sprawdzamy, czy myszka jest DOKŁADNIE nad małym przyciskiem
+       # --- 2. SPRAWDZANIE DOLNEJ STREFY (y >= 620) ---
+        if my >= 610: # Obniżyłem lekko próg, by łapało też ramkę (zgodnie z draw_ui)
+            # --- A. PRZYCISKI AKCJI ---
             for i, rect in enumerate(self.world.action_buttons):
                 if rect.collidepoint(mx, my):
-                    if button == 1: 
-                        self.handle_action_button_click(i)
-                    return True # Kliknąłeś w konkretny przycisk - blokujemy mapę
+                    if button == 1:
+                        # KLUCZOWA ZMIANA:
+                        if getattr(self.world, 'build_menu_open', False):
+                            # Jeśli menu budowy jest otwarte, wykonaj akcję budowy (0-5)
+                            self.world.execute_build_action(i, self.world.selected_unit)
+                        else:
+                            # Standardowe zachowanie (Ruch, Atak, otwarcie menu budowy)
+                            self.handle_action_button_click(i)
+                    return True # Zablokuj mapę pod przyciskiem
 
-            # --- B. PANEL ARMII (Garnizon) ---
-            garrison = getattr(u, 'garrison', [])
-            display_units = [unit for unit in ([u] + garrison) if unit is not None]
+            # --- B. PANEL ARMII (Po lewej stronie) ---
+            u = self.world.selected_unit
+            if u:
+                garrison = getattr(u, 'garrison', [])
+                display_units = [unit for unit in ([u] + garrison) if unit is not None]
 
-            if len(display_units) >= 2:
-                # Jeśli jest armia, wyświetla się duży brązowy panel.
-                # Sprawdzamy sloty jednostek:
-                if hasattr(self, 'army_slot_rects'):
-                    for i, rect in enumerate(self.army_slot_rects):
-                        if rect.collidepoint(mx, my):
-                            if i < len(display_units):
-                                # Logika kliknięcia w jednostkę...
-                                print(f"Kliknięto slot {i}")
-                            return True # Kliknięto w obszar slotu - blokujemy mapę
-                
-                # Jeśli jest armia (panel widoczny), blokujemy CAŁY dół (0 do 1024)
-                # żeby nie klikać mapy pod brązowym tłem panelu.
-                if mx < 1024: 
-                    return True
+                if len(display_units) >= 2:
+                    # Sprawdzamy kliknięcia w konkretne jednostki w armii
+                    if hasattr(self.world, 'army_slot_rects'):
+                        for i, rect in enumerate(self.world.army_slot_rects):
+                            if rect.collidepoint(mx, my):
+                                print(f"Kliknięto jednostkę w armii: {display_units[i].type}")
+                                # Tutaj w przyszłości dodasz kod na WYCIĄGANIE oddziału z armii
+                                # np. self.world.split_army(u, display_units[i])
+                                return True # Zablokuj mapę
+                    
+                    # Jeśli kliknąłeś w drewniane tło panelu (mx < 800), ale nie w jednostkę
+                    if mx < 800: 
+                        return True # Zablokuj mapę pod brązowym panelem
 
-            # --- C. WOLNA STREFA ---
-            # Jeśli jednostka jest sama (len < 2) i NIE kliknąłeś w przycisk akcji,
-            # to pozwalamy na kliknięcie w mapę (np. budowanie drogi na dole).
-            return False
-
-        return False
+        return False # Zezwól na kliknięcie w mapę
     
     def handle_action_button_click(self, index):
-        """Obsługuje kliknięcia w 6 przycisków akcji po prawej stronie panelu."""
+        """Obsługuje kliknięcia w 6 przycisków akcji (0-5)."""
         u = self.world.selected_unit
+
+        # --- KROK 1: PRIORYTET DLA MENU BUDOWANIA ---
+        # Jeśli menu jest otwarte, WSZYSTKIE 6 przycisków przejmuje execute_build_action
+        if getattr(self.world, 'build_menu_open', False):
+            if u: # Budowanie wymaga jednostki
+                self.world.execute_build_action(index, u)
+            return # Ważne: kończymy tutaj, nie sprawdzamy standardowych akcji!
+
+        # --- KROK 2: STANDARDOWE AKCJE (Gdy build_menu_open == False) ---
+        
+        # Indeks 0: Powrót/System
+        if index == 0:
+            self.world.handle_tryb_mapy_button()
+            return
+
+        # Indeksy 1 i 2: Przełączanie jednostek/zamków
+        if index == 1:
+            print("Szukam kolejnego oddziału...")
+            # self.world.select_next_unit()
+            return
+        elif index == 2:
+            print("Szukam kolejnego zamku...")
+            # self.world.select_next_castle()
+            return
+
+        # Pozostałe akcje wymagają zaznaczonej jednostki
         if not u:
             return
 
-        print(f"Kliknięto przycisk akcji nr: {index} dla jednostki {u.type}")
+        if index == 3: # POŁĄCZ
+            self.world.merge_mode = not getattr(self.world, 'merge_mode', False)
+            print(f"Tryb łączenia: {self.world.merge_mode}")
 
-        # Przykładowa logika przycisków (możesz ją dostosować do swoich potrzeb):
-        if index == 0: # Przycisk 1: Buduj (jeśli to budowniczy)
-            if u.type == "BUDOW":
-                self.world.road_build_mode = not getattr(self.world, 'road_build_mode', False)
-                print("Tryb budowy drogi:", self.world.road_build_mode)
-        
-        elif index == 1: # Przycisk 2: Rozwiąż jednostkę / Usuń
-            print("Akcja: Rozwiąż jednostkę (do zaimplementowania)")
-            
-        elif index == 5: # Przycisk 6: Czekaj / Koniec akcji
-            self.world.selected_unit = None
+        elif index == 4: # BUDUJ (Otwieranie menu)
+            if self.world.has_builder(u):
+                self.world.build_menu_open = True
+                print("Otwarto menu budowania.")
+            else:
+                print("Brak budowniczego w oddziale!")
+
+        elif index == 5: # UKRYCIE
+            if u.type == "Generał" or getattr(u, 'level', 0) >= 6:
+                if self.world.is_far_from_enemies(u, 8):
+                    u.is_hidden = True
+                    print(f"Oddział {u.type} został ukryty.")
+                else:
+                    print("Zbyt blisko wroga!")
+            else:
+                print("Wymagany Generał lub 6 lvl.")

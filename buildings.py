@@ -182,14 +182,16 @@ class BuildingsMixin:
     def execute_build_action(self, button_index, army):
         if not army:
             return
-        grid_x, grid_y = army.x, army.y
+        
+        # Konwersja na int, aby uniknąć błędów przy sprawdzaniu mapy
+        grid_x, grid_y = int(army.x), int(army.y)
 
         def get_builder(a):
-            if a.type == "Budowniczy":
+            if getattr(a, 'type', None) == "Budowniczy":
                 return a
             if hasattr(a, 'garrison'):
                 for slot in a.garrison:
-                    if slot and slot.type == "Budowniczy":
+                    if slot and getattr(slot, 'type', None) == "Budowniczy":
                         return slot
             return None
 
@@ -198,37 +200,48 @@ class BuildingsMixin:
             print("Brak Budowniczego w armii!")
             return
 
-        if button_index == 0:           # Droga
+        # --- LOGIKA PRZYCISKÓW ---
+        
+        if button_index == 0:           # 1. Droga (Grafiki 15/16)
             if army.move_points >= 5:
-                self.road_build_mode  = True
-                self.build_menu_open  = False
+                self.road_build_mode = True
+                self.build_menu_open = False
                 print("Tryb budowy drogi.")
             else:
                 print("Za mało punktów ruchu!")
-            return
+            return # Ważne: przerywamy funkcję po wykonaniu akcji
 
-        if button_index == 1:           # Pułapka
-            self.trap_build_mode     = True
-            self.build_menu_open     = False
+        elif button_index == 1:         # 2. Pułapka (Grafiki 17/18)
+            self.trap_build_mode = True
+            self.build_menu_open = False
             self.active_builder_army = army
             self.active_builder_unit = builder
             print("Wybierz pole na pułapkę.")
             return
 
-        if button_index == 2:           # Skarb
+        elif button_index == 2:         # 3. Skarb / Specjalne (Grafiki 19/20)
             if self.map[grid_y][grid_x] == "$":
-                army.owner.gold      += 500
+                army.owner.gold += 500
                 self.map[grid_y][grid_x] = "."
                 self.build_menu_open = False
+                print("Skarb zebrany!")
             return
 
+        # Pozostałe budynki (Indeksy 3, 4, 5)
+        # 3: Strażnica (21/21), 4: Twierdza (21/21), 5: Zamek (22/23)
         menu_to_type = {3: "Strażnica", 4: "Twierdza", 5: "Zamek"}
+        
         if button_index in menu_to_type:
-            self.start_building(grid_x, grid_y,
-                                menu_to_type[button_index], builder)
+            building_type = menu_to_type[button_index]
+            print(f"Próba budowy: {building_type}")
+            
+            # Wywołujemy Twoją funkcję start_building
+            self.start_building(grid_x, grid_y, building_type, builder)
+            
+            # Po zleceniu budowy ZAMYKAMY menu
             self.build_menu_open = False
-            self.selected_unit   = None
-
+            self.selected_unit = None
+            return
     # -------------------------------------------------------
     # RYSOWANIE BUDYNKÓW (teksty opisowe)
     # -------------------------------------------------------
