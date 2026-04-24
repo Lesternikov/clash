@@ -8,15 +8,8 @@ import pygame  # Silnik gry
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
 from court import CourtHandler
 from controls import ControlsHandler
-<<<<<<< HEAD
 
 @property
-=======
-from garrison_graphics import GarrisonGraphics
-from castle_graphics import CastleGraphics
-import map_graphics
-
->>>>>>> b48fa93b1bb99829c564fa06098f3cfc5a364e1e
 def back_button(self):
     if self.screen == "castle":
         return self.back_button_castle
@@ -192,11 +185,7 @@ class World(BuildingsMixin):
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
         # --- DOLNY PANEL AKCJI (MAPA) ---
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
-<<<<<<< HEAD
         self.unit_info_window = UnitInfoWindow()
-=======
-
->>>>>>> b48fa93b1bb99829c564fa06098f3cfc5a364e1e
         self.action_buttons = []
         button_width = 120  # Zwiększone z 70 (wydłużenie w prawo)
         button_height = 60 # Zwiększone z 70 (żeby padding w rendererze ładnie wyglądał)
@@ -792,12 +781,8 @@ class World(BuildingsMixin):
         if "hospital" in built:
             self.renderer.draw_button(screen, "HEAL", self.heal_button, (80, 160, 80))
         if "school" in built:
-<<<<<<< HEAD
             self.renderer.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
         self.renderer.draw_button(screen, "WYPUŚĆ", self.button_send_army, (160, 120, 60))
-=======
-            self.draw_button(screen, "TRAIN", self.train_button, (160, 160, 80))
->>>>>>> b48fa93b1bb99829c564fa06098f3cfc5a364e1e
         self.draw_building_footer(screen)
   
     def draw_castle_on_map(self, screen, castle):
@@ -1911,12 +1896,9 @@ class World(BuildingsMixin):
 
         if self.screen == "garrison":                          # ← DODAJ TO
             pass  # przycisk wypuść jest w garrison_gfx.draw()
-<<<<<<< HEAD
  
         if self.selected_castle and getattr(self.selected_castle, 'building_type', "") == "Strażnica":
             self.renderer.draw_button(screen, "ZBURZ", self.destroy_button, (100, 40, 40))
-=======
->>>>>>> b48fa93b1bb99829c564fa06098f3cfc5a364e1e
 
     def release_selected_units(self, stay_in_menu=True):        
         target = self.selected_castle or getattr(self, 'active_building', None)
