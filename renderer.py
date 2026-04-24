@@ -1,4 +1,4 @@
-import main
+
 import pygame
 import random
 from settings import TERRAIN_TYPES, TILE_SIZE, SCREEN_HEIGHT, SCREEN_WIDTH
