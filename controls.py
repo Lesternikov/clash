@@ -1,7 +1,7 @@
 import pygame
 import sys
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
-import main
+
 
 class ControlsHandler:
     def __init__(self, world_instance):

@@ -1,5 +1,4 @@
 import pygame
-import main
 from settings import UNIT_STATS, UNIT_NAMES
 
 
@@ -224,3 +223,4 @@ class UnitInfoWindow:
             area = pygame.Rect(0, 0, self.sword_full.get_width(), draw_h)
             # Rysujemy w dokładnie tych samych koordynatach X i Y, bez przesunięć w dół
             screen.blit(self.sword_full, (x, y), area)
+

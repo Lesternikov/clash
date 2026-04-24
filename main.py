@@ -60,7 +60,7 @@ while running:
 
     # Rysowanie
     screen.fill((0, 0, 0))
-    renderer.draw(screen)
+    renderer.draw(screen, renderer)
         
     pygame.display.flip()
     clock.tick(30)
