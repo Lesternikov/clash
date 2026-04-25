@@ -206,10 +206,90 @@ class Pathfinder:
 
         for dx, dy, symbol in directions:
             tx, ty = u.x + dx, u.y + dy
-            if w.can_build_road(tx, ty):
+            if self.can_build_road(tx, ty):
                 pos_x = tx * TILE_SIZE - w.camera_x
                 pos_y = ty * TILE_SIZE - w.camera_y
                 rect  = pygame.Rect(pos_x + 4, pos_y + 4, 24, 24)
                 pygame.draw.rect(screen, (200, 200, 200), rect)
                 txt = font.render(symbol, True, (0, 0, 0))
                 screen.blit(txt, (pos_x + 6, pos_y + 4))
+
+    def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
+        """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
+        w = self.world
+        for radius in range(1, 4): # Szuka w promieniu 1, 2, 3 kratek
+            for dy in range(-radius, radius + 1):
+                for dx in range(-radius, radius + 1):
+                    nx, ny = start_x + dx, start_y + dy
+                    if 0 <= ny < len(w.map) and 0 <= nx < len(w.map[0]):
+                        if w.map[ny][nx] in base_terrains:
+                            return w.map[ny][nx]
+        return "." # Domyślna trawa w razie ekstremalnej sytuacji
+      
+    def get_river_direction(self, x, y):
+        w = self.world
+        # Sprawdzamy, z której strony jest najbliższy ląd
+        if y > 0 and w.map[y-1][x] in [".", "p", "B"]: return "UP"
+        if x > 0 and w.map[y][x-1] in [".", "p", "B"]: return "LEFT"
+        if x < len(w.map[0])-1 and w.map[y][x+1] in [".", "p", "B"]: return "RIGHT"
+        if y < len(w.map)-1 and w.map[y+1][x] in [".", "p", "B"]: return "DOWN"
+        return "UP" # Domyślny, jeśli coś pójdzie nie tak
+       
+    def is_near_tile(self, x, y, search_type, check_bg=False):
+        for dy in [-1, 0, 1]:
+            for dx in [-1, 0, 1]:
+                if dx == 0 and dy == 0: continue
+                
+                # Skoro jesteśmy w Pathfinderze, wywołujemy po prostu self!
+                if check_bg:
+                    found_tile = self.get_bg_tile_at(x + dx, y + dy)
+                else:
+                    found_tile = self.get_tile_at(x + dx, y + dy)
+                    
+                if found_tile == search_type:
+                    return True
+        return False
+    
+    def is_area_occupied_by_foundation(self, gx, gy):
+        w = self.world
+        """Zwraca True, jeśli pole gx, gy jest częścią (lub samym) fundamentem #."""
+        check_positions = [
+            (gx, gy),       # Bezpośrednio
+            (gx - 1, gy),   # Lewo
+            (gx, gy - 1),   # Góra
+            (gx - 1, gy - 1)# Skos
+        ]
+        
+        for cx, cy in check_positions:
+            if 0 <= cy < len(w.map) and 0 <= cx < len(w.map[0]):
+                if w.map[cy][cx] == "#":
+                    return True
+        return False
+    
+    def can_build_trap(self, x, y):
+        # gdzie można budować pułapkę
+        if not (0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[0])): return False
+        terrain = self.world.map[y][x]
+        # Blokada: l (las), g (niskie góry), G (wysokie góry), W (woda)
+        if terrain in ["l", "g", "#", "&","S","x","B","b", "G", "W"]: return False
+        # Nie budujemy na budynkach (duże litery) ani innych pułapkach
+        if terrain == "X" or (terrain.isupper() and terrain not in ["P"]): return False
+        return True           
+            
+    def can_build_road(self, x, y):
+        # gdzie można budować drogę
+        if not (0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[0])):
+            return False
+        
+        terrain = self.world.map[y][x]
+        # Lista zakazana według Twoich wytycznych
+        forbidden = ["l", "g", "#", "&", "S", "x", "B", "b", "G", "W"]
+        
+        if terrain in forbidden:
+            return False
+            
+        # Nie budujemy na już istniejącej drodze (chyba że chcesz naprawiać?)
+        if terrain == "_":
+            return False
+            
+        return True

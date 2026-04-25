@@ -91,7 +91,7 @@ class ControlsHandler:
 
         if w.screen == "map":
             if self.handle_ui_click(mx, my): return 
-            w.handle_map_logic_combined(mx, my, button) # Tylko sprawdza pułapki/drogi
+            self.handle_map_logic_combined(mx, my, button) # Tylko sprawdza pułapki/drogi
             # Dodaj to wywołanie ręcznie, bo usunęliśmy je ze świata!
             self.handle_map_click(mx, my, button) 
             return
@@ -369,3 +369,213 @@ class ControlsHandler:
                     print("Zbyt blisko wroga!")
             else:
                 print("Wymagany Generał lub 6 lvl.")
+
+    
+    def handle_camera(self):
+        w = self.world  # Alias dla wygody
+        keys = pygame.key.get_pressed()
+        
+        # --- ZMIANA PRĘDKOŚCI KAMERY ---
+        scroll_speed = 30  # <--- Zmień tę liczbę, aby przyspieszyć/zwolnić (np. 10, 15, 20)
+        
+        # Osobne flagi dla ruchu w poziomie (X) i pionie (Y)
+        moving_x = False
+        moving_y = False
+
+        # === OGRANICZENIA MAPY (GRANICE KAFELKOWE) ===
+        # Zakładamy, że kafelki mają 32x32 piksele
+        TILE_SIZE = 32
+        
+        # Pobieramy prawdziwą wielkość mapy z listy w świecie (np. 100 na 100)
+        if hasattr(w, 'map') and w.map:
+            map_width_tiles = len(w.map[0])
+            map_height_tiles = len(w.map)
+        else:
+            # Awaryjnie, gdyby mapy nie było, ustawiamy sztywny rozmiar
+            map_width_tiles = 100
+            map_height_tiles = 100
+
+        # Pobieramy rozmiar okna dynamicznie
+        screen_w = pygame.display.get_surface().get_width()
+        screen_h = pygame.display.get_surface().get_height()
+
+        # Obliczamy maksymalny wychył kamery. 
+        max_x = (map_width_tiles * TILE_SIZE) - screen_w
+        max_y = (map_height_tiles * TILE_SIZE) - screen_h
+
+        # Zabezpieczenie: nie pozwala kamerze spaść poniżej 0
+        max_x = max(0, max_x)
+        max_y = max(0, max_y)
+
+        # Twarda blokada (Clamp)
+        w.camera_x = max(0, min(w.camera_x, max_x))
+        w.camera_y = max(0, min(w.camera_y, max_y))
+        
+        # --- RUCH W POZIOMIE (Oś X) ---
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            w.camera_x -= scroll_speed
+            moving_x = True
+        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            w.camera_x += scroll_speed
+            moving_x = True
+
+        # --- RUCH W PIONIE (Oś Y) ---
+        if keys[pygame.K_UP] or keys[pygame.K_w]:
+            w.camera_y -= scroll_speed
+            moving_y = True
+        elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            w.camera_y += scroll_speed
+            moving_y = True
+
+        # === NIEZALEŻNE DOCIĄGANIE (Snapping) ===
+        # Puszczasz klawisze lewo/prawo? Wyrównujemy tylko oś X!
+        if not moving_x:
+            w.camera_x = round(w.camera_x / TILE_SIZE) * TILE_SIZE
+            
+        # Puszczasz klawisze góra/dół? Wyrównujemy tylko oś Y!
+        if not moving_y:
+            w.camera_y = round(w.camera_y / TILE_SIZE) * TILE_SIZE
+
+        # Ponowne, ostateczne ograniczenie mapy (aby uniknąć wyjazdu za krawędź po dociągnięciu)
+        w.camera_x = max(0, min(w.camera_x, max_x))
+        w.camera_y = max(0, min(w.camera_y, max_y))
+
+    def handle_map_logic_combined(self, mx, my, button):
+        # --- NOWOŚĆ: Jeśli to prawy klik, nie rób nic więcej na mapie ---
+        # Podgląd został już ustawiony w handle_events, 
+        # więc tutaj przerywamy, żeby nie wywołać ruchu/odznaczenia.
+        if button == 3:
+            return
+        # specjalne zdolności budowniczego
+        gx = (mx + self.world.camera_x) // TILE_SIZE
+        gy = (my + self.world.camera_y) // TILE_SIZE
+
+        # 1. Tryby specjalne (Budowa dróg / pułapek)
+        if getattr(self.world, 'trap_build_mode', False):
+            self.world.execute_trap_build(gx, gy) # <--- POPRAWIONE
+            return
+        
+        if getattr(self.world, 'road_build_mode', False):
+            self.world.execute_road_build(gx, gy) # <--- POPRAWIONE
+            return
+
+        # 2. Kliknięcie w interaktywne obiekty mapy (Pułapka X)
+        if self.world.map[gy][gx] == "X":
+            self.world.screen = "trap_info"
+            self.world.active_trap_pos = (gx, gy) # <--- PEŁNA NAZWA ZMIENNEJ   
+            
+    def handle_tryb_mapy_button(self):
+        """Wyłącza zaznaczenie jednostki, pozwalając na klikanie w zamki."""
+        self.world.selected_unit = None
+        self.world.selected_castle = None
+        print("Tryb mapy: Odznaczono jednostki.") 
+    
+    
+    def handle_dropdown_clicks(self, mx, my):
+        #tu jest dokłana obsługa
+        # def execute_menu_command(self, menu, index):
+        # Sprawdzamy menu System
+        #if menu == "System":
+         #   if index == 5:  # "Koniec" (szósta opcja, więc indeks 5)
+          #      print("Zamykanie gry...")
+           #     pygame.quit()
+            #    import sys
+             #   sys.exit()
+                
+           # elif index == 2: # Zapisz grę
+            #    print("Zapisywanie stanu gry...")
+                # Tutaj w przyszłości dodasz self.world.save_game()
+                    
+        # Sprawdzamy menu Mapa
+       # elif menu == "Mapa":
+        #    opcja = self.world.menu_options['Mapa'][index]
+         #   print(f"Wybrano opcję mapy: {opcja}")
+            
+          #  if index == 3: # "Nic"
+           #     print("Ukrywam elementy mapy...")
+
+        """Obsługuje kliknięcia wewnątrz rozwiniętych list System i Mapa."""
+        if not self.world.active_dropdown:
+            return False
+
+        # Pobieramy przyciski dla aktualnie otwartego menu
+        buttons_to_check = {}
+        if self.world.active_dropdown == "System":
+            buttons_to_check = getattr(self.world, 'system_buttons', {})
+        elif self.world.active_dropdown == "Mapa":
+            buttons_to_check = getattr(self.world, 'mapa_buttons', {})
+
+        # Sprawdzamy kolizję dla każdej opcji w słowniku
+        for name, rect in buttons_to_check.items():
+            if rect.collidepoint(mx, my):
+                print(f"DEBUG {self.world.active_dropdown}: Wybrano opcję -> {name}")
+                
+                # Tymczasowe zamykanie gry dla testów
+                pygame.quit()
+                import sys
+                sys.exit()
+                return True
+                        
+        return False
+ 
+                           
+    def handle_castle_entry(self, mx, my):
+        """Sprawdza kliknięcie w budynki na mapie. Zwraca True, jeśli wejdzie do środka."""
+        for castle in self.world.castles:
+            # POBIERAMY TYP: Jeśli to Strażnica, obszar to 1x1, inaczej 2x2
+            b_type = str(castle.building_type).strip()
+            size = TILE_SIZE if b_type == "Strażnica" else TILE_SIZE * 2
+            
+            # Tworzymy prostokąt kolizji o odpowiednim rozmiarze
+            rect = pygame.Rect(
+                (castle.x * TILE_SIZE) - self.world.camera_x, 
+                (castle.y * TILE_SIZE) - self.world.camera_y, 
+                size, size
+            )
+            
+            if rect.collidepoint(mx, my) and not getattr(castle, 'destroyed', False):
+                self.world.selected_castle = castle
+                self.world.selected_unit = None
+                # Wybór odpowiedniego ekranu
+                self.world.screen = "Strażnica" if b_type == "Strażnica" else "castle"
+                print(f"Wejście do: {b_type} na {castle.x},{castle.y}")
+                return True
+        return False
+   
+    def check_unit_info(self, mx, my):
+        self.world.inspected_unit = None # Reset na start
+        
+        # 1. Najpierw sprawdź garnizon (jeśli jesteś w zamku)
+        if self.world.screen == "garrison":
+            castle = self.world.selected_castle
+            if castle:
+                start_x, start_y = 100, 120
+                offset_x, offset_y = 130, 210
+                col = (mx - start_x) // offset_x
+                row = (my - start_y) // offset_y
+                if 0 <= col < 6 and 0 <= row < 2:
+                    idx = row * 6 + col
+                    if idx < len(castle.garrison):
+                        self.world.inspected_unit = castle.garrison[idx]
+
+        # 2. Jeśli nie garnizon, sprawdź mapę
+        if not self.world.inspected_unit:
+            self.world.inspected_unit = self.world.find_unit_at(mx, my)
+
+        # 3. Jeśli coś znalazłeś, ustal tryb
+        if self.world.inspected_unit:
+            if self.world.inspected_unit.type_code in ["GOLD", "PEAS", "SPECK", "SPECM"]:
+                self.world.info_mode = "SIMPLE"
+            else:
+                self.world.info_mode = "COMBAT"
+
+    
+    def handle_tryb_mapy_button(self):
+        """Resetuje interfejs do stanu 'Globus'."""
+        self.world.selected_unit = None
+        self.world.selected_castle = None
+        self.world.build_menu_open = False
+        self.world.merge_mode = False
+        print("Tryb mapy: Odznaczono wszystko.")
+    
+    

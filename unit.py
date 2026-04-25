@@ -1,7 +1,7 @@
 import pygame
 import os
 from settings import UNIT_STATS, UNIT_NAMES, COLOR_TO_ID
-
+        
 class Unit:
     def __init__(self, type_code, x, y, owner, level=1):
         # type_code musi być kodem (np. "INFL", "BUDOW")
@@ -20,9 +20,13 @@ class Unit:
         self.owner = owner
         self.level = level
 
-        from settings import UNIT_NAMES, UNIT_STATS
-        # Pobieramy pełną nazwę
-        self.type = UNIT_NAMES.get(type_code, "Nieznany")
+        # Jeśli type_code to już jest pełna nazwa (przychodzi z produkcji w zamku)
+        if type_code in UNIT_STATS:
+            self.type = type_code
+        else:
+            # Jeśli type_code to 3-literowy kod (przychodzi z ładowania mapy)
+            self.type = UNIT_NAMES.get(type_code, "Nieznany")
+            
         self.name = self.type
 
         # Statystyki

@@ -14,7 +14,7 @@ clock = pygame.time.Clock()
 if __name__ == "__main__":
     # cała logika startowa tutaj
     pygame.init()
-    screen = pygame.display.set_mode((1280, 800))
+    screen = pygame.display.set_mode((1026, 766))
     # itd.
 
 # --- INICJALIZACJA GRY ---
@@ -57,8 +57,7 @@ while running:
     # Wykonają się dokładnie JEDEN RAZ na klatkę obrazu.
     # =========================================================
     controls.handle_events(events) 
-    world.handle_camera()
-
+    controls.handle_camera()
     # Rysowanie
     screen.fill((0, 0, 0))
     renderer.draw(screen)

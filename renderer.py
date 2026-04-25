@@ -1,4 +1,4 @@
-
+import main
 import pygame
 import random
 from settings import TERRAIN_TYPES, TILE_SIZE, SCREEN_HEIGHT, SCREEN_WIDTH
@@ -49,29 +49,29 @@ class Renderer:
         elif w.screen == "trap_info":
             self.draw_top_bar(screen)
             self.draw_ui(screen)
-            w.draw_trap_popup(screen)
+            self.draw_trap_popup(screen)
 
         elif w.screen == "castle":
             self.draw_castle_interface(screen, self.world)
             if getattr(w, "menu_open", False):
                 mx, my = pygame.mouse.get_pos()
-                w.draw_castle_menu(screen, mx, my)
+                self.draw_castle_menu(screen, mx, my)
 
         # --- TUTAJ BYŁ BŁĄD. Zmienione wszystkie "b" na "w" ---
         elif w.screen in ("garrison", "Strażnica"):
             if w.selected_castle and getattr(w.selected_castle, 'building_type', "") == "Strażnica":
-                w.draw_garrison_only(screen)
+                self.draw_garrison_only(screen)
             else:
-                w.draw_garrison(screen)
+                self.draw_garrison(screen)
 
         elif w.screen == "recruitment":
-            w.draw_recruitment(screen)
+            self.draw_recruitment(screen)
 
         elif w.screen == "court":
             w.court.draw_court(screen)
 
         elif w.screen == "peasants":
-            w.draw_peasants(screen)
+            self.draw_peasants(screen)
 
         elif w.screen in ["forge", "workshop", "hospital", "school"]:
             draw_func = getattr(w, f"draw_{w.screen}", None)
@@ -79,17 +79,17 @@ class Renderer:
                 draw_func(screen)
 
         elif w.screen == "unit_info":
-            w.draw_unit_info(screen, w)
+            self.draw_unit_info(screen, w)
 
         # Nakładka statystyk jednostki
         if getattr(w, 'inspected_unit', None):
             stats_x = 300 if w.screen == "garrison" else 150
             stats_y = 380 if w.screen == "garrison" else 200
-            w.draw_unit_stats_table(screen, stats_x, stats_y,
+            self.draw_unit_stats_table(screen, stats_x, stats_y,
                                     w.inspected_unit.type, w.inspected_unit)
 
         if getattr(w, "demolish_confirm", False):
-            w.draw_demolish_confirm(screen)
+            self.draw_demolish_confirm(screen)
 
     def draw_map(self, screen):
         w = self.world
@@ -102,7 +102,7 @@ class Renderer:
 
         # Zamki
         for castle in w.castles:
-            w.draw_castle_on_map(screen, castle)
+            self.draw_castle_on_map(screen, castle)
 
         # Jednostki
         unit_font = pygame.font.SysFont(None, 24)
@@ -136,7 +136,7 @@ class Renderer:
 
         # Podgląd zasięgu pułapki
         if getattr(w, 'trap_build_mode', False):
-            w.draw_build_system(screen)
+            self.draw_build_system(screen)
 
         random.seed()
 
@@ -193,7 +193,7 @@ class Renderer:
 
         if getattr(world, 'menu_open', False):
             # Wywołujemy rysowanie menu (zakładam, że draw_castle_menu też jest w Rendererze)
-            world.draw_castle_menu(screen, mx, my)
+            self.draw_castle_menu(screen, mx, my)
             
             # Sprawdzamy czy mysz jest nad opcjami menu
             for rect in world.menu_rects.values():
@@ -216,7 +216,7 @@ class Renderer:
         self.draw_button(screen, "MENU", world.menu_button)
 
         # 6. STOPKA (zakładam, że ta funkcja też jest w Rendererze)
-        world.draw_building_footer(screen)
+        self.draw_building_footer(screen)
 
     def draw_castle(self, screen, castle):
         """Ta funkcja rysuje tylko OBIEKT na mapie świata."""
@@ -561,3 +561,471 @@ class Renderer:
         # Informacja o powrocie na dole ekranu
         info = font_text.render("Kliknij dowolny klawisz lub przycisk myszy, aby wrócić", True, (120, 120, 120))
         screen.blit(info, (120, screen.get_height() - 80))
+    
+    def draw_garrison(self, screen):
+        w = self.world
+        castle = w.selected_castle
+        if not castle: return
+
+        slot_rects = w.garrison_gfx.draw(
+            screen, castle,
+            w.selected_units,
+            w.inspected_unit
+        )
+        # Zapisujemy recty do świata
+        w.garrison_slot_rects = slot_rects
+
+        # Przyciski funkcyjne
+        built = [b.lower() for b in castle.buildings]
+        if "koszary" in built:
+            self.draw_button(screen, "RECRUIT", w.recruit_button, (240, 120, 20))
+        if "hospital" in built:
+            self.draw_button(screen, "HEAL", w.heal_button, (80, 160, 80))
+        if "school" in built:
+            self.draw_button(screen, "TRAIN", w.train_button, (160, 160, 80))
+            
+        self.draw_button(screen, "WYPUŚĆ", w.button_send_army, (160, 120, 60))
+        self.draw_building_footer(screen)
+  
+    def draw_castle_on_map(self, screen, castle):
+        w = self.world
+        TILE_SIZE = 32
+        px = int(castle.x * TILE_SIZE) - w.camera_x
+        py = int(castle.y * TILE_SIZE) - w.camera_y
+        
+        # Optymalizacja
+        screen_w, screen_h = screen.get_size()
+        if px < -100 or px > screen_w + 100 or py < -100 or py > screen_h + 100:
+            return
+
+        is_tower = getattr(castle, 'building_type', 'Zamek') == "Strażnica"
+        
+        if getattr(castle, 'destroyed', False):
+            s_idx = 4
+        elif getattr(castle, 'under_construction', False):
+            s_idx = 0 
+        else:
+            s_idx = 3 
+
+        if is_tower:
+            img = w.tower_tiles.get(s_idx)
+            if img:
+                screen.blit(img, (px, py))
+        else:
+            tiles = w.castle_tiles.get(s_idx, [])
+            if len(tiles) == 4:
+                offsets = [(0,0), (1,0), (0,1), (1,1)]
+                for i in range(4):
+                    dx, dy = offsets[i]
+                    screen.blit(tiles[i], (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
+ 
+    def draw_recruitment(self, screen):
+        w = self.world
+        screen_w, screen_h = screen.get_size()
+        
+        # Tło
+        if getattr(w, 'bg_recruitment', None):
+            screen.blit(w.bg_recruitment, (0, 0))
+        else:
+            screen.fill((60, 50, 40)) 
+            
+        font = pygame.font.SysFont(None, 24)
+        castle = w.selected_castle
+        if not castle: return
+
+        from settings import UNIT_STATS # Upewnij się, że zaimportowałeś to na górze pliku
+        all_units = list(UNIT_STATS.keys())
+        unit_types = [u for u in all_units if w.castle_has_patent(castle, u) or castle.is_patent_available(u)]
+        w.recruitment_unit_types = unit_types
+
+        w.patent_rects = [] 
+        for i in range(12):
+            x = screen_w - 300 + (i % 4) * 60
+            y = 30 + (i // 4) * 90 + 50
+            rect = pygame.Rect(x, y, 50, 80)
+            w.patent_rects.append(rect) 
+            pygame.draw.rect(screen, (40, 30, 20), rect) 
+            r_color = (255, 255, 0) if w.selected_patent_index == i else (100, 100, 100)
+            pygame.draw.rect(screen, r_color, rect, 2 if w.selected_patent_index == i else 1)
+
+            if i < len(castle.patents) and castle.patents[i] is not None:
+                p = castle.patents[i]
+                name = p["unit_type"] if isinstance(p, dict) else p
+                screen.blit(font.render(name[:5], True, (255, 255, 0)), (x + 2, y + 30))
+
+        can_start = False
+        if w.selected_patent_index is not None:
+            if w.selected_patent_index < len(castle.patents) and castle.patents[w.selected_patent_index] is not None:
+                can_start = True
+
+        for btn, col in [(w.info_button, (120,120,120)), 
+                        (w.buy_patent_button, (80,140,80)), (w.remove_patent_button, (120,80,80)),
+                        (w.stop_prod_button, (140,80,80))]:
+            pygame.draw.rect(screen, col, btn)
+        
+        pygame.draw.rect(screen, (80, 140, 80) if can_start else (60, 60, 60), w.start_prod_button)
+        self.draw_building_footer(screen)
+        
+        screen.blit(font.render("INFO", True, (255, 255, 255)), (150, 595))
+        screen.blit(font.render("KUP PATENT", True, (255, 255, 255)), (170, 635))
+        screen.blit(font.render("USUŃ", True, (255, 255, 255)), (screen_w - 210, 595))
+        screen.blit(font.render("START", True, (255, 255, 255) if can_start else (120, 120, 120)), (screen_w - 270, 635))
+        screen.blit(font.render("STOP", True, (255, 255, 255)), (screen_w - 130, 635))
+
+        if castle.production_enabled and castle.production_unit_type:
+            p_text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
+            p_color = (0, 255, 0)
+        else:
+            p_text = "Produkcja nieaktywna"
+            p_color = (200, 200, 200)
+        screen.blit(font.render(p_text, True, p_color), (screen_w - 300, 380))
+
+        w.unit_list_rects = [] 
+        start_x, start_y, box_w, box_h, gap = 30, 80, 220, 30, 2
+        center_index = 2
+
+        for i in range(5):
+            scroll_index = w.recruitment_scroll + i
+            if 0 <= scroll_index < len(unit_types):
+                unit_name = unit_types[scroll_index]
+                rect = pygame.Rect(start_x, start_y + i * (box_h + gap), box_w, box_h)
+                w.unit_list_rects.append(rect) 
+                
+                has_p = w.castle_has_patent(castle, unit_name)
+                t_col = (255, 255, 255) if i == center_index else ((90, 90, 90) if has_p else (180, 180, 180))
+                
+                pygame.draw.rect(screen, (30, 30, 30), rect)
+                screen.blit(font.render(unit_name, True, t_col), (rect.x + 10, rect.y + 8))
+
+        center_index = 2
+        idx_on_center = w.recruitment_scroll + center_index
+
+        if 0 <= idx_on_center < len(unit_types):
+            unit_to_show = unit_types[idx_on_center]
+            stats = UNIT_STATS.get(unit_to_show, {}) 
+            self.draw_unit_stats_table(screen, 20, 250, unit_to_show, stats)
+
+            if stats:
+                cost_rect = pygame.Rect(20, 480, 450, 50)
+                pygame.draw.rect(screen, (0, 30, 0), cost_rect) 
+                pygame.draw.rect(screen, (200, 180, 100), cost_rect, 5)
+
+                pygame.draw.line(screen, (200, 180, 100), (cost_rect.x + 150, cost_rect.y), (cost_rect.x + 150, cost_rect.bottom), 2)
+                pygame.draw.line(screen, (200, 180, 100), (cost_rect.x + 300, cost_rect.y), (cost_rect.x + 300, cost_rect.bottom), 2)
+
+                p_cost = stats.get('patent_cost', 0)
+                m_cost = stats.get('production_cost', 0)
+                time = stats.get('production_time', 0)
+
+                screen.blit(font.render(f"Patent: {p_cost}", True, (255, 255, 0)), (cost_rect.x + 10, cost_rect.y + 15))
+                screen.blit(font.render(f"Prod: {m_cost}", True, (255, 255, 0)), (cost_rect.x + 160, cost_rect.y + 15))
+                screen.blit(font.render(f"Tury: {time}", True, (255, 255, 0)), (cost_rect.x + 310, cost_rect.y + 15))
+                
+                panel_rect = pygame.Rect(470, 620, 120, 60)
+                pygame.draw.rect(screen, (40, 30, 25), panel_rect) 
+                pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3)
+
+        screen.blit(font.render(f"Gold: {castle.gold}", True, (255, 215, 0)), (screen_w // 2 - 30, 640))
+        
+        pygame.draw.rect(screen, (100, 100, 100), w.scroll_up_button)
+        pygame.draw.rect(screen, (100, 100, 100), w.scroll_down_button)
+        screen.blit(font.render("▲", True, (255, 255, 255)), (w.scroll_up_button.x + 12, w.scroll_up_button.y + 8))
+        screen.blit(font.render("▼", True, (255, 255, 255)), (w.scroll_down_button.x + 12, w.scroll_down_button.y + 8))
+        
+    def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
+        w = self.world
+        if not stats_source:
+            return
+
+        u_type = getattr(stats_source, 'type_code', None)
+        if not u_type and isinstance(stats_source, dict):
+            u_type = stats_source.get('type_code') 
+
+        mode = "COMBAT"
+        if u_type in ["GOLD", "PEAS", "SPECK", "SPECM"]:
+            mode = "SIMPLE"
+
+        w.unit_info_window.draw(screen, x, y, stats_source, mode)
+                
+    def draw_peasants(self, screen):
+        w = self.world
+        font = pygame.font.SysFont(None, 24)
+
+        castle = w.selected_castle
+        if not castle:
+            return
+
+        screen_w = screen.get_width()
+        screen_h = screen.get_height()
+
+        happiness_factor = 0.5 + (castle.happiness / 100) * 0.5
+        tax_income = int(castle.peasants * 0.1 * castle.tax_rate * happiness_factor)
+
+        screen.blit(font.render(f"Peasants: {castle.peasants}", True, (255,255,255)), (screen_w//2 - 60, 20))
+        screen.blit(font.render(f"Happiness: {castle.happiness}%", True, (200,255,200)), (screen_w//2 - 70, 45))
+        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)), (screen_w - 120, 20))
+
+        screen.blit(font.render("TAX", True, (255,255,255)), (60, screen_h//2 - 80))
+        screen.blit(font.render(f"{castle.tax_rate:.1f}", True, (255,255,255)), (70, screen_h//2 - 20))
+        screen.blit(font.render(f"+{tax_income}/turn", True, (255,255,0)), (40, screen_h//2 + 10))
+
+        w.tax_minus_button.topleft = (20, screen_h//2 - 40)
+        w.tax_plus_button.topleft = (140, screen_h//2 - 40)
+
+        pygame.draw.rect(screen, (120,120,120), w.tax_minus_button)
+        pygame.draw.rect(screen, (120,120,120), w.tax_plus_button)
+
+        screen.blit(font.render("-", True, (0,0,0)), w.tax_minus_button.move(12,5))
+        screen.blit(font.render("+", True, (0,0,0)), w.tax_plus_button.move(12,5))
+
+        panel_rect = pygame.Rect(screen_w//2 - 150, screen_h//2 - 60, 300, 120)
+        pygame.draw.rect(screen, (70,50,40), panel_rect)
+
+        owned = [c for c in w.castles if c.owner == w.players[w.current_player] and not getattr(c, 'destroyed', False)]
+        visible = owned[w.castle_list_offset : w.castle_list_offset+3]
+
+        for i, c in enumerate(visible):
+            txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
+            screen.blit(font.render(txt, True, (255,255,255)), (screen_w//2 - 130, screen_h//2 - 40 + i*30))
+
+        w.castle_up_button.topleft = (screen_w//2 + 160, screen_h//2 - 60)
+        w.castle_down_button.topleft = (screen_w//2 + 160, screen_h//2)
+
+        pygame.draw.rect(screen,(120,120,120),w.castle_up_button)
+        pygame.draw.rect(screen,(120,120,120),w.castle_down_button)
+
+        screen.blit(font.render("^",True,(255,255,255)), w.castle_up_button.move(12,5))
+        screen.blit(font.render("v",True,(255,255,255)), w.castle_down_button.move(12,5))
+
+        w.peasants_minus_button.topleft = (screen_w - 180, screen_h//2 - 40)
+        w.peasants_plus_button.topleft = (screen_w - 140, screen_h//2 - 40)
+
+        w.gold_minus_button.topleft = (screen_w - 180, screen_h//2 + 10)
+        w.gold_plus_button.topleft = (screen_w - 140, screen_h//2 + 10)
+
+        w.send_button.center = (screen_w - 120, screen_h//2 + 80)
+
+        pygame.draw.rect(screen, (120,120,120), w.peasants_minus_button)
+        pygame.draw.rect(screen, (120,120,120), w.peasants_plus_button)
+        pygame.draw.rect(screen, (120,120,120), w.gold_minus_button)
+        pygame.draw.rect(screen, (120,120,120), w.gold_plus_button)
+        pygame.draw.rect(screen, (80,140,80), w.send_button)
+
+        screen.blit(font.render("-", True, (0,0,0)), w.peasants_minus_button.move(12,5))
+        screen.blit(font.render("+", True, (0,0,0)), w.peasants_plus_button.move(12,5))
+        screen.blit(font.render("-", True, (0,0,0)), w.gold_minus_button.move(12,5))
+        screen.blit(font.render("+", True, (0,0,0)), w.gold_plus_button.move(12,5))
+        screen.blit(font.render("SEND", True, (255,255,255)), w.send_button.move(30,10))
+        screen.blit(font.render(f"P: {w.send_peasants_amount}", True, (255,255,255)), (screen_w-120, screen_h//2 - 60))
+        screen.blit(font.render(f"G: {w.send_gold_amount}", True, (255,255,0)), (screen_w-120, screen_h//2 - 15))
+
+        self.draw_building_footer(screen)
+
+    def draw_demolish_confirm(self, screen):
+        w = self.world
+        font = pygame.font.SysFont(None, 28)
+        win_w, win_h = 320, 160
+        win_x = (screen.get_width() // 2) - (win_w // 2)
+        win_y = (screen.get_height() // 2) - (win_h // 2)
+        
+        rect = pygame.Rect(win_x, win_y, win_w, win_h)
+        pygame.draw.rect(screen, (40, 40, 40), rect) 
+        pygame.draw.rect(screen, (255, 0, 0), rect, 2) 
+
+        text = font.render("Zburzyć ten zamek?", True, (255, 255, 255))
+        screen.blit(text, (win_x + 60, win_y + 30))
+
+        w.demolish_yes = pygame.Rect(win_x + 40, win_y + 90, 100, 40)
+        w.demolish_no = pygame.Rect(win_x + 180, win_y + 90, 100, 40)
+
+        pygame.draw.rect(screen, (0, 150, 0), w.demolish_yes) 
+        pygame.draw.rect(screen, (150, 0, 0), w.demolish_no)  
+
+        screen.blit(font.render("TAK", True, (255,255,255)), (win_x + 70, win_y + 100))
+        screen.blit(font.render("NIE", True, (255,255,255)), (win_x + 210, win_y + 100))
+        
+    def draw_castle_menu(self, screen, mx, my):
+        w = self.world
+        if w.screen != "castle":
+            return 
+
+        options = ["Buduj", "ZBURZ ZAMEK", "ROZBUDUJ MURY"]
+        w.menu_rects.clear()
+
+        menu_w, menu_h = 180, 35
+        menu_x = w.menu_button.x
+        menu_y = w.menu_button.y + 40
+
+        for i, opt in enumerate(options):
+            rect = pygame.Rect(menu_x, menu_y + i * menu_h, menu_w, menu_h)
+            self.draw_button(screen, opt, rect)
+            w.menu_rects[opt] = rect
+
+        w.demolish_button = w.menu_rects.get("ZBURZ ZAMEK")
+        w.wall_button = w.menu_rects.get("ROZBUDUJ MURY")
+
+        buduj_rect = w.menu_rects.get("Buduj")
+        if not buduj_rect: return
+        
+        safe_zone_to_submenu = pygame.Rect(menu_x - 165, menu_y, 170, 200)
+
+        if buduj_rect.collidepoint(mx, my) or (getattr(w, "build_open", False) and safe_zone_to_submenu.collidepoint(mx, my)):
+            w.build_open = True
+            self.draw_build_submenu(screen, menu_x, menu_y)
+        else:
+            if mx > menu_x: 
+                w.build_open = False
+        
+    def draw_build_submenu(self, screen, menu_x, menu_y):
+        w = self.world
+        castle = w.selected_castle
+        if not castle: return
+
+        sub_w, sub_h = 160, 40 
+        sub_x = menu_x - sub_w
+        sub_y = menu_y
+
+        buildings = ["hospital", "school", "koszary", "forge", "workshop"]
+        w.build_rects.clear()
+
+        for i, b in enumerate(buildings):
+            rect = pygame.Rect(sub_x, sub_y + i * sub_h, sub_w, sub_h)
+            is_built = b in castle.buildings
+            
+            if is_built:
+                pygame.draw.rect(screen, (50, 50, 50), rect) 
+                pygame.draw.rect(screen, (80, 80, 80), rect, 1) 
+                small_font = pygame.font.SysFont(None, 20)
+                txt_surf = small_font.render(b, True, (100, 100, 100)) 
+                screen.blit(txt_surf, txt_surf.get_rect(center=rect.center))
+            else:
+                self.draw_button(screen, b, rect)
+
+            w.build_rects[b] = rect
+    
+    def draw_trap_popup(self, screen):
+        w = self.world
+        font = getattr(self, 'font', pygame.font.SysFont(None, 32))
+        
+        screen_w, screen_h = screen.get_size()
+        box_w, box_h = 300, 200
+        x = (screen_w - box_w) // 2
+        y = (screen_h - box_h) // 2
+        
+        popup_rect = pygame.Rect(x, y, box_w, box_h)
+        
+        pygame.draw.rect(screen, (50, 50, 50), popup_rect) 
+        pygame.draw.rect(screen, (255, 255, 255), popup_rect, 3) 
+        
+        title = font.render("PUŁAPKA", True, (255, 255, 255))
+        screen.blit(title, (popup_rect.centerx - title.get_width()//2, popup_rect.y + 20))
+        
+        w.btn_trap_stop = pygame.Rect(x + 20, y + 100, 110, 50)
+        w.btn_trap_dalej = pygame.Rect(x + 170, y + 100, 110, 50)
+        
+        pygame.draw.rect(screen, (150, 0, 0), w.btn_trap_stop) 
+        pygame.draw.rect(screen, (0, 150, 0), w.btn_trap_dalej) 
+        
+        stop_txt = font.render("STOP", True, (255, 255, 255))
+        dalej_txt = font.render("DALEJ", True, (255, 255, 255))
+        
+        screen.blit(stop_txt, (w.btn_trap_stop.centerx - stop_txt.get_width()//2, w.btn_trap_stop.centery - stop_txt.get_height()//2))
+        screen.blit(dalej_txt, (w.btn_trap_dalej.centerx - dalej_txt.get_width()//2, w.btn_trap_dalej.centery - dalej_txt.get_height()//2))
+    
+    def draw_garrison_only(self, screen):
+        w = self.world
+        castle = w.selected_castle
+        if not castle:
+            w.screen = "map" 
+            return
+
+        screen.fill((30, 30, 35)) 
+        font = pygame.font.SysFont(None, 32)
+        
+        title = font.render(f"GARNIZON: {castle.building_type.upper()}", True, (200, 200, 200))
+        screen.blit(title, (screen.get_width()//2 - title.get_width()//2, 50))
+
+        start_x = 150
+        start_y = 200
+        gap = 20
+        slot_size = 120
+
+        for i in range(10): 
+            col = i % 5
+            row = i // 5
+            slot_rect = pygame.Rect(150 + col * 140, 200 + row * 140, 120, 120)
+            
+            pygame.draw.rect(screen, (50, 50, 60), slot_rect)
+            pygame.draw.rect(screen, (100, 100, 120), slot_rect, 2)
+            
+            if i < len(castle.garrison) and castle.garrison[i]:
+                unit = castle.garrison[i]
+                u_txt = font.render(unit.type[:5], True, (255, 255, 255))
+                screen.blit(u_txt, (slot_rect.centerx - u_txt.get_width()//2, 
+                                    slot_rect.centery - u_txt.get_height()//2))
+
+                if unit in w.selected_units:
+                    pygame.draw.rect(screen, (0, 255, 0), slot_rect, 4) 
+
+        self.draw_building_footer(screen)
+
+        w.release_tower = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)
+        self.draw_button(screen, "RELEASE", w.release_tower)
+        
+        w.destroy_button = pygame.Rect(screen.get_width()//2 + 90, 650, 160, 45)
+        pygame.draw.rect(screen, (150, 0, 0), w.destroy_button)
+        txt = font.render("ZNISZCZ", True, (255, 255, 255))
+        screen.blit(txt, (w.destroy_button.centerx - txt.get_width()//2, 
+                          w.destroy_button.centery - txt.get_height()//2))
+
+    def draw_building_footer(self, screen):
+        w = self.world
+        if w.screen == "castle":
+            self.draw_button(screen, "", w.back_button_castle, style="castle")
+        else:
+            self.draw_button(screen, "", w.back_button_bldg, style="bldg")
+
+        if w.selected_castle and getattr(w.selected_castle, 'building_type', "") == "Strażnica":
+            self.draw_button(screen, "ZBURZ", w.destroy_button, (100, 40, 40))
+
+        if w.screen == "garrison":                         
+            pass  
+
+    def draw_build_system(self, screen):
+        w = self.world
+        if w.selected_unit and w.selected_unit.type == "Budowniczy":
+            if hasattr(self, 'draw_grid_lines'):
+                self.draw_grid_lines(screen)
+            
+            mx, my = pygame.mouse.get_pos()
+            TILE_SIZE = 32
+            gx = (mx + w.camera_x) // TILE_SIZE
+            gy = (my + w.camera_y) // TILE_SIZE
+            
+            draw_x = gx * TILE_SIZE - w.camera_x
+            draw_y = gy * TILE_SIZE - w.camera_y
+            
+            u = w.selected_unit
+            dist_x = abs(gx - u.x)
+            dist_y = abs(gy - u.y)
+            
+            is_in_range = dist_x <= 1 and dist_y <= 1 and not (dist_x == 0 and dist_y == 0)
+            
+            # Zapytania do świata/mapy:
+            is_foundation = w.pathfinder.is_area_occupied_by_foundation(gx, gy)
+            is_valid_terrain = w.pathfinder.can_build_trap(gx, gy) and not is_foundation
+
+            preview_rect = pygame.Rect(draw_x, draw_y, TILE_SIZE, TILE_SIZE)
+
+            if is_in_range and is_valid_terrain:
+                pygame.draw.rect(screen, (255, 255, 255), preview_rect, 2)
+            else:
+                s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                s.fill((255, 0, 0, 80)) 
+                
+                for dx in range(4, TILE_SIZE, 8):
+                    for dy in range(4, TILE_SIZE, 8):
+                        pygame.draw.circle(s, (150, 0, 0), (dx, dy), 1)
+                
+                screen.blit(s, (draw_x, draw_y))
+                pygame.draw.rect(screen, (255, 0, 0), preview_rect, 2)

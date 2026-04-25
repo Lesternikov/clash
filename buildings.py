@@ -2,8 +2,7 @@ import pygame
 import re
 from castle import Castle, BUILDING_TYPES
 from unit import Unit
-from settings import UNIT_STATS
-
+from settings import UNIT_STATS, UNIT_NAMES
 
 # =====================================================
 #   BUILDINGS.PY
@@ -330,3 +329,604 @@ class BuildingsMixin:
         for unit in self.selected_units:
             castle.start_training(unit)
         self.selected_units.clear()
+
+    def recruit_unit(self):
+        if not self.selected_castle:
+            print("Nie wybrano zamku")
+            return
+            
+        if len(self.selected_castle.garrison) >= 12:
+            print("Zamek jest pełny")
+            return
+
+        if not self.selected_recruit_unit:
+            print("Nie wybrano jednostki do rekrutacji")
+            return
+
+        player = self.players[self.current_player]
+        unit_code = self.selected_recruit_unit  # np. "INFL"
+
+        # 1. Pobieramy pełną nazwę, bo UNIT_STATS używa nazw (np. "Lekka piechota")
+        full_name = UNIT_NAMES.get(unit_code, "Nieznany")
+
+        # 2. Pobieramy statystyki dla tej nazwy
+        unit_data = UNIT_STATS.get(full_name, {})
+
+        # 3. Pobieramy koszt (w Twoim settings.py to "production_cost")
+        cost = unit_data.get("production_cost", 0)
+
+        if player.gold < cost:
+            print(f"Za mało złota! Potrzeba {cost}, masz {player.gold}")
+            return
+
+        # 4. Odejmowanie złota i tworzenie jednostki
+        player.gold -= cost
+
+        u = Unit(
+            unit_code,            # Zmieniono z unit_type na unit_code!            
+            self.selected_castle.x,
+            self.selected_castle.y,
+            player
+        )
+
+        self.selected_castle.add_to_garrison(u)
+        print(f"Zrekrutowano {full_name}") # full_name ładniej wygląda w konsoli
+
+    def train_selected_garrison_units(self):
+        if not self.selected_castle or not self.selected_units:
+            print("Błąd: Nie wybrano zamku lub jednostek!")
+            return
+
+        # Wykonaj szkolenie
+        for unit in list(self.selected_units):
+            self.selected_castle.start_training(unit)
+        
+        # WAŻNE: Nie czyść listy, jeśli chcesz widzieć, że jednostki zniknęły 
+        # (przeszły do slotów treningowych) w tym samym widoku.
+        self.selected_units.clear()
+
+    def castle_has_patent(self, castle, unit_name):
+        for p in castle.patents:
+            if isinstance(p, dict) and p["unit_type"] == unit_name:
+                return True
+            if p == unit_name:
+                return True
+        return False
+    
+    def update_selected_from_scroll(self):
+        center_offset = 5 // 2  # <--- Podmienione na 5
+        idx = self.recruitment_scroll + center_offset
+        
+        if 0 <= idx < len(self.recruitment_unit_types):
+            self.selected_unit_type = idx
+        else:
+            self.selected_unit_type = None
+
+    def center_on_selected_unit(self):
+        visible = 5  # <--- Podmienione na 5
+        max_scroll = max(0, len(self.recruitment_unit_types) - visible)
+
+        self.recruitment_scroll = max(
+            0,
+            min(
+                self.selected_unit_type - visible // 2,
+                max_scroll
+            )
+        )
+
+    def destroy_straznica(self, castle):
+        """Niszczy strażnicę, tworzy jedną armię z jej załogi i zostawia ruiny."""
+        from unit import Unit  # Import lokalny, żeby uniknąć problemów
+        
+        # 1. Sprawdzamy czy w środku ktoś jest
+        units_in_garrison = [u for u in castle.garrison if u is not None]
+        
+        if units_in_garrison:
+            print("Ewakuacja: Formowanie armii z garnizonu...")
+            
+            # Szukamy miejsca wokół strażnicy dla JEDNEJ armii
+            spawn_pos = self.find_free_space_around(castle.x, castle.y)
+            if spawn_pos:
+                nx, ny = spawn_pos
+                
+                # Tworzymy nową jednostkę-matkę (lidera armii)
+                # Jako typ bierzemy typ pierwszej jednostki z garnizonu
+                leader_type = units_in_garrison[0].type
+                new_army = Unit(leader_type, nx, ny, castle.owner)
+                new_army.garrison = [None] * 10
+                
+                # Przepisujemy jednostki ze slotów strażnicy do slotów nowej armii
+                for i, u in enumerate(units_in_garrison):
+                    if i < 10:
+                        new_army.garrison[i] = u
+                
+                # Dodajemy nową armię do gry
+                self.units.append(new_army)
+                castle.owner.units.append(new_army)
+                print(f"Armia ewakuowana na pole {nx, ny}")
+            else:
+                print("Brak miejsca wokół! Garnizon zginął w gruzach.")
+
+        # 2. Usuwamy budynek i zostawiamy ruiny
+        if castle in self.castles:
+            self.castles.remove(castle)
+        
+        # Zmieniamy kafel na 'R' (Ruiny)
+        self.map[castle.y][castle.x] = "R"
+        
+        self.selected_castle = None
+        self.screen = "map"
+        return True
+
+    def execute_trap_build(self, gx, gy):
+        u = self.selected_unit
+
+        dist_x = abs(gx - u.x)
+        dist_y = abs(gy - u.y)
+
+        # Sprawdzamy zasięg 1 pola i czy to nie jest pole budowniczego
+        if dist_x <= 1 and dist_y <= 1 and not (dist_x == 0 and dist_y == 0):
+            # Sprawdzamy teren za pomocą Twojej funkcji sprawdzającej
+            if self.pathfinder.can_build_trap(gx, gy):
+                # Budujemy!
+                self.trap_backgrounds[(gx, gy)] = self.map[gy][gx]
+                self.map[gy][gx] = "X"
+                
+                # Usuwamy jednego budowniczego (Twoja specjalna funkcja)
+                self.remove_unit_or_builder(u, u)
+                
+                self.trap_build_mode = False
+                self.selected_unit = None
+                print("Pułapka zastawiona pomyślnie!")
+            else:
+                print("Zły teren na pułapkę!")
+        else:
+            print("Poza zasięgiem budowy!")
+            self.trap_build_mode = False
+
+    def execute_road_build(self, gx, gy):
+        u = self.selected_unit
+        
+        # STRAŻNIK: Jeśli u jest None, po prostu wyjdź z funkcji
+        if u is None:
+            print("DEBUG: Próba budowy drogi bez zaznaczonej jednostki!")
+            return
+
+        dist_x = abs(gx - u.x)
+        dist_y = abs(gy - u.y)
+
+        # Sprawdzamy czy kliknięto dokładnie 1 pole obok (kierunek N, S, E, W)
+        if (dist_x == 1 and dist_y == 0) or (dist_x == 0 and dist_y == 1):
+            if self.pathfinder.can_build_road(gx, gy):
+                # 1. Stawiamy drogę na aktualnym polu budowniczego
+                self.map[u.y][u.x] = "_"
+                
+                # 2. Przesuwamy budowniczego na nowe pole
+                u.x, u.y = gx, gy
+                
+                # 3. Zabieramy punkty ruchu (koszt budowy drogi u Ciebie to 5)
+                u.move_points -= 5
+                
+                # 4. Sprawdzamy czy może budować dalej w tej turze
+                if u.move_points < 5:
+                    self.road_build_mode = False
+                    print("Koniec punktów ruchu. Droga ukończona.")
+                else:
+                    print("Droga położona. Możesz kontynuować budowę.")
+            else:
+                print("Tu nie można budować drogi!")
+                self.road_build_mode = False
+        else:
+            # Jeśli gracz kliknął za daleko, wyłączamy tryb
+            self.road_build_mode = False        
+
+           
+    def handle_building_logic(self, mx, my, gx, gy):
+        tile = self.map[gy][gx]
+        builder = self.selected_unit # Tutaj już używasz nazwy 'builder'
+        mode = getattr(self, "building_mode", None)
+
+        if not builder or builder.type != "Budowniczy":
+            return False
+
+        if tile == "#":
+            if mode == "Tower":
+                print("BŁĄD: Strażnica wymaga wolnego pola!")
+                return False
+            if mode in ["Zamek", "Twierdza"]:
+                # Wywołujemy funkcję, która schowa buildera za nas
+                self.start_building(gx, gy, mode, builder)
+                return True
+
+        elif tile == ".":
+            if mode in ["Zamek", "Twierdza"]:
+                print("BŁĄD: Zamek wymaga fundamentów!")
+                return False
+            if mode == "Tower":
+                if self.is_area_occupied_by_foundation(gx, gy):
+                    return False
+                self.start_building(gx, gy, "Strażnica", builder)
+                return True
+        return False
+            #elif mode == "Foundation":
+                # Stawiamy fundamenty pod Zamek/Twierdzę
+                #self.map[gy][gx] = "#"
+                #print("Postawiono fundamenty (#)")
+            # self.building_mode = None
+                # Tutaj budowniczy NIE musi znikać, bo to postawienie kafelka, a nie budowa czasowa
+                #return True
+        return False
+ 
+     
+    def show_foundation_menu(self, gx, gy):
+        self.screen = "foundation_selection"
+        self.construction_target = (gx, gy) # Zapamiętujemy, gdzie budujemy
+
+    
+    def click_on_recruitment(self, mx, my):
+        # Sprawdzamy, który z narysowanych slotów został kliknięty
+        for i, rect in enumerate(self.unit_list_rects):
+            if rect.collidepoint(mx, my):
+                return i  # Zwraca numer slotu (0, 1, 2, 3 lub 4)
+        return None
+  
+    def click_on_garrison(self, mx, my):
+        castle = self.selected_castle
+        if not castle: return None
+
+        rects = getattr(self, 'garrison_slot_rects', 
+                        self.garrison_gfx.slot_rects)
+        for i, rect in enumerate(rects):
+            if rect.collidepoint(mx, my):
+                return i
+        return None
+   
+
+           
+    def handle_recruitment_click(self, mx, my):
+        castle = self.selected_castle
+        unit_types = self.recruitment_unit_types
+        if not castle: return
+
+       # 1. PRZYCISK INFO (Podąża za środkiem listy po lewej)
+        if self.info_button.collidepoint(mx, my):
+            # Obliczamy środek listy dokładnie tak samo jak w statystykach
+            center_idx = self.recruitment_scroll + 2
+            
+            if 0 <= center_idx < len(unit_types):
+                u_name = unit_types[center_idx]
+                
+                # Sprawdzamy czy opis istnieje w UNIT_STATS
+                if u_name in UNIT_STATS and 'description' in UNIT_STATS[u_name]:
+                    self.unit_info_text = UNIT_STATS[u_name]['description']
+                    self.screen = "unit_info"
+                else:
+                    print(f"Brak opisu dla jednostki: {u_name}")
+            return
+
+        if self.back_button.collidepoint(mx, my):
+            self.screen = "garrison"; return
+
+        if self.buy_patent_button.collidepoint(mx, my):
+            # Logika: Kupujemy jednostkę, która jest aktualnie wycelowana na środku (indeks 2)
+            center_idx = self.recruitment_scroll + 2
+            
+            if 0 <= center_idx < len(unit_types):
+                u_name = unit_types[center_idx]
+                
+                # Sprawdzamy status patentu
+                if not self.castle_has_patent(castle, u_name):
+                    print(f"Kupuję patent ze środka listy: {u_name}")
+                    castle.buy_patent(u_name)
+                else:
+                    print(f"Patent na {u_name} jest już kupiony (wygaszony na liście).")
+            return
+
+        
+        if self.garrison_gfx.handle_prod_click(mx, my, castle):
+            if self.selected_patent_index is not None:
+                p = castle.patents[self.selected_patent_index]
+                u_name = p["unit_type"] if isinstance(p, dict) else p
+                if u_name:
+                    castle.start_production(u_name)
+                    print(f"Uruchomiono produkcję: {u_name}")
+            else:
+                print("Najpierw zaznacz patent!")
+            return
+
+        if self.stop_prod_button.collidepoint(mx, my):
+            castle.stop_production(); return
+
+        if self.remove_patent_button.collidepoint(mx, my):
+            if self.selected_patent_index is not None:
+                p = castle.patents[self.selected_patent_index]
+                u_name = p["unit_type"] if isinstance(p, dict) else p
+                
+                # Zatrzymaj produkcję TYLKO jeśli usuwamy to, co się właśnie buduje
+                if castle.production_enabled and castle.production_unit_type == u_name:
+                    castle.stop_production()
+                    
+                castle.patents[self.selected_patent_index] = None
+                self.selected_patent_index = None
+            return
+
+        # KLIKNIĘCIE W PATENT (Prawa strona)
+        for i, rect in enumerate(self.patent_rects):
+            if rect.collidepoint(mx, my):
+                if i < len(castle.patents) and castle.patents[i]:
+                    self.selected_patent_index = i
+                    self.selected_unit_type = None # Resetujemy wybór z lewej listy
+                    
+                    # JEDNORAZOWY SKOK LISTY:
+                    u_name = castle.patents[i]["unit_type"] if isinstance(castle.patents[i], dict) else castle.patents[i]
+                    if u_name in unit_types:
+                        target_idx = unit_types.index(u_name)
+                        self.recruitment_scroll = target_idx - 2 # Ustaw na środku
+                    return
+
+        # 3. SCROLL
+        if self.scroll_up_button.collidepoint(mx, my):
+            self.recruitment_scroll = max(-2, self.recruitment_scroll - 1); return
+        if self.scroll_down_button.collidepoint(mx, my):
+            self.recruitment_scroll = min(len(unit_types)-3, self.recruitment_scroll + 1); return
+
+        # 4. NA KOŃCU LISTA PO LEWEJ (Matematyczne sprawdzanie obszaru)
+        start_x, start_y = 30, 80
+        box_w, box_h, gap = 220, 30, 2
+        
+        if start_x <= mx <= start_x + box_w:
+            relative_y = my - start_y
+            slot_index = relative_y // (box_h + gap)
+            if 0 <= slot_index < 5:
+                clicked_unit_idx = self.recruitment_scroll + int(slot_index)
+                if 0 <= clicked_unit_idx < len(unit_types):
+                    self.recruitment_scroll = clicked_unit_idx - 2 # Centrowanie
+                    self.selected_unit_type = clicked_unit_idx
+                    # self.selected_patent_index = None
+                    return
+   
+    def handle_peasants_click(self, mx, my):
+        if self.back_button.collidepoint(mx, my):
+            self.back_destination = "castle"
+            self.back_anim_timer = pygame.time.get_ticks()
+            return
+
+        if not self.selected_castle:
+            return
+
+        print("peasants screen click")
+
+        castle = self.selected_castle
+
+        # ================= SEND AMOUNT =================
+
+        if self.peasants_plus_button.collidepoint(mx, my):
+            if self.send_peasants_amount + 10 <= castle.peasants:
+                self.send_peasants_amount += 10
+            return
+
+        if self.peasants_minus_button.collidepoint(mx, my):
+            self.send_peasants_amount = max(0, self.send_peasants_amount - 10)
+            return
+
+        if self.gold_plus_button.collidepoint(mx, my):
+            if self.send_gold_amount + 10 <= castle.gold:
+                self.send_gold_amount += 10
+            return
+
+        if self.gold_minus_button.collidepoint(mx, my):
+            self.send_gold_amount = max(0, self.send_gold_amount - 10)
+            return
+
+        # ================= TAX =================
+
+        if self.tax_plus_button.collidepoint(mx, my):
+            castle.tax_rate = min(4.0, castle.tax_rate + 0.1)
+            return
+
+        if self.tax_minus_button.collidepoint(mx, my):
+            castle.tax_rate = max(0.0, castle.tax_rate - 0.1)
+            return
+
+        # ================= SCROLL =================
+
+        owned = [c for c in self.castles if c.owner == self.players[self.current_player]]
+        max_offset = max(0, len(owned) - 3)
+
+        if self.castle_up_button.collidepoint(mx, my):
+            self.castle_list_offset = max(0, self.castle_list_offset - 1)
+            return
+
+        if self.castle_down_button.collidepoint(mx, my):
+            self.castle_list_offset = min(max_offset, self.castle_list_offset + 1)
+            return
+
+        # ================= SEND =================
+
+        if self.send_button.collidepoint(mx, my):
+            if self.send_peasants_amount <= castle.peasants and \
+            self.send_gold_amount <= castle.gold:
+
+                castle.peasants -= self.send_peasants_amount
+                castle.gold -= self.send_gold_amount
+
+                print("Resources sent!")
+
+                self.send_peasants_amount = 0
+                self.send_gold_amount = 0
+    
+    
+    def handle_recruitment_scroll(self, event):
+        # Pobieramy aktualną listę dostępnych jednostek dla wybranego zamku
+        castle = self.selected_castle
+        if not castle: return
+
+        # Filtrujemy listę dokładnie tak samo jak w draw_recruitment
+        available_units = [u for u in UNIT_STATS.keys() if 
+                        self.castle_has_patent(castle, u) or 
+                        castle.is_patent_available(u)]
+        
+        # Ile jednostek mamy łącznie
+        total_units = len(available_units)
+        # Widzimy 5 jednostek na raz, więc max_scroll to różnica
+        max_scroll = max(0, total_units - 3)
+        
+
+        if event.button == 4: # GÓRA
+            if self.recruitment_scroll > -2:
+                self.recruitment_scroll -= 1
+        elif event.button == 5: # DÓŁ
+            if self.recruitment_scroll < max_scroll:
+                self.recruitment_scroll += 1
+  
+                   
+    def handle_trap_info_click(self, mx, my):
+        # W Mixinie 'self' to już jest World, nie potrzebujesz .world!
+        
+        if hasattr(self, 'btn_trap_stop') and self.btn_trap_stop.collidepoint(mx, my):
+            tx, ty = self.active_trap_pos
+            original = self.trap_backgrounds.get((tx, ty), ".")
+            self.map[ty][tx] = original
+            
+            if (tx, ty) in self.trap_backgrounds:
+                del self.trap_backgrounds[(tx, ty)]
+            
+            u = getattr(self, 'selected_unit', None)
+            if u and u.type == "Budowniczy":
+                self.remove_unit_or_builder(u, u)
+                self.selected_unit = None
+                
+            self.screen = "map"
+
+        elif hasattr(self, 'btn_trap_dalej') and self.btn_trap_dalej.collidepoint(mx, my):
+            self.screen = "map"
+
+    def handle_castle_click(self, mx, my):
+        if not self.selected_castle: return
+        castle = self.selected_castle
+        built = set(b.lower() for b in castle.buildings)
+
+        # 1. MENU BUDOWANIA (Najwyższy priorytet)
+        if getattr(self, 'menu_open', False):
+            for name, rect in getattr(self, 'build_rects', {}).items():
+                if rect.collidepoint(mx, my):
+                    if castle.build(name):
+                        self.menu_open = False
+                    return
+            return
+
+        # 2. PRZYCISKI SYSTEMOWE
+        if hasattr(self, 'back_button_castle') and self.back_button_castle.collidepoint(mx, my): 
+            self.screen = "map"
+            self.selected_castle = None
+            return  
+            
+        if hasattr(self, 'menu_button') and self.menu_button.collidepoint(mx, my):
+            self.menu_open = not getattr(self, 'menu_open', False)
+            return
+
+        # 3. MASKA KOLORÓW - jedyne źródło prawdy o kliknięciu w budynek
+        if hasattr(self, 'castle_gfx'):
+            clicked_id = self.castle_gfx.get_building_at_pos(mx, my, castle)
+        else:
+            print("Błąd: brak castle_gfx! Upewnij się, że inicjujesz CastleGraphics.")
+            return
+
+        if not clicked_id:
+            return  # kliknięto w puste miejsce
+
+        if clicked_id in ("garrison", "koszary"):
+            self.screen = "garrison"
+        elif clicked_id == "peasants":
+            self.screen = "peasants"
+        elif clicked_id == "court":
+            self.screen = "court"
+        elif clicked_id in ("hospital", "workshop", "forge", "school"):
+            if clicked_id in built:
+                self.screen = clicked_id
+            else:
+                print(f"Budynek '{clicked_id}' nie jest jeszcze zbudowany.")
+
+    def handle_garrison_click(self, mx, my, button):
+        castle = self.selected_castle
+        if not castle:
+            return
+
+        # ================= BACK =================
+        if hasattr(self, 'back_button_castle') and self.back_button_castle.collidepoint(mx, my):
+            self.selected_units.clear()
+            self.screen = "castle"
+            return
+
+        # ================= RECRUITMENT =================
+        if ("koszary" in castle.buildings and hasattr(self, 'recruit_button') and self.recruit_button.collidepoint(mx, my)):
+            self.screen = "recruitment"
+            self.recruitment_open = True
+            self.recruitment_scroll = -2  
+            self.selected_unit_type = 0   
+            self.selected_patent_index = None
+            return
+
+        # ================= HEAL =================
+        if "hospital" in castle.buildings and hasattr(self, 'heal_button') and self.heal_button.collidepoint(mx, my):
+            for unit in self.selected_units:
+                castle.start_healing_unit(unit)
+            return
+
+        # ================= TRAIN ================= 
+        if "school" in castle.buildings and hasattr(self, 'train_button') and self.train_button.collidepoint(mx, my):
+            if self.selected_units:
+                castle.start_training_group(self.selected_units) 
+                self.selected_units.clear() 
+                print("Zakończono wydawanie rozkazów szkolenia")
+            else:
+                print("Brak zaznaczonych jednostek do szkolenia")
+            return
+            
+        # ================= WYŚLIJ WOJSKO ======================
+        if hasattr(self, 'button_send_army') and self.button_send_army.collidepoint(mx, my):
+            self.release_selected_units()
+            return
+        
+        # ================= PRZYCISKI STRAŻNICY =================
+        is_release = False
+        if hasattr(self, 'release_tower') and isinstance(self.release_tower, pygame.Rect):
+            if self.release_tower.collidepoint(mx, my):
+                is_release = True
+        if is_release:
+            self.release_selected_units()
+            return
+
+        if hasattr(self, 'destroy_button') and self.destroy_button.collidepoint(mx, my):
+            if self.selected_castle and self.selected_castle.building_type == "Strażnica":
+                self.destroy_straznica(self.selected_castle)
+                return
+
+        # ================= SELEKCJA JEDNOSTEK W SLOTACH =================
+        index = self.click_on_garrison(mx, my)
+        if index is None or index >= len(self.selected_castle.garrison):
+            return
+
+        unit = self.selected_castle.garrison[index]
+
+        # --- PRAWY PRZYCISK: Statystyki ---
+        if button == 3: 
+            if unit is not None:
+                self.inspected_unit = unit  
+            else:
+                self.inspected_unit = None
+            return
+
+        # --- LEWY PRZYCISK: Zaznaczanie ---
+        if button == 1:
+            self.inspected_unit = None
+            if unit is None:
+                return
+
+            if unit in self.selected_units:
+                self.selected_units.remove(unit)
+            else:
+                if len(self.selected_units) < getattr(self.selected_castle, 'garrison_limit', 12):
+                    self.selected_units.append(unit)
+                else:
+                    print("DEBUG: Garnizon jest pełen!")
