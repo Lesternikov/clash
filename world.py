@@ -8,6 +8,9 @@ import pygame  # Silnik gry
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
 from court import CourtHandler
 from controls import ControlsHandler
+from UI_components import UnitInfoWindow  
+from castle_graphics import CastleGraphics
+from garrison_graphics import GarrisonGraphics
 
 @property
 def back_button(self):
@@ -38,7 +41,11 @@ class World(BuildingsMixin):
         # Pobieramy wymiary ekranu dla dynamicznego pozycjonowania
         w = pygame.display.get_surface().get_width()
         h = pygame.display.get_surface().get_height()
-        
+        self.castle_gfx = CastleGraphics(w, h)
+        self.garrison_gfx = GarrisonGraphics(w, h)
+        self.unit_info_window = UnitInfoWindow()
+        self.court = CourtHandler(self)
+
         pygame.font.init()
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)
@@ -178,36 +185,40 @@ class World(BuildingsMixin):
             "System": ["Misja", "Poddanie się", "Zapisz grę", "Wczytaj grę", "Opcje", "Koniec"],
             "Mapa": ["Wszystko", "Budynki", "Jednostki", "Nic"]
         }
-
+        
         # =====================================================
         #              INNE / MAPA
         # =====================================================
         self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
+        # =====================================================
         # --- DOLNY PANEL AKCJI (MAPA) ---
-        self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
-        self.unit_info_window = UnitInfoWindow()
+        # =====================================================
         self.action_buttons = []
-        button_width = 120  # Zwiększone z 70 (wydłużenie w prawo)
-        button_height = 60 # Zwiększone z 70 (żeby padding w rendererze ładnie wyglądał)
+        button_width = 120
+        button_height = 60
         
-        # Odstępy między przyciskami (muszą być większe niż szerokość/wysokość)
-        # column_spacing = 130 # 120 szerokości + 10 przerwy
-        # row_spacing = 90    # 82 wysokości + 8 przerwy
+        # Cały panel to 3 kolumny przycisków i 2 rzędy
+        panel_total_width = 3 * button_width   # 360 pikseli
+        panel_total_height = 2 * button_height # 120 pikseli
         
-        # Jeśli używałeś siatki 2x3 po prawej stronie:
-        panel_x = 664 # Startowa pozycja X
-        panel_y = 650 # Startowa pozycja Y
+        # Ustawiamy margines od krawędzi ekranu (żeby nie dotykały samej ramki)
+        margin_right = 0
+        margin_bottom = 0
+        
+        # DYNAMICZNE WYLICZANIE POZYCJI
+        # Zamiast sztywnych liczb (np. 664), odejmujemy szerokość panelu od szerokości ekranu (w)
+        panel_x = w - panel_total_width - margin_right
+        panel_y = h - panel_total_height - margin_bottom
 
+        # Tworzenie przycisków bazując na dynamicznym x i y
         for row in range(2):
             for col in range(3):
-                # Tworzymy szersze prostokąty
-                # Używamy kol * odstęp, żeby się nie nakładały
-                rect = pygame.Rect(panel_x + col * 120, panel_y + row * 60, button_width, button_height)
+                rect = pygame.Rect(panel_x + col * button_width, panel_y + row * button_height, button_width, button_height)
                 self.action_buttons.append(rect)
                 
-        # Aktualizujemy też tło panelu, żeby pasowało do nowych, szerszych przycisków
-        # (3 kolumny * 130 + margines)
-        self.ui_panel_rect = pygame.Rect(790, 610, 400, 190)
+        # Zaktualizowanie ewentualnego tła dla tych przycisków, jeśli go używasz
+        self.ui_panel_rect = pygame.Rect(panel_x - 10, panel_y - 10, panel_total_width + 20, panel_total_height + 20)
+        
         self.show_grid = False
         self.traps = []
         self.trap_backgrounds = {}    # Słownik: (x, y) -> "oryginalny_znak_terenu"
@@ -260,8 +271,6 @@ class World(BuildingsMixin):
 
             self.back_destination = "map" # Cel powrotu
     
-        self.unit_info_window = None
-
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
         for radius in range(1, 4): # Szuka w promieniu 1, 2, 3 kratek
@@ -613,8 +622,54 @@ class World(BuildingsMixin):
         # 2. Kliknięcie w interaktywne obiekty mapy (Pułapka X)
         if self.map[gy][gx] == "X":
             self.screen = "trap_info"
-            self.active_trap_pos = (gx, gy)
+            self.activ
+            
+    def handle_castle_click(self, mx, my):
+        if not self.selected_castle: return
+        castle = self.selected_castle
+        built = set(b.lower() for b in castle.buildings)
+
+        # 1. MENU BUDOWANIA (Najwyższy priorytet)
+        if getattr(self, 'menu_open', False):
+            for name, rect in self.build_rects.items():
+                if rect.collidepoint(mx, my):
+                    if castle.build(name):
+                        self.menu_open = False
+                    return
             return
+
+        # 2. PRZYCISKI SYSTEMOWE
+        if self.back_button.collidepoint(mx, my): return  # obsłużone wyżej
+        if self.menu_button.collidepoint(mx, my):
+            self.menu_open = not getattr(self, 'menu_open', False)
+            return
+
+        # 3. MASKA KOLORÓW - jedyne źródło prawdy o kliknięciu w budynek
+        if hasattr(self, 'castle_gfx'):
+            clicked_id = self.castle_gfx.get_building_at_pos(mx, my, castle)
+        else:
+            print("Błąd: brak castle_gfx! Upewnij się, że inicjujesz CastleGraphics.")
+            return
+
+        if not clicked_id:
+            return  # kliknięto w puste miejsce
+
+        print(f"DEBUG handle_castle_click: clicked_id = {clicked_id}")
+
+        if clicked_id in ("garrison", "koszary"):
+            self.screen = "garrison"
+
+        elif clicked_id == "peasants":
+            self.screen = "peasants"
+
+        elif clicked_id == "court":
+            self.screen = "court"
+
+        elif clicked_id in ("hospital", "workshop", "forge", "school"):
+            if clicked_id in built:
+                self.screen = clicked_id
+            else:
+                print(f"Budynek '{clicked_id}' nie jest jeszcze zbudowany.")
 
     def execute_trap_build(self, gx, gy):
         u = self.selected_unit
@@ -2012,7 +2067,7 @@ class World(BuildingsMixin):
     def draw_build_system(self, screen):
     # 1. Rysuj siatkę (opcjonalnie, tylko gdy budowniczy jest wybrany)
         if self.selected_unit and self.selected_unit.type == "Budowniczy":
-            self.draw_grid_lines(screen)
+            self.renderer.draw_grid_lines(screen)
             
             # 2. Logika podglądu (Universal Preview)
             mx, my = pygame.mouse.get_pos()
