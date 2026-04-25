@@ -73,8 +73,8 @@ class CourtHandler:
         self.draw_prison_sections(screen)
         
         # Wywołujemy draw_button z World, bo tam pewnie została ta metoda
-        self.world.draw_button(screen, "<-", self.court_back_button, (140, 40, 40))
-
+        self.world.renderer.draw_button(screen, "<-", 
+        self.court_back_button, (140, 40, 40))
     def draw_court_players_header(self, screen):
         start_x = 140
         start_y = 20
@@ -148,6 +148,6 @@ class CourtHandler:
                 draw_text(screen, "Brak więźnia", x+10, y+10)
 
             # Przyciski - wywołujemy draw_button z World
-            self.world.draw_button(screen, "SCIECIE", pygame.Rect(x+130, y+10, 100, 25))
-            self.world.draw_button(screen, "TORTURY", pygame.Rect(x+130, y+45, 100, 25))
-            self.world.draw_button(screen, "PRZEKUP", pygame.Rect(x+130, y+80, 100, 25))
+            self.world.renderer.draw_button(screen, "SCIECIE", pygame.Rect(x+130, y+10, 100, 25))
+            self.world.renderer.draw_button(screen, "TORTURY", pygame.Rect(x+130, y+45, 100, 25))
+            self.world.renderer.draw_button(screen, "PRZEKUP", pygame.Rect(x+130, y+80, 100, 25))

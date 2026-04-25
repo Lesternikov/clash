@@ -270,49 +270,6 @@ class ControlsHandler:
                             self.world.screen = "castle" # POPRAWKA: self.world
                         return
                     
-    def handle_castle_click(self, mx, my):
-        if not self.selected_castle: return
-        castle = self.selected_castle
-        built = set(b.lower() for b in castle.buildings)
-
-        # 1. MENU BUDOWANIA (Najwyższy priorytet)
-        if self.menu_open:
-            for name, rect in self.build_rects.items():
-                if rect.collidepoint(mx, my):
-                    if castle.build(name):
-                        self.menu_open = False
-                    return
-            return
-
-        # 2. PRZYCISKI SYSTEMOWE
-        if self.back_button.collidepoint(mx, my): return  # obsłużone wyżej
-        if self.menu_button.collidepoint(mx, my):
-            self.menu_open = not self.menu_open
-            return
-
-        # 3. MASKA KOLORÓW - jedyne źródło prawdy o kliknięciu w budynek
-        clicked_id = self.castle_gfx.get_building_at_pos(mx, my, castle)
-
-        if not clicked_id:
-            return  # kliknięto w puste miejsce
-
-        print(f"DEBUG handle_castle_click: clicked_id = {clicked_id}")
-
-        if clicked_id in ("garrison", "koszary"):
-            self.screen = "garrison"
-
-        elif clicked_id == "peasants":
-            self.screen = "peasants"
-
-        elif clicked_id == "court":
-            self.screen = "court"
-
-        elif clicked_id in ("hospital", "workshop", "forge", "school"):
-            if clicked_id in built:
-                self.screen = clicked_id
-            else:
-                print(f"Budynek '{clicked_id}' nie jest jeszcze zbudowany.")
-
     def handle_ui_click(self, mx, my, button=1):
         # 1. SPRAWDZANIE GÓRNEGO PASKA (System/Mapa/Tura)
         if self.world.show_top_ui:

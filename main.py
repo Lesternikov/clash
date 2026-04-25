@@ -24,6 +24,7 @@ world = World()
 gfx = MapGraphics(world)
 # 2. Tworzysz renderer i dajesz mu dostęp do świata
 renderer = Renderer(world, gfx) # Dodajemy gfx jako drugi argument
+world.renderer = renderer
 pathfinding = Pathfinder(world)
 world.pathfinder = pathfinding
 # 3. Tworzysz kontroler
@@ -60,7 +61,7 @@ while running:
 
     # Rysowanie
     screen.fill((0, 0, 0))
-    renderer.draw(screen, renderer)
+    renderer.draw(screen)
         
     pygame.display.flip()
     clock.tick(30)

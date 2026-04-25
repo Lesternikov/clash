@@ -18,14 +18,12 @@ class Renderer:
         self.font = pygame.font.SysFont("Arial", 24)
         # Możesz też dodać inne, jeśli będą potrzebne
         self.font_small = pygame.font.SysFont("Arial", 18)
-        self.buildings = BuildingsMixin()
         self.active_dropdown = None
         self.show_top_ui = False
         self.top_ui_full_area = pygame.Rect(0, 0, 1024, 55)
 
     def draw(self, screen):
         w = self.world
-        b = self.buildings
         # Stoper powrotu
         if getattr(w, 'back_anim_timer', 0) > 0:
             elapsed = pygame.time.get_ticks() - w.back_anim_timer
@@ -54,34 +52,34 @@ class Renderer:
             w.draw_trap_popup(screen)
 
         elif w.screen == "castle":
-            if getattr(self.world, 'castle_menu_open', False):
-                self.draw_castle_interface(screen, self.world)
-                if getattr(w, "menu_open", False):
-                    mx, my = pygame.mouse.get_pos()
-                    w.draw_castle_menu(screen, mx, my)
+            self.draw_castle_interface(screen, self.world)
+            if getattr(w, "menu_open", False):
+                mx, my = pygame.mouse.get_pos()
+                w.draw_castle_menu(screen, mx, my)
 
-        elif b.screen in ("garrison", "Strażnica"):
-            if b.selected_castle and getattr(b.selected_castle, 'building_type', "") == "Strażnica":
-                b.draw_garrison_only(screen)
+        # --- TUTAJ BYŁ BŁĄD. Zmienione wszystkie "b" na "w" ---
+        elif w.screen in ("garrison", "Strażnica"):
+            if w.selected_castle and getattr(w.selected_castle, 'building_type', "") == "Strażnica":
+                w.draw_garrison_only(screen)
             else:
-                b.draw_garrison(screen)
+                w.draw_garrison(screen)
 
-        elif b.screen == "recruitment":
+        elif w.screen == "recruitment":
             w.draw_recruitment(screen)
 
-        elif self.court.screen == "court":
-            self.court.draw_court(screen)
+        elif w.screen == "court":
+            w.court.draw_court(screen)
 
         elif w.screen == "peasants":
             w.draw_peasants(screen)
 
-        elif b.screen in ["forge", "workshop", "hospital", "school"]:
-            draw_func = getattr(w, f"draw_{b.screen}", None)
+        elif w.screen in ["forge", "workshop", "hospital", "school"]:
+            draw_func = getattr(w, f"draw_{w.screen}", None)
             if draw_func:
                 draw_func(screen)
 
         elif w.screen == "unit_info":
-            w.draw_unit_info(screen)
+            w.draw_unit_info(screen, w)
 
         # Nakładka statystyk jednostki
         if getattr(w, 'inspected_unit', None):
@@ -195,7 +193,7 @@ class Renderer:
 
         if getattr(world, 'menu_open', False):
             # Wywołujemy rysowanie menu (zakładam, że draw_castle_menu też jest w Rendererze)
-            self.draw_castle_menu(screen, world, mx, my)
+            world.draw_castle_menu(screen, mx, my)
             
             # Sprawdzamy czy mysz jest nad opcjami menu
             for rect in world.menu_rects.values():
@@ -218,7 +216,7 @@ class Renderer:
         self.draw_button(screen, "MENU", world.menu_button)
 
         # 6. STOPKA (zakładam, że ta funkcja też jest w Rendererze)
-        self.draw_building_footer(screen, world)
+        world.draw_building_footer(screen)
 
     def draw_castle(self, screen, castle):
         """Ta funkcja rysuje tylko OBIEKT na mapie świata."""
@@ -340,17 +338,18 @@ class Renderer:
         style="bldg"    -> grafika back_normal/back_clicked
         """
         
+        # Zmieniamy self. na self.world. przy grafikach i timerze!
         if style == "castle":
-            img = self.back_img_castle_pressed if getattr(self, 'back_anim_timer', 0) > 0 and \
-                pygame.time.get_ticks() - self.back_anim_timer < 500 \
-                else self.back_img_castle_normal
+            img = self.world.back_img_castle_pressed if getattr(self.world, 'back_anim_timer', 0) > 0 and \
+                pygame.time.get_ticks() - self.world.back_anim_timer < 500 \
+                else self.world.back_img_castle_normal
             screen.blit(img, rect.topleft)
             return
 
         if style == "bldg":
-            img = self.back_img_bldg_pressed if getattr(self, 'back_anim_timer', 0) > 0 and \
-                pygame.time.get_ticks() - self.back_anim_timer < 500 \
-                else self.back_img_bldg_normal
+            img = self.world.back_img_bldg_pressed if getattr(self.world, 'back_anim_timer', 0) > 0 and \
+                pygame.time.get_ticks() - self.world.back_anim_timer < 500 \
+                else self.world.back_img_bldg_normal
             screen.blit(img, rect.topleft)
             return
 
@@ -534,3 +533,31 @@ class Renderer:
         # Wyciągnięte poza "if u:", więc będą widoczne od startu gry
         self.draw_bottom_bar(screen)
     
+    def draw_unit_info(self, screen, w):
+        """Rysuje ekran z historycznym opisem jednostki (INFO)."""
+        screen.fill((20, 20, 20))
+        
+        # Zabezpieczenie, gdyby tekst był pusty
+        if not hasattr(w, 'unit_info_text') or not w.unit_info_text:
+            w.unit_info_text = "Brak informacji\nNie wybrano jednostki."
+
+        font_title = pygame.font.SysFont(None, 48)
+        font_text = pygame.font.SysFont(None, 28)
+
+        lines = w.unit_info_text.split("\n")
+        y = 120
+
+        # Nagłówek (pierwsza linia na żółto)
+        if lines:
+            screen.blit(font_title.render(lines[0], True, (255, 255, 0)), (120, y))
+            y += 80
+
+        # Opis (reszta tekstu na szaro)
+        for line in lines[1:]:
+            txt_surf = font_text.render(line, True, (200, 200, 200))
+            screen.blit(txt_surf, (120, y))
+            y += 35
+
+        # Informacja o powrocie na dole ekranu
+        info = font_text.render("Kliknij dowolny klawisz lub przycisk myszy, aby wrócić", True, (120, 120, 120))
+        screen.blit(info, (120, screen.get_height() - 80))
