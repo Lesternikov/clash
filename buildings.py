@@ -202,27 +202,6 @@ class BuildingsMixin:
             if p == unit_name:
                 return True
         return False
-    
-    def update_selected_from_scroll(self):
-        center_offset = 5 // 2  # <--- Podmienione na 5
-        idx = self.recruitment_scroll + center_offset
-        
-        if 0 <= idx < len(self.recruitment_unit_types):
-            self.selected_unit_type = idx
-        else:
-            self.selected_unit_type = None
-
-    def center_on_selected_unit(self):
-        visible = 5  # <--- Podmienione na 5
-        max_scroll = max(0, len(self.recruitment_unit_types) - visible)
-
-        self.recruitment_scroll = max(
-            0,
-            min(
-                self.selected_unit_type - visible // 2,
-                max_scroll
-            )
-        )
 
     def destroy_straznica(self, castle):
 
@@ -490,12 +469,10 @@ class BuildingsMixin:
                 # Tutaj budowniczy NIE musi znikać, bo to postawienie kafelka, a nie budowa czasowa
                 #return True
         return False
- 
      
     def show_foundation_menu(self, gx, gy):
         self.screen = "foundation_selection"
         self.construction_target = (gx, gy) # Zapamiętujemy, gdzie budujemy
-
     
     def click_on_recruitment(self, mx, my):
         # Sprawdzamy, który z narysowanych slotów został kliknięty
@@ -514,111 +491,7 @@ class BuildingsMixin:
             if rect.collidepoint(mx, my):
                 return i
         return None
-   
-
-           
-    def handle_recruitment_click(self, mx, my):
-        castle = self.selected_castle
-        unit_types = self.recruitment_unit_types
-        if not castle: return
-
-       # 1. PRZYCISK INFO (Podąża za środkiem listy po lewej)
-        if self.info_button.collidepoint(mx, my):
-            # Obliczamy środek listy dokładnie tak samo jak w statystykach
-            center_idx = self.recruitment_scroll + 2
-            
-            if 0 <= center_idx < len(unit_types):
-                u_name = unit_types[center_idx]
-                
-                # Sprawdzamy czy opis istnieje w UNIT_STATS
-                if u_name in UNIT_STATS and 'description' in UNIT_STATS[u_name]:
-                    self.unit_info_text = UNIT_STATS[u_name]['description']
-                    self.screen = "unit_info"
-                else:
-                    print(f"Brak opisu dla jednostki: {u_name}")
-            return
-
-        if self.back_button.collidepoint(mx, my):
-            self.screen = "garrison"; return
-
-        if self.buy_patent_button.collidepoint(mx, my):
-            # Logika: Kupujemy jednostkę, która jest aktualnie wycelowana na środku (indeks 2)
-            center_idx = self.recruitment_scroll + 2
-            
-            if 0 <= center_idx < len(unit_types):
-                u_name = unit_types[center_idx]
-                
-                # Sprawdzamy status patentu
-                if not self.castle_has_patent(castle, u_name):
-                    print(f"Kupuję patent ze środka listy: {u_name}")
-                    castle.buy_patent(u_name)
-                else:
-                    print(f"Patent na {u_name} jest już kupiony (wygaszony na liście).")
-            return
-
-        
-        if self.start_prod_button.collidepoint(mx, my): # PRAWIDŁOWY PRZYCISK "START"
-            if self.selected_patent_index is not None:
-                p = castle.patents[self.selected_patent_index]
-                u_name = p["unit_type"] if isinstance(p, dict) else p
-                if u_name:
-                    castle.start_production(u_name)
-                    print(f"Uruchomiono produkcję: {u_name}")
-            else:
-                print("Najpierw zaznacz patent!")
-            return
-
-        if self.stop_prod_button.collidepoint(mx, my):
-            castle.stop_production(); return
-
-        if self.remove_patent_button.collidepoint(mx, my):
-            if self.selected_patent_index is not None:
-                p = castle.patents[self.selected_patent_index]
-                u_name = p["unit_type"] if isinstance(p, dict) else p
-                
-                # Zatrzymaj produkcję TYLKO jeśli usuwamy to, co się właśnie buduje
-                if castle.production_enabled and castle.production_unit_type == u_name:
-                    castle.stop_production()
-                    
-                castle.patents[self.selected_patent_index] = None
-                self.selected_patent_index = None
-            return
-
-        # KLIKNIĘCIE W PATENT (Prawa strona)
-        for i, rect in enumerate(self.patent_rects):
-            if rect.collidepoint(mx, my):
-                if i < len(castle.patents) and castle.patents[i]:
-                    self.selected_patent_index = i
-                    self.selected_unit_type = None # Resetujemy wybór z lewej listy
-                    
-                    # JEDNORAZOWY SKOK LISTY:
-                    u_name = castle.patents[i]["unit_type"] if isinstance(castle.patents[i], dict) else castle.patents[i]
-                    if u_name in unit_types:
-                        target_idx = unit_types.index(u_name)
-                        self.recruitment_scroll = target_idx - 2 # Ustaw na środku
-                    return
-
-        # 3. SCROLL
-        if self.scroll_up_button.collidepoint(mx, my):
-            self.recruitment_scroll = max(-2, self.recruitment_scroll - 1); return
-        if self.scroll_down_button.collidepoint(mx, my):
-            self.recruitment_scroll = min(len(unit_types)-3, self.recruitment_scroll + 1); return
-
-        # 4. NA KOŃCU LISTA PO LEWEJ (Matematyczne sprawdzanie obszaru)
-        start_x, start_y = 30, 80
-        box_w, box_h, gap = 220, 30, 2
-        
-        if start_x <= mx <= start_x + box_w:
-            relative_y = my - start_y
-            slot_index = relative_y // (box_h + gap)
-            if 0 <= slot_index < 5:
-                clicked_unit_idx = self.recruitment_scroll + int(slot_index)
-                if 0 <= clicked_unit_idx < len(unit_types):
-                    self.recruitment_scroll = clicked_unit_idx - 2 # Centrowanie
-                    self.selected_unit_type = clicked_unit_idx
-                    # self.selected_patent_index = None
-                    return
-   
+     
     def handle_peasants_click(self, mx, my):
         if self.back_button.collidepoint(mx, my):
             self.back_destination = "castle"
@@ -688,32 +561,7 @@ class BuildingsMixin:
 
                 self.send_peasants_amount = 0
                 self.send_gold_amount = 0
-    
-    
-    def handle_recruitment_scroll(self, event):
-        # Pobieramy aktualną listę dostępnych jednostek dla wybranego zamku
-        castle = self.selected_castle
-        if not castle: return
-
-        # Filtrujemy listę dokładnie tak samo jak w draw_recruitment
-        available_units = [u for u in UNIT_STATS.keys() if 
-                        self.castle_has_patent(castle, u) or 
-                        castle.is_patent_available(u)]
-        
-        # Ile jednostek mamy łącznie
-        total_units = len(available_units)
-        # Widzimy 5 jednostek na raz, więc max_scroll to różnica
-        max_scroll = max(0, total_units - 3)
-        
-
-        if event.button == 4: # GÓRA
-            if self.recruitment_scroll > -2:
-                self.recruitment_scroll -= 1
-        elif event.button == 5: # DÓŁ
-            if self.recruitment_scroll < max_scroll:
-                self.recruitment_scroll += 1
-  
-                   
+                     
     def handle_trap_info_click(self, mx, my):
         # W Mixinie 'self' to już jest World, nie potrzebujesz .world!
         

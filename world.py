@@ -11,6 +11,7 @@ from controls import ControlsHandler
 from UI_components import UnitInfoWindow  
 from castle_graphics import CastleGraphics
 from garrison_graphics import GarrisonGraphics
+from recruitment import RecruitmentManager
 
 @property
 def back_button(self):
@@ -45,7 +46,7 @@ class World(BuildingsMixin):
         self.garrison_gfx = GarrisonGraphics(w, h)
         self.unit_info_window = UnitInfoWindow()
         self.court = CourtHandler(self)
-
+        self.recruitment_manager = RecruitmentManager(self)
         pygame.font.init()
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)

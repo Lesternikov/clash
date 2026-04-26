@@ -8,7 +8,7 @@ import pygame
 GARRISON_BG    = os.path.join("assets", "garninon.png")
 GARRISON_TABLE = os.path.join("assets", "DW_12_GFX.png")
 
-ORIG_W, ORIG_H = 638, 478
+ORIG_W, ORIG_H = 640, 480
 
 ORIG_SLOTS_X = [124, 195, 266, 337, 408, 479]
 ORIG_SLOT_Y1 = 74
@@ -28,8 +28,8 @@ class GarrisonGraphics:
         self.screen_w = screen_w
         self.screen_h = screen_h
 
-        self.bg_w = ORIG_W + 400
-        self.bg_h = ORIG_H + 300
+        self.bg_w = ORIG_W + 386
+        self.bg_h = ORIG_H + 285
         self.sx = self.bg_w / ORIG_W
         self.sy = self.bg_h / ORIG_H
 
@@ -37,6 +37,18 @@ class GarrisonGraphics:
         self.table = self._load(GARRISON_TABLE,
                                 int(ORIG_TABLE_W * self.sx),
                                 int(ORIG_TABLE_H * self.sy))
+
+# --- TESTOWE ŁADOWANIE 5 GRAFIK PASKA (BEZ PIKSELOZY) ---
+        self.top_bar_parts = []
+        for i in range(5):
+            path = os.path.join("assets", f"DZ_INFO_S32_{i}.png")
+            if os.path.exists(path):
+                img = pygame.image.load(path).convert_alpha()
+                # Używamy SMOOTHSCALE dla efektu "ładnego wygładzenia"
+                # Skalujemy o 2.5x żeby były dobrze widoczne na górze
+                w, h = img.get_size()
+                smooth_img = pygame.transform.smoothscale(img, (int(w * 2.5), int(h * 2.5)))
+                self.top_bar_parts.append(smooth_img)
 
         # --- ANIMACJA DRZWI ---
         # Kolejność od zamkniętych do otwartych:
@@ -102,8 +114,9 @@ class GarrisonGraphics:
             print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
             return None
         img = pygame.image.load(path).convert_alpha()
-        return pygame.transform.scale(img, (w, h))
-
+            # smoothscale tutaj też zapewni lepszą jakość tła
+        return pygame.transform.smoothscale(img, (w, h))
+    
     def _load_raw(self, path: str):
         if not os.path.exists(path):
             print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
@@ -171,6 +184,16 @@ class GarrisonGraphics:
 
         # 2. Aktualizacja animacji drzwi (indywidualna dla każdego slotu!)
         self._update_doors() # <--- WAŻNE: Tu musi być liczba mnoga (doors)
+
+        # 2. --- RYSOWANIE TESTOWEGO PASKA NA GÓRZE ---
+        # Układamy te 5 grafik jedna obok drugiej na środku ekranu
+        if self.top_bar_parts:
+            total_w = sum(img.get_width() for img in self.top_bar_parts)
+            start_x = (self.bg_w - total_w) // 2
+            current_x = start_x
+            for img in self.top_bar_parts:
+                screen.blit(img, (current_x, 10)) # 10 pikseli od górnej krawędzi
+                current_x += img.get_width()
 
         # 3. Sloty jednostek
         font     = pygame.font.SysFont("Arial", 14, bold=True)

@@ -64,7 +64,7 @@ class Renderer:
                 self.draw_garrison(screen)
 
         elif w.screen == "recruitment":
-            self.draw_recruitment(screen)
+            w.recruitment_manager.draw(screen)
 
         elif w.screen == "court":
             w.court.draw_court(screen)
@@ -138,7 +138,7 @@ class Renderer:
             self.draw_build_system(screen)
 
         random.seed()
-
+        
     def draw_grid_lines(self, screen):
         w = self.world
         offset_x = -(w.camera_x % TILE_SIZE)
@@ -627,120 +627,7 @@ class Renderer:
                 for i in range(4):
                     dx, dy = offsets[i]
                     screen.blit(tiles[i], (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
- 
-    def draw_recruitment(self, screen):
-        w = self.world
-        screen_w, screen_h = screen.get_size()
-        
-        # Tło
-        if getattr(w, 'bg_recruitment', None):
-            screen.blit(w.bg_recruitment, (0, 0))
-        else:
-            screen.fill((60, 50, 40)) 
-            
-        font = pygame.font.SysFont(None, 24)
-        castle = w.selected_castle
-        if not castle: return
-
-        from settings import UNIT_STATS # Upewnij się, że zaimportowałeś to na górze pliku
-        all_units = list(UNIT_STATS.keys())
-        unit_types = [u for u in all_units if w.castle_has_patent(castle, u) or castle.is_patent_available(u)]
-        w.recruitment_unit_types = unit_types
-
-        w.patent_rects = [] 
-        for i in range(12):
-            x = screen_w - 300 + (i % 4) * 60
-            y = 30 + (i // 4) * 90 + 50
-            rect = pygame.Rect(x, y, 50, 80)
-            w.patent_rects.append(rect) 
-            pygame.draw.rect(screen, (40, 30, 20), rect) 
-            r_color = (255, 255, 0) if w.selected_patent_index == i else (100, 100, 100)
-            pygame.draw.rect(screen, r_color, rect, 2 if w.selected_patent_index == i else 1)
-
-            if i < len(castle.patents) and castle.patents[i] is not None:
-                p = castle.patents[i]
-                name = p["unit_type"] if isinstance(p, dict) else p
-                screen.blit(font.render(name[:5], True, (255, 255, 0)), (x + 2, y + 30))
-
-        can_start = False
-        if w.selected_patent_index is not None:
-            if w.selected_patent_index < len(castle.patents) and castle.patents[w.selected_patent_index] is not None:
-                can_start = True
-
-        for btn, col in [(w.info_button, (120,120,120)), 
-                        (w.buy_patent_button, (80,140,80)), (w.remove_patent_button, (120,80,80)),
-                        (w.stop_prod_button, (140,80,80))]:
-            pygame.draw.rect(screen, col, btn)
-        
-        pygame.draw.rect(screen, (80, 140, 80) if can_start else (60, 60, 60), w.start_prod_button)
-        self.draw_building_footer(screen)
-        
-        screen.blit(font.render("INFO", True, (255, 255, 255)), (150, 595))
-        screen.blit(font.render("KUP PATENT", True, (255, 255, 255)), (170, 635))
-        screen.blit(font.render("USUŃ", True, (255, 255, 255)), (screen_w - 210, 595))
-        screen.blit(font.render("START", True, (255, 255, 255) if can_start else (120, 120, 120)), (screen_w - 270, 635))
-        screen.blit(font.render("STOP", True, (255, 255, 255)), (screen_w - 130, 635))
-
-        if castle.production_enabled and castle.production_unit_type:
-            p_text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
-            p_color = (0, 255, 0)
-        else:
-            p_text = "Produkcja nieaktywna"
-            p_color = (200, 200, 200)
-        screen.blit(font.render(p_text, True, p_color), (screen_w - 300, 380))
-
-        w.unit_list_rects = [] 
-        start_x, start_y, box_w, box_h, gap = 30, 80, 220, 30, 2
-        center_index = 2
-
-        for i in range(5):
-            scroll_index = w.recruitment_scroll + i
-            if 0 <= scroll_index < len(unit_types):
-                unit_name = unit_types[scroll_index]
-                rect = pygame.Rect(start_x, start_y + i * (box_h + gap), box_w, box_h)
-                w.unit_list_rects.append(rect) 
-                
-                has_p = w.castle_has_patent(castle, unit_name)
-                t_col = (255, 255, 255) if i == center_index else ((90, 90, 90) if has_p else (180, 180, 180))
-                
-                pygame.draw.rect(screen, (30, 30, 30), rect)
-                screen.blit(font.render(unit_name, True, t_col), (rect.x + 10, rect.y + 8))
-
-        center_index = 2
-        idx_on_center = w.recruitment_scroll + center_index
-
-        if 0 <= idx_on_center < len(unit_types):
-            unit_to_show = unit_types[idx_on_center]
-            stats = UNIT_STATS.get(unit_to_show, {}) 
-            self.draw_unit_stats_table(screen, 20, 250, unit_to_show, stats)
-
-            if stats:
-                cost_rect = pygame.Rect(20, 480, 450, 50)
-                pygame.draw.rect(screen, (0, 30, 0), cost_rect) 
-                pygame.draw.rect(screen, (200, 180, 100), cost_rect, 5)
-
-                pygame.draw.line(screen, (200, 180, 100), (cost_rect.x + 150, cost_rect.y), (cost_rect.x + 150, cost_rect.bottom), 2)
-                pygame.draw.line(screen, (200, 180, 100), (cost_rect.x + 300, cost_rect.y), (cost_rect.x + 300, cost_rect.bottom), 2)
-
-                p_cost = stats.get('patent_cost', 0)
-                m_cost = stats.get('production_cost', 0)
-                time = stats.get('production_time', 0)
-
-                screen.blit(font.render(f"Patent: {p_cost}", True, (255, 255, 0)), (cost_rect.x + 10, cost_rect.y + 15))
-                screen.blit(font.render(f"Prod: {m_cost}", True, (255, 255, 0)), (cost_rect.x + 160, cost_rect.y + 15))
-                screen.blit(font.render(f"Tury: {time}", True, (255, 255, 0)), (cost_rect.x + 310, cost_rect.y + 15))
-                
-                panel_rect = pygame.Rect(470, 620, 120, 60)
-                pygame.draw.rect(screen, (40, 30, 25), panel_rect) 
-                pygame.draw.rect(screen, (200, 180, 100), panel_rect, 3)
-
-        screen.blit(font.render(f"Gold: {castle.gold}", True, (255, 215, 0)), (screen_w // 2 - 30, 640))
-        
-        pygame.draw.rect(screen, (100, 100, 100), w.scroll_up_button)
-        pygame.draw.rect(screen, (100, 100, 100), w.scroll_down_button)
-        screen.blit(font.render("▲", True, (255, 255, 255)), (w.scroll_up_button.x + 12, w.scroll_up_button.y + 8))
-        screen.blit(font.render("▼", True, (255, 255, 255)), (w.scroll_down_button.x + 12, w.scroll_down_button.y + 8))
-        
+     
     def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
         w = self.world
         if not stats_source:

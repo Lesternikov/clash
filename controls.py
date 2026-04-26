@@ -153,7 +153,7 @@ class ControlsHandler:
 
         # 5. LOGIKA POD-EKRANÓW (Tylko te, które mają PRAWDZIWĄ mechanikę)
         if w.screen == "recruitment":
-            w.handle_recruitment_click(mx, my)
+            w.recruitment_manager.handle_click(mx, my) # Obsługa kliknięć z nowego modułu
             return
         
         elif w.screen == "garrison":

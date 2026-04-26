@@ -55,14 +55,26 @@ class MapGraphics:
         ]
         self.build_button_images = self._load_button_set(path_ui, build_files)
 
+
         # 3. Tło panelu armii
-        army_bg_path = "assets/minimum/MARKS_S32_35.png" 
+        army_bg_path = "assets/minimum/MARKS_S32/MARKS_S32_35.png" 
         if os.path.exists(army_bg_path):
             self.army_panel_bg = pygame.image.load(army_bg_path).convert_alpha()
         else:
             print(f"Błąd: Nie znaleziono tła armii: {army_bg_path}")
             self.army_panel_bg = pygame.Surface((32, 32))
             self.army_panel_bg.fill((101, 67, 33))
+        # --- TESTOWE ŁADOWANIE PASKA ZASOBÓW ---
+        self.test_bar_imgs = []
+        for i in range(5):
+            path = os.path.join("assets/DZ_INFO_S32", f"DZ_INFO_S32_{i}.png")
+            if os.path.exists(path):
+                img = pygame.image.load(path).convert_alpha()
+                # Używamy smoothscale dla super jakości
+                w, h = img.get_size()
+                self.test_bar_imgs.append(pygame.transform.smoothscale(img, (int(w * 2.5), int(h * 2.5))))
+            else:
+                print(f"DEBUG: Brak pliku {path}")
 
     def _load_button_set(self, path, files):
         """Pomocnicza funkcja, żeby nie powtarzać kodu ładowania"""
