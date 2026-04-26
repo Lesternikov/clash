@@ -64,7 +64,7 @@ class Renderer:
                 self.draw_garrison(screen)
 
         elif w.screen == "recruitment":
-            self.draw_recruitment(screen)
+            w.recruitment_manager.draw(screen)
 
         elif w.screen == "court":
             w.court.draw_court(screen)
@@ -131,7 +131,7 @@ class Renderer:
 
         # Strzałki budowy drogi
         if getattr(w, 'road_build_mode', False):
-            w.pathfinder.draw_road_arrows(screen)
+            self.draw_road_arrows(screen)
 
         # Podgląd zasięgu pułapki
         if getattr(w, 'trap_build_mode', False):
@@ -363,40 +363,50 @@ class Renderer:
         screen.blit(txt_surface, txt_surface.get_rect(center=rect.center))
 
     def draw_bottom_bar(self, screen):
-        # 1. Pobieramy pozycję myszy
         mx, my = pygame.mouse.get_pos()
-        
-        # 2. Pobieramy stan przycisków myszy. 
-        # m_pressed będzie True TYLKO wtedy, gdy lewy przycisk jest w danej chwili TRZYMANY.
         m_pressed = pygame.mouse.get_pressed()[0] 
+        w = self.world
 
-        # Decydujemy o zestawie ikon
-        is_building = getattr(self.world, 'build_menu_open', False)
+        is_building = getattr(w, 'build_menu_open', False)
         current_icons = self.gfx.build_button_images if is_building else self.gfx.button_images
 
-        for i, rect in enumerate(self.world.action_buttons):
+        for i, rect in enumerate(w.action_buttons):
             base_index = i * 2 
+            img_index = base_index # Domyślnie NIEWCIŚNIĘTY
             
-            if base_index < len(current_icons):
-                # KLUCZOWA POPRAWKA LOGIKI:
-                # Obrazek wciśnięty (img_index = base_index + 1) rysujemy TYLKO,
-                # gdy mysz jest nad przyciskiem I lewy przycisk jest trzymany.
-                
-                is_hover = rect.collidepoint(mx, my)
-                
-                if is_hover and m_pressed:
-                    img_index = base_index + 1  # Grafika WCIŚNIĘTA (np. 23 dla Zamku)
-                else:
-                    img_index = base_index      # Grafika NORMALNA (np. 22 dla Zamku)
-                
-                # Zabezpieczenie przed wyjściem poza listę (np. gdy brak wciśniętej ramki)
-                if img_index >= len(current_icons):
-                    img_index = base_index
-                
-                image = current_icons[img_index]
-                scaled_img = pygame.transform.scale(image, (rect.width, rect.height))
-                screen.blit(scaled_img, rect.topleft)
+            is_hover = rect.collidepoint(mx, my)
+            is_clicked = is_hover and m_pressed
+            
+            # --- ZARZĄDZANIE STANEM WCIŚNIĘCIA ---
+            if is_building:
+                # MENU BUDOWNICZEGO
+                if i == 0 and getattr(w, 'road_build_mode', False):
+                    img_index = base_index + 1 # Droga trwale wciśnięta
+                elif i == 1 and getattr(w, 'trap_build_mode', False):
+                    img_index = base_index + 1 # Pułapka trwale wciśnięta
+                elif is_clicked:
+                    img_index = base_index + 1 # Zwykłe kliknięcie (np. dla Zamku)
+            else:
+                # GŁÓWNE MENU (Kula / Namiot)
+                if i == 0:
+                    # Przycisk Trybu: Namiot (zaznaczona jednostka) lub Kula (brak jednostki)
+                    if w.selected_unit is not None:
+                        img_index = base_index + 1 # Pokazuje wciśnięty Namiot
+                    else:
+                        img_index = base_index     # Pokazuje odciśniętą Kulę ziemską
+                elif i == 3 and getattr(w, 'merge_mode', False):
+                    img_index = base_index + 1 # Połącz oddziały wciśnięte
+                elif is_clicked:
+                    img_index = base_index + 1
 
+            # Zabezpieczenie
+            if img_index >= len(current_icons):
+                img_index = base_index
+            
+            image = current_icons[img_index]
+            scaled_img = pygame.transform.scale(image, (rect.width, rect.height))
+            screen.blit(scaled_img, rect.topleft)
+            
     def draw_army_panel(self, screen):
         u = self.world.selected_unit
         if not u:
@@ -496,7 +506,7 @@ class Renderer:
             y += 28
 
         # 6. Stopka (Twoje przyciski)
-        self.world.draw_building_footer(screen)
+        self.draw_building_footer(screen)
 
     def draw_ui(self, screen):
 
@@ -1028,3 +1038,168 @@ class Renderer:
                 
                 screen.blit(s, (draw_x, draw_y))
                 pygame.draw.rect(screen, (255, 0, 0), preview_rect, 2)
+
+    def draw_road_arrows(self, screen):
+        w = self.world
+        u = w.selected_unit
+        if not u:
+            return
+
+        # ZMIANA: Zwracamy się do obiektu pathfinder wewnątrz świata
+        if getattr(w.pathfinder.__class__, '_arrow_imgs', None) is None:
+            if hasattr(w.pathfinder, '_load_arrows'):
+                w.pathfinder._load_arrows()
+
+        for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+            tx, ty = u.x + dx, u.y + dy
+            
+            # ZMIANA: Pytamy Pathfindera, czy można budować
+            if not w.pathfinder.can_build_road(tx, ty):
+                continue
+
+            pos_x = tx * TILE_SIZE - w.camera_x
+            pos_y = ty * TILE_SIZE - w.camera_y
+
+            if pos_x < -TILE_SIZE or pos_x > SCREEN_WIDTH or \
+               pos_y < -TILE_SIZE or pos_y > SCREEN_HEIGHT:
+                continue
+
+            # Rysowanie grafiki z pamięci Pathfindera
+            img = w.pathfinder.__class__._arrow_imgs.get((dx, dy))
+            if img:
+                offset_x = (TILE_SIZE - img.get_width())  // 2
+                offset_y = (TILE_SIZE - img.get_height()) // 2
+                screen.blit(img, (pos_x + offset_x, pos_y + offset_y))
+
+
+    # -------------------------------------------------------
+    # RYSOWANIE TRASY — STOPY zamiast kropek
+    # -------------------------------------------------------
+
+    def draw_path_dots(self, screen, unit, path):
+        w = self.world
+
+        # ZMIANA: Sprawdzamy i ładujemy przez w.pathfinder
+        if getattr(w.pathfinder.__class__, '_step_imgs', None) is None:
+            if hasattr(w.pathfinder, '_load_steps'):
+                w.pathfinder._load_steps()
+
+        # Zabezpieczone pobieranie słowników z obrazkami
+        step_imgs = getattr(w.pathfinder.__class__, '_step_imgs', {})
+        black_imgs = step_imgs.get("black", {}) if step_imgs else {}
+        red_imgs   = step_imgs.get("red", {}) if step_imgs else {}
+
+        current_x, current_y = unit.x, unit.y
+        accumulated_cost = 0
+
+        for px, py in path:
+            dx = px - current_x
+            dy = py - current_y
+
+            # Koszt kroku
+            tile_char = w.map[py][px]
+            base_cost = TERRAIN_TYPES.get(tile_char, {}).get("cost", 4)
+            move_mod  = 1.41 if (dx != 0 and dy != 0) else 1.0
+            accumulated_cost += base_cost * move_mod
+
+            # Pozycja na ekranie — środek kafla
+            screen_x = px * TILE_SIZE + TILE_SIZE // 2 - w.camera_x
+            screen_y = py * TILE_SIZE + TILE_SIZE // 2 - w.camera_y
+
+            # Poza ekranem — pomijamy
+            margin = TILE_SIZE * 2
+            if not (-margin < screen_x < SCREEN_WIDTH  + margin and
+                    -margin < screen_y < SCREEN_HEIGHT + margin):
+                current_x, current_y = px, py
+                continue
+
+            # Kierunek → normalizujemy do -1/0/1
+            direction = ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
+
+            in_range = accumulated_cost <= unit.move_points
+            img      = (black_imgs if in_range else red_imgs).get(direction)
+
+            if img:
+                blit_x = screen_x - img.get_width()  // 2
+                blit_y = screen_y - img.get_height() // 2
+                screen.blit(img, (blit_x, blit_y))
+            else:
+                # Fallback: stare kółka (w razie braku grafiki dla danego kierunku)
+                color = (0, 0, 0) if in_range else (255, 0, 0)
+                pygame.draw.circle(screen, (255, 255, 255), (screen_x, screen_y), 5)
+                pygame.draw.circle(screen, color,           (screen_x, screen_y), 4)
+
+            current_x, current_y = px, py
+
+        # -------------------------------------------------------
+    # RYSOWANIE BUDYNKÓW (teksty opisowe)
+    # -------------------------------------------------------
+
+    def draw_forge(self, screen):
+        lines = [
+            "Dzień i noc słychać rytmiczne uderzenia żelaznych młotów –",
+            "to ławrowni kowale w pocie czoła pokuwają bojowe rumaki.",
+            "Dzięki ich wysiłkom będziesz mógł rozpocząć produkcję",
+            "oddziałów konnych, bardzo przydatnych w bojowych zmaganiach.",
+            "",
+            "Jednocześnie łowisarze z górskich krain wytapiają tu stal",
+            "na pancerze i wytwarzają broń palną.",
+        ]
+        self.draw_building_template(screen, "Kuźnia", lines,
+                                    (120, 90, 60), (200, 170, 90))
+
+    def draw_workshop(self, screen):
+        lines = [
+            "Pracują tu znakomici rzemieślnicy ze starego kraju.",
+            "Dzięki ich kunsztowi staniesz się posiadaczem łuków, kusz,",
+            "oszczepów oraz strzał niespotykanych wcześniej w tej części",
+            "kontynentu.",
+        ]
+        self.draw_building_template(screen, "Warsztat", lines)
+
+    def draw_hospital(self, screen):
+        lines = [
+            "Zapach rozcieranych ziół da się odczuć we wszystkich zakamarkach.",
+            "Powstające tu specyfiki i mikstury robione są według starych receptur.",
+            "Owe lekarstwa pomogą odzyskać Twoim rycerzom pełnię sił.",
+            "Ponadto troskliwi kapłani roztoczyli swą opiekę nad wsiami.",
+        ]
+        self.draw_building_template(screen, "Szpital", lines)
+
+    def draw_school(self, screen):
+        lines = [
+            "Dzięki wykładanym tu naukom możliwe będzie szkolenie",
+            "Twoich wojsk w rzemiośle rycerskim.",
+            "",
+            "Ponadto uczeni waldzcy umożliwią osiągnięcie wyższego",
+            "poziomu technologii w Twoim królestwie.",
+        ]
+        self.draw_building_template(screen, "Szkoła", lines)
+
+    def draw_building_template(self, screen, title, lines,
+                                theme_color=(100, 100, 130),
+                                border_color=(180, 180, 220)):
+        screen.fill((60, 60, 80))
+        font_title = pygame.font.SysFont(None, 48)
+        font_text  = pygame.font.SysFont(None, 24)
+
+        panel = pygame.Rect(120, 80, 760, 420)
+        pygame.draw.rect(screen, theme_color, panel)
+        pygame.draw.rect(screen, border_color, panel, 6)
+
+        title_surface = font_title.render(title.upper(), True, border_color)
+        screen.blit(title_surface,
+                    (panel.centerx - title_surface.get_width() // 2, panel.y - 40))
+
+        y = panel.y + 30
+        for line in lines:
+            txt = font_text.render(line, True, (255, 255, 255))
+            screen.blit(txt, (panel.x + 30, y))
+            y += 28
+
+        self.draw_building_footer(screen)        
+
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])

@@ -20,6 +20,9 @@ class ControlsHandler:
             elif event.type == pygame.KEYDOWN:
                 # Zamiast self.screen używamy self.world.screen
                 if event.key == pygame.K_ESCAPE:
+                    self.world.road_build_mode = False
+                    self.world.trap_build_mode = False
+                    self.world.build_menu_open = False
                     if self.world.screen in ["recruitment", "garrison", "forge", "workshop", "hospital", "school", "peasants", "court"]:
                         self.world.screen = "castle"
                         self.world.inspected_unit = None
@@ -53,7 +56,7 @@ class ControlsHandler:
                     self.world.inspected_unit = None
                     
                     if self.world.screen == "garrison":
-                        self.world.check_unit_info(mx, my)
+                        self.check_unit_info(mx, my)
                     
                     elif self.world.screen == "map":
                         if my >= 610 and hasattr(self.world, 'army_slot_rects'):
@@ -80,6 +83,15 @@ class ControlsHandler:
         if button != 1 and button != 3: return
         w = self.world # Skrót dla wygody
 
+        # --- DODANE: Obsługa okienka ZBURZ ZAMEK (TAK/NIE) ---
+        if getattr(w, 'demolish_confirm', False):
+            if hasattr(w, 'demolish_yes') and w.demolish_yes.collidepoint(mx, my):
+                w.demolish_castle(w.selected_castle)
+            elif hasattr(w, 'demolish_no') and w.demolish_no.collidepoint(mx, my):
+                w.demolish_confirm = False
+            return
+        # ----------------------------------------------------
+
         # 1. PRIORYTET: Ekrany specjalne
         if w.screen == "trap_info":
             w.handle_trap_info_click(mx, my)
@@ -91,8 +103,11 @@ class ControlsHandler:
 
         if w.screen == "map":
             if self.handle_ui_click(mx, my): return 
-            self.handle_map_logic_combined(mx, my, button) # Tylko sprawdza pułapki/drogi
-            # Dodaj to wywołanie ręcznie, bo usunęliśmy je ze świata!
+            
+            # --- ZMIANA: Zatrzymujemy kliknięcie, jeśli wykonano akcję budowy ---
+            if self.handle_map_logic_combined(mx, my, button): 
+                return 
+            
             self.handle_map_click(mx, my, button) 
             return
 
@@ -138,7 +153,7 @@ class ControlsHandler:
 
         # 5. LOGIKA POD-EKRANÓW (Tylko te, które mają PRAWDZIWĄ mechanikę)
         if w.screen == "recruitment":
-            w.handle_recruitment_click(mx, my)
+            w.recruitment_manager.handle_click(mx, my) # Obsługa kliknięć z nowego modułu
             return
         
         elif w.screen == "garrison":
@@ -273,7 +288,7 @@ class ControlsHandler:
     def handle_ui_click(self, mx, my, button=1):
         # 1. SPRAWDZANIE GÓRNEGO PASKA (System/Mapa/Tura)
         if self.world.show_top_ui:
-            if self.world.handle_dropdown_clicks(mx, my): return True
+            if self.handle_dropdown_clicks(mx, my): return True
             if self.world.top_ui_full_area.collidepoint(mx, my):
                 if self.world.btn_system.collidepoint(mx, my): self.active_dropdown = "System"
                 elif self.world.btn_mapa.collidepoint(mx, my): self.active_dropdown = "Mapa"
@@ -332,7 +347,7 @@ class ControlsHandler:
         
         # Indeks 0: Powrót/System
         if index == 0:
-            self.world.handle_tryb_mapy_button()
+            self.handle_tryb_mapy_button()
             return
 
         # Indeksy 1 i 2: Przełączanie jednostek/zamków
@@ -442,33 +457,39 @@ class ControlsHandler:
 
     def handle_map_logic_combined(self, mx, my, button):
         # --- NOWOŚĆ: Jeśli to prawy klik, nie rób nic więcej na mapie ---
-        # Podgląd został już ustawiony w handle_events, 
-        # więc tutaj przerywamy, żeby nie wywołać ruchu/odznaczenia.
         if button == 3:
-            return
-        # specjalne zdolności budowniczego
+            return False
+            
         gx = (mx + self.world.camera_x) // TILE_SIZE
         gy = (my + self.world.camera_y) // TILE_SIZE
 
         # 1. Tryby specjalne (Budowa dróg / pułapek)
         if getattr(self.world, 'trap_build_mode', False):
-            self.world.execute_trap_build(gx, gy) # <--- POPRAWIONE
-            return
+            self.world.execute_trap_build(gx, gy)
+            return True  # <--- ZWRACA TRUE (Blokuje pojawienie się stóp)
         
         if getattr(self.world, 'road_build_mode', False):
-            self.world.execute_road_build(gx, gy) # <--- POPRAWIONE
-            return
-
+            self.world.execute_road_build(gx, gy)
+            return True  # <--- ZWRACA TRUE
+            
         # 2. Kliknięcie w interaktywne obiekty mapy (Pułapka X)
         if self.world.map[gy][gx] == "X":
             self.world.screen = "trap_info"
-            self.world.active_trap_pos = (gx, gy) # <--- PEŁNA NAZWA ZMIENNEJ   
+            self.world.active_trap_pos = (gx, gy)
+            return True  # <--- ZWRACA TRUE
+            
+        return False # Zwykłe kliknięcie, pozwól grze działać dalej
             
     def handle_tryb_mapy_button(self):
-        """Wyłącza zaznaczenie jednostki, pozwalając na klikanie w zamki."""
+        """Resetuje interfejs do stanu 'Globus'."""
         self.world.selected_unit = None
         self.world.selected_castle = None
-        print("Tryb mapy: Odznaczono jednostki.") 
+        self.world.build_menu_open = False
+        self.world.merge_mode = False
+        # --- TE 2 LINIE TRZEBA DODAĆ ---
+        self.world.road_build_mode = False 
+        self.world.trap_build_mode = False 
+        print("Tryb mapy: Odznaczono wszystko.")
     
     
     def handle_dropdown_clicks(self, mx, my):
@@ -577,5 +598,10 @@ class ControlsHandler:
         self.world.build_menu_open = False
         self.world.merge_mode = False
         print("Tryb mapy: Odznaczono wszystko.")
-    
+
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])
+        
     

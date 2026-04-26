@@ -224,3 +224,9 @@ class UnitInfoWindow:
             # Rysujemy w dokładnie tych samych koordynatach X i Y, bez przesunięć w dół
             screen.blit(self.sword_full, (x, y), area)
 
+
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])
+        

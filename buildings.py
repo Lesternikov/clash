@@ -104,55 +104,6 @@ class BuildingsMixin:
         self.screen = "map"
         print("Zamek stał się ruiną.")
 
-    def start_building(self, x, y, b_type, builder=None):
-        if b_type not in BUILDING_TYPES:
-            return
-        config = BUILDING_TYPES[b_type]
-
-        ix, iy = int(x), int(y)
-        anchor_x, anchor_y = ix, iy
-        found_foundation = False
-
-        if config.get("size") == 2:
-            for dx in [0, -1]:
-                for dy in [0, -1]:
-                    nx, ny = ix + dx, iy + dy
-                    if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
-                        if self.map[ny][nx] == "#":
-                            anchor_x, anchor_y = nx, ny
-                            found_foundation = True
-                            break
-                if found_foundation:
-                    break
-            if not found_foundation:
-                return
-        else:
-            if self.map[iy][ix] in [".", "p"] and \
-               not self.is_area_occupied_by_foundation(ix, iy):
-                found_foundation = True
-            else:
-                return
-
-        new_castle = Castle(anchor_x, anchor_y, self.current_player,
-                            building_type=b_type)
-        new_castle.under_construction = True
-        new_castle.total_work_needed  = 12.0
-        new_castle.work_done          = 0.0
-        new_castle.mury_percent       = 0
-
-        army = self.get_unit_at(ix, iy)
-        if army:
-            self.enter_castle(army, new_castle)
-
-        self.castles.append(new_castle)
-
-        size = 2 if config.get("size") == 2 else 1
-        for dy in range(size):
-            for dx in range(size):
-                self.map[anchor_y + dy][anchor_x + dx] = "P"
-
-        print(f"Rozpoczęto budowę {b_type}.")
-
     def process_construction(self):
         for castle in self.castles:
             if not getattr(castle, 'under_construction', False):
@@ -177,137 +128,6 @@ class BuildingsMixin:
                     for dx in range(size):
                         self.map[castle.y + dy][castle.x + dx] = sym
                 print(f"Budowa ukończona: {castle.building_type}!")
-
-    def execute_build_action(self, button_index, army):
-        if not army:
-            return
-        
-        # Konwersja na int, aby uniknąć błędów przy sprawdzaniu mapy
-        grid_x, grid_y = int(army.x), int(army.y)
-
-        def get_builder(a):
-            if getattr(a, 'type', None) == "Budowniczy":
-                return a
-            if hasattr(a, 'garrison'):
-                for slot in a.garrison:
-                    if slot and getattr(slot, 'type', None) == "Budowniczy":
-                        return slot
-            return None
-
-        builder = get_builder(army)
-        if not builder:
-            print("Brak Budowniczego w armii!")
-            return
-
-        # --- LOGIKA PRZYCISKÓW ---
-        
-        if button_index == 0:           # 1. Droga (Grafiki 15/16)
-            if army.move_points >= 5:
-                self.road_build_mode = True
-                self.build_menu_open = False
-                print("Tryb budowy drogi.")
-            else:
-                print("Za mało punktów ruchu!")
-            return # Ważne: przerywamy funkcję po wykonaniu akcji
-
-        elif button_index == 1:         # 2. Pułapka (Grafiki 17/18)
-            self.trap_build_mode = True
-            self.build_menu_open = False
-            self.active_builder_army = army
-            self.active_builder_unit = builder
-            print("Wybierz pole na pułapkę.")
-            return
-
-        elif button_index == 2:         # 3. Skarb / Specjalne (Grafiki 19/20)
-            if self.map[grid_y][grid_x] == "$":
-                army.owner.gold += 500
-                self.map[grid_y][grid_x] = "."
-                self.build_menu_open = False
-                print("Skarb zebrany!")
-            return
-
-        # Pozostałe budynki (Indeksy 3, 4, 5)
-        # 3: Strażnica (21/21), 4: Twierdza (21/21), 5: Zamek (22/23)
-        menu_to_type = {3: "Strażnica", 4: "Twierdza", 5: "Zamek"}
-        
-        if button_index in menu_to_type:
-            building_type = menu_to_type[button_index]
-            print(f"Próba budowy: {building_type}")
-            
-            # Wywołujemy Twoją funkcję start_building
-            self.start_building(grid_x, grid_y, building_type, builder)
-            
-            # Po zleceniu budowy ZAMYKAMY menu
-            self.build_menu_open = False
-            self.selected_unit = None
-            return
-    # -------------------------------------------------------
-    # RYSOWANIE BUDYNKÓW (teksty opisowe)
-    # -------------------------------------------------------
-
-    def draw_forge(self, screen):
-        lines = [
-            "Dzień i noc słychać rytmiczne uderzenia żelaznych młotów –",
-            "to ławrowni kowale w pocie czoła pokuwają bojowe rumaki.",
-            "Dzięki ich wysiłkom będziesz mógł rozpocząć produkcję",
-            "oddziałów konnych, bardzo przydatnych w bojowych zmaganiach.",
-            "",
-            "Jednocześnie łowisarze z górskich krain wytapiają tu stal",
-            "na pancerze i wytwarzają broń palną.",
-        ]
-        self.draw_building_template(screen, "Kuźnia", lines,
-                                    (120, 90, 60), (200, 170, 90))
-
-    def draw_workshop(self, screen):
-        lines = [
-            "Pracują tu znakomici rzemieślnicy ze starego kraju.",
-            "Dzięki ich kunsztowi staniesz się posiadaczem łuków, kusz,",
-            "oszczepów oraz strzał niespotykanych wcześniej w tej części",
-            "kontynentu.",
-        ]
-        self.draw_building_template(screen, "Warsztat", lines)
-
-    def draw_hospital(self, screen):
-        lines = [
-            "Zapach rozcieranych ziół da się odczuć we wszystkich zakamarkach.",
-            "Powstające tu specyfiki i mikstury robione są według starych receptur.",
-            "Owe lekarstwa pomogą odzyskać Twoim rycerzom pełnię sił.",
-            "Ponadto troskliwi kapłani roztoczyli swą opiekę nad wsiami.",
-        ]
-        self.draw_building_template(screen, "Szpital", lines)
-
-    def draw_school(self, screen):
-        lines = [
-            "Dzięki wykładanym tu naukom możliwe będzie szkolenie",
-            "Twoich wojsk w rzemiośle rycerskim.",
-            "",
-            "Ponadto uczeni waldzcy umożliwią osiągnięcie wyższego",
-            "poziomu technologii w Twoim królestwie.",
-        ]
-        self.draw_building_template(screen, "Szkoła", lines)
-
-    def draw_building_template(self, screen, title, lines,
-                                theme_color=(100, 100, 130),
-                                border_color=(180, 180, 220)):
-        screen.fill((60, 60, 80))
-        font_title = pygame.font.SysFont(None, 48)
-        font_text  = pygame.font.SysFont(None, 24)
-
-        panel = pygame.Rect(120, 80, 760, 420)
-        pygame.draw.rect(screen, theme_color, panel)
-        pygame.draw.rect(screen, border_color, panel, 6)
-
-        title_surface = font_title.render(title.upper(), True, border_color)
-        screen.blit(title_surface,
-                    (panel.centerx - title_surface.get_width() // 2, panel.y - 40))
-
-        y = panel.y + 30
-        for line in lines:
-            txt = font_text.render(line, True, (255, 255, 255))
-            screen.blit(txt, (panel.x + 30, y))
-            y += 28
-
-        self.draw_building_footer(screen)
 
     def start_recruitment(self, index):
         if index is None:
@@ -415,6 +235,7 @@ class BuildingsMixin:
         )
 
     def destroy_straznica(self, castle):
+
         """Niszczy strażnicę, tworzy jedną armię z jej załogi i zostawia ruiny."""
         from unit import Unit  # Import lokalny, żeby uniknąć problemów
         
@@ -457,70 +278,193 @@ class BuildingsMixin:
         self.selected_castle = None
         self.screen = "map"
         return True
+ 
+    def start_building(self, x, y, b_type, builder=None):
+        if b_type not in BUILDING_TYPES:
+            return False
+        config = BUILDING_TYPES[b_type]
+
+        ix, iy = int(x), int(y)
+        anchor_x, anchor_y = ix, iy
+        found_foundation = False
+
+        if config.get("size") == 2:
+            for dx in [0, -1]:
+                for dy in [0, -1]:
+                    nx, ny = ix + dx, iy + dy
+                    if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
+                        if self.map[ny][nx] == "#":
+                            anchor_x, anchor_y = nx, ny
+                            found_foundation = True
+                            break
+                if found_foundation:
+                    break
+            if not found_foundation:
+                print("BŁĄD: Zamek/Twierdza wymaga fundamentów (#)!")
+                return False
+        else:
+            # Strażnica (size 1) - Naprawione odwołanie do pathfindera
+            if self.map[iy][ix] in [".", "p", "P", "s"] and \
+               not getattr(self.pathfinder, 'is_area_occupied_by_foundation', lambda x,y: False)(ix, iy):
+                found_foundation = True
+            else:
+                print(f"BŁĄD: Strażnica wymaga czystego terenu! Aktualnie jest tu: '{self.map[iy][ix]}'")
+                return False
+
+        new_castle = Castle(anchor_x, anchor_y, self.current_player,
+                            building_type=b_type)
+        new_castle.under_construction = True
+        new_castle.total_work_needed  = 12.0
+        new_castle.work_done          = 0.0
+        new_castle.mury_percent       = 0
+
+        army = self.get_unit_at(ix, iy)
+        if army:
+            self.enter_castle(army, new_castle)
+
+        self.castles.append(new_castle)
+
+        size = 2 if config.get("size") == 2 else 1
+        for dy in range(size):
+            for dx in range(size):
+                self.map[anchor_y + dy][anchor_x + dx] = "P"
+
+        print(f"Rozpoczęto budowę {b_type}.")
+        return True
+
+    def execute_build_action(self, button_index, army):
+        if not army: return
+        grid_x, grid_y = int(army.x), int(army.y)
+
+        def get_builder(a):
+            if getattr(a, 'type', None) == "Budowniczy":
+                return a
+            if hasattr(a, 'garrison'):
+                for slot in a.garrison:
+                    if slot and getattr(slot, 'type', None) == "Budowniczy":
+                        return slot
+            return None
+
+        builder = get_builder(army)
+        if not builder:
+            print("Brak Budowniczego w armii!")
+            return
+
+        # ===============================================
+        # NOWOŚĆ: Wyzerowanie trasy marszu i zniknięcie stóp
+        # ===============================================
+        army.planned_path = []
+        army.target_x = None
+        army.target_y = None
+
+        # 1. DROGA (Indeks 0) - WŁĄCZ / WYŁĄCZ
+        if button_index == 0:           
+            if getattr(self, 'road_build_mode', False):
+                self.road_build_mode = False 
+                self.build_menu_open = False # Odkliknięcie = powrót do 6 przycisków
+                print("Wyłączono tryb budowy drogi.")
+            else:
+                if army.move_points >= 5:
+                    self.road_build_mode = True
+                    self.trap_build_mode = False 
+                    # ZOSTWIAMY MENU OTWARTE! (żeby się świeciło)
+                    print("Włączono tryb budowy drogi.")
+                else:
+                    print("Za mało punktów ruchu!")
+            return 
+
+        # 2. PUŁAPKA (Indeks 1) - WŁĄCZ / WYŁĄCZ
+        elif button_index == 1:         
+            if getattr(self, 'trap_build_mode', False):
+                self.trap_build_mode = False 
+                self.build_menu_open = False # Odkliknięcie = powrót do 6 przycisków
+                print("Wyłączono tryb budowy pułapki.")
+            else:
+                self.trap_build_mode = True
+                self.road_build_mode = False 
+                self.active_builder_army = army
+                self.active_builder_unit = builder
+                # ZOSTWIAMY MENU OTWARTE!
+                print("Wybierz pole na pułapkę.")
+            return
+
+        # 3. SKARB (Indeks 2)
+        elif button_index == 2:         
+            if self.map[grid_y][grid_x] == "$":
+                army.owner.gold += 500
+                self.map[grid_y][grid_x] = "."
+                print("Skarb zebrany!")
+            else:
+                print("Tu nie ma żadnego skarbu.")
+            
+            # Zawsze czyścimy i wracamy do 6 przycisków
+            self.road_build_mode = False
+            self.trap_build_mode = False
+            self.build_menu_open = False 
+            return
+
+        # Pozostałe budynki (Indeksy 3, 4, 5)
+        menu_to_type = {3: "Strażnica", 4: "Twierdza", 5: "Zamek"}
+        if button_index in menu_to_type:
+            building_type = menu_to_type[button_index]
+            print(f"Próba budowy: {building_type}")
+            
+            # Resetujemy strzałki/pułapki na wszelki wypadek
+            self.road_build_mode = False
+            self.trap_build_mode = False
+            
+            success = self.start_building(grid_x, grid_y, building_type, builder)
+            
+            # Po kliknięciu zamku zawsze zamykamy menu budowy
+            self.build_menu_open = False
+            if success:
+                self.selected_unit = None
+            return
 
     def execute_trap_build(self, gx, gy):
         u = self.selected_unit
-
         dist_x = abs(gx - u.x)
         dist_y = abs(gy - u.y)
 
-        # Sprawdzamy zasięg 1 pola i czy to nie jest pole budowniczego
         if dist_x <= 1 and dist_y <= 1 and not (dist_x == 0 and dist_y == 0):
-            # Sprawdzamy teren za pomocą Twojej funkcji sprawdzającej
             if self.pathfinder.can_build_trap(gx, gy):
-                # Budujemy!
                 self.trap_backgrounds[(gx, gy)] = self.map[gy][gx]
                 self.map[gy][gx] = "X"
-                
-                # Usuwamy jednego budowniczego (Twoja specjalna funkcja)
                 self.remove_unit_or_builder(u, u)
                 
                 self.trap_build_mode = False
+                self.build_menu_open = False # Wraca do 6 przycisków po zbudowaniu
                 self.selected_unit = None
                 print("Pułapka zastawiona pomyślnie!")
             else:
                 print("Zły teren na pułapkę!")
         else:
             print("Poza zasięgiem budowy!")
-            self.trap_build_mode = False
 
     def execute_road_build(self, gx, gy):
         u = self.selected_unit
-        
-        # STRAŻNIK: Jeśli u jest None, po prostu wyjdź z funkcji
-        if u is None:
-            print("DEBUG: Próba budowy drogi bez zaznaczonej jednostki!")
-            return
+        if u is None: return
 
         dist_x = abs(gx - u.x)
         dist_y = abs(gy - u.y)
 
-        # Sprawdzamy czy kliknięto dokładnie 1 pole obok (kierunek N, S, E, W)
         if (dist_x == 1 and dist_y == 0) or (dist_x == 0 and dist_y == 1):
             if self.pathfinder.can_build_road(gx, gy):
-                # 1. Stawiamy drogę na aktualnym polu budowniczego
                 self.map[u.y][u.x] = "_"
-                
-                # 2. Przesuwamy budowniczego na nowe pole
                 u.x, u.y = gx, gy
-                
-                # 3. Zabieramy punkty ruchu (koszt budowy drogi u Ciebie to 5)
                 u.move_points -= 5
                 
-                # 4. Sprawdzamy czy może budować dalej w tej turze
                 if u.move_points < 5:
                     self.road_build_mode = False
+                    self.build_menu_open = False # Wraca do 6 przycisków po wyczerpaniu ruchu
                     print("Koniec punktów ruchu. Droga ukończona.")
                 else:
-                    print("Droga położona. Możesz kontynuować budowę.")
+                    print("Droga położona. Możesz kontynuować.")
             else:
                 print("Tu nie można budować drogi!")
-                self.road_build_mode = False
         else:
-            # Jeśli gracz kliknął za daleko, wyłączamy tryb
-            self.road_build_mode = False        
+            print("Buduj drogę na sąsiednim polu (pion/poziom).")
 
-           
     def handle_building_logic(self, mx, my, gx, gy):
         tile = self.map[gy][gx]
         builder = self.selected_unit # Tutaj już używasz nazwy 'builder'
@@ -623,7 +567,7 @@ class BuildingsMixin:
             return
 
         
-        if self.garrison_gfx.handle_prod_click(mx, my, castle):
+        if self.start_prod_button.collidepoint(mx, my): # PRAWIDŁOWY PRZYCISK "START"
             if self.selected_patent_index is not None:
                 p = castle.patents[self.selected_patent_index]
                 u_name = p["unit_type"] if isinstance(p, dict) else p
@@ -808,6 +752,15 @@ class BuildingsMixin:
 
         # 1. MENU BUDOWANIA (Najwyższy priorytet)
         if getattr(self, 'menu_open', False):
+            # NAJPIERW: Sprawdzamy główne menu (ZBURZ ZAMEK itp.)
+            for name, rect in getattr(self, 'menu_rects', {}).items():
+                if rect.collidepoint(mx, my):
+                    if name == "ZBURZ ZAMEK":
+                        self.demolish_confirm = True # Aktywujemy okienko!
+                        self.menu_open = False
+                        return
+                        
+            # POTEM: Sprawdzamy opcje budowania
             for name, rect in getattr(self, 'build_rects', {}).items():
                 if rect.collidepoint(mx, my):
                     if castle.build(name):
@@ -858,8 +811,8 @@ class BuildingsMixin:
             self.screen = "castle"
             return
 
-        # ================= RECRUITMENT =================
-        if ("koszary" in castle.buildings and hasattr(self, 'recruit_button') and self.recruit_button.collidepoint(mx, my)):
+        # ================= RECRUITMENT (Poprawione) =================
+        if self.garrison_gfx.handle_prod_click(mx, my, castle):
             self.screen = "recruitment"
             self.recruitment_open = True
             self.recruitment_scroll = -2  
@@ -883,8 +836,8 @@ class BuildingsMixin:
                 print("Brak zaznaczonych jednostek do szkolenia")
             return
             
-        # ================= WYŚLIJ WOJSKO ======================
-        if hasattr(self, 'button_send_army') and self.button_send_army.collidepoint(mx, my):
+        # ================= WYŚLIJ WOJSKO (Poprawione) ======================
+        if self.garrison_gfx.handle_release_click(mx, my, self.selected_units):
             self.release_selected_units()
             return
         
@@ -930,3 +883,8 @@ class BuildingsMixin:
                     self.selected_units.append(unit)
                 else:
                     print("DEBUG: Garnizon jest pełen!")
+
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])

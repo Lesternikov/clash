@@ -28,29 +28,95 @@ from castle import Castle
 #  Zmień numer po prawej stronie na inny z tej samej grupy.
 #  Np. góra to 12 — jeśli zła, spróbuj 30, 42, 49, 59
  
+# ================================================================
+#  SYSTEM STYKÓW — każdy kafel trasy zna kierunek SKĄD i DOKĄD
+#
+#  Klucz: (skąd_dx, skąd_dy, dokąd_dx, dokąd_dy)
+#  Czyli: z jakiego kierunku przyszedłem + w jaki kierunek idę
+#
+#  Przykład: (1,0, 1,0) = szedłem w prawo i dalej idę w prawo → prosta linia
+#            (0,1, 1,0) = szedłem w dół, teraz skręcam w prawo → zakręt
+#
+#  skąd/dokąd to wartości -1, 0 lub 1
+#
+#  CZARNE (dotrę w tej turze) — zmień numery jeśli zła grafika
 STEP_BLACK = {
-    # (dx, dy) : numer_pliku    # kierunek    # alternatywy z innych grup
-    ( 0, -1):  32,  # góra          
-    ( 1, -1):  41,  # góra-prawo    
-    ( 1,  0):  50,  # prawo         
-    ( 1,  1):  59,  # dół-prawo     
-    ( 0,  1):   4,  # dół           
-    (-1,  1):  13,  # dół-lewo      
-    (-1,  0):  22,  # lewo          
-    (-1, -1):  31,  # góra-lewo     
+    # Format: (skąd_x, skąd_y, dokąd_x, dokąd_y): numer_pliku
+    # Zakręty używają grafiki kierunku DOKĄD (stopa "wchodzi" w nowy kierunek)
+ 
+    # === PROSTO ===
+    ( 1, 0,  1, 0):  50,  # prawo → prawo 
+    (-1, 0, -1, 0):  22,  # lewo  → lewo  
+    ( 0, 1,  0, 1):   4,  # dół   → dół   
+    ( 0,-1,  0,-1):  32,  # góra  → góra  
+    ( 1, 1,  1, 1):  59,  # skos PD → PD  
+    (-1, 1, -1, 1):  13,  # skos LD → LD  
+    ( 1,-1,  1,-1):  41,  # skos PG → PG  
+    (-1,-1, -1,-1):  31,  # skos LG → LG
+ 
+    # === ZAKRĘTY 90° ===
+    ( 1, 0,  0,-1):  16,  # prawo  → góra 
+    ( 0, 1,  1, 0):  34,  # dół    → prawo
+    (-1, 0,  0, 1):  52,  # lewo   → dół  
+    ( 0,-1, -1, 0):   6,  # góra   → lewo 
+    ( 1, 0,  0, 1):  20,  # prawo  → dół  
+    ( 0,-1,  1, 0):   2,  # góra   → prawo
+    (-1, 0,  0,-1):  48,  # lewo   → góra 
+    ( 0, 1, -1, 0):  38,  # dół    → lewo 
+ 
+    # === ZAKRĘTY ze skosu ===
+    ( 1,-1,  0, 1):  12,  # skos PG → dół 
+    (-1, 1,  0,-1):  40,  # skos LD → góra
+    ( 1, 1, -1, 0):  30,  # skos PD → lewo
+    (-1,-1,  1, 0):  58,  # skos LG → prawo
+    ( 1,-1, -1, 0):  14,  # skos PG → lewo
+    (-1, 1,  1, 0):  42,  # skos LD → prawo
+    ( 1, 1,  0,-1):  24,  # skos PD → góra
+    (-1,-1,  0, 1):  60,  # skos LG → dół 
 }
  
 STEP_RED = {
-    # Czerwone zaczynają się od 67, ta sama kolejność co czarne
-    # (dx, dy) : numer_pliku    # kierunek    # alternatywy
-    ( 0, -1):  97,  # góra        ← spróbuj: 97, 112
-    ( 1, -1): 106,  # góra-prawo  ← spróbuj: 98, 113
-    ( 1,  0): 115,  # prawo       ← spróbuj: 99, 114
-    ( 1,  1): 124,  # dół-prawo   ← spróbuj: 100
-    ( 0,  1):  69,  # dół         ← spróbuj: 71, 88
-    (-1,  1):  78,  # dół-lewo    ← spróbuj: 72, 86, 95
-    (-1,  0):  87,  # lewo        ← spróbuj: 87, 96
-    (-1, -1):  96,  # góra-lewo   ← spróbuj: 76, 96, 106
+    # === PROSTO ===
+    ( 1, 0,  1, 0): 115,  # prawo → prawo 
+    (-1, 0, -1, 0):  87,  # lewo  → lewo  
+    ( 0, 1,  0, 1):  69,  # dół   → dół   
+    ( 0,-1,  0,-1):  97,  # góra  → góra  
+    ( 1, 1,  1, 1): 124,  # skos PD → PD  
+    (-1, 1, -1, 1):  78,  # skos LD → LD  
+    ( 1,-1,  1,-1): 106,  # skos PG → PG  
+    (-1,-1, -1,-1):  96,  # skos LG → LG  
+ 
+    # === ZAKRĘTY 90° ===
+    ( 1, 0,  0,-1):  97,  # prawo  → góra 
+    ( 0, 1,  1, 0): 115,  # dół    → prawo
+    (-1, 0,  0, 1):  69,  # lewo   → dół  
+    ( 0,-1, -1, 0):  87,  # góra   → lewo 
+    ( 1, 0,  0, 1):  69,  # prawo  → dół  
+    ( 0,-1,  1, 0): 115,  # góra   → prawo
+    (-1, 0,  0,-1):  97,  # lewo   → góra 
+    ( 0, 1, -1, 0):  87,  # dół    → lewo 
+ 
+    # === ZAKRĘTY ze skosu ===
+    ( 1,-1,  0, 1):  69,  # skos PG → dół 
+    (-1, 1,  0,-1):  97,  # skos LD → góra
+    ( 1, 1, -1, 0):  87,  # skos PD → lewo
+    (-1,-1,  1, 0): 115,  # skos LG → prawo
+    ( 1,-1, -1, 0):  87,  # skos PG → lewo
+    (-1, 1,  1, 0): 115,  # skos LD → prawo
+    ( 1, 1,  0,-1):  97,  # skos PD → góra
+    (-1,-1,  0, 1):  69,  # skos LG → dół 
+}
+ 
+#  FALLBACK — pierwszy krok trasy (brak poprzedniego kierunku)
+STEP_BLACK_SINGLE = {
+    ( 0,-1):  32,   ( 1,-1):  41,   ( 1, 0):  50,
+    ( 1, 1):  59,   ( 0, 1):   4,   (-1, 1):  13,
+    (-1, 0):  22,   (-1,-1):  31,
+}
+STEP_RED_SINGLE = {
+    ( 0,-1):  97,   ( 1,-1): 106,   ( 1, 0): 115,
+    ( 1, 1): 124,   ( 0, 1):  69,   (-1, 1):  78,
+    (-1, 0):  87,   (-1,-1):  96,
 }
  
 # ================================================================
@@ -231,29 +297,35 @@ class Pathfinder:
  
     def _load_steps(self):
         """
-        Ładuje grafiki stóp jeden raz.
-        Przy błędnym kierunku zmień numer w STEP_BLACK / STEP_RED na górze pliku.
-        Fallback = stare kółko jeśli plik nie istnieje.
+        Ładuje wszystkie unikalne numery plików z STEP_BLACK i STEP_RED.
+        Każdy plik ładowany tylko raz, nawet jeśli używany wielokrotnie.
         """
-        def load_one(number, fallback_color):
-            path = os.path.join(STEP_FOLDER, f"STEP_S32_{number}.png")
+        # Zbieramy wszystkie unikalne numery
+        all_nums = set(STEP_BLACK.values()) | set(STEP_RED.values()) | \
+                   set(STEP_BLACK_SINGLE.values()) | set(STEP_RED_SINGLE.values())
+ 
+        raw = {}  # numer -> Surface
+        for num in all_nums:
+            path = os.path.join(STEP_FOLDER, f"STEP_S32_{num}.png")
             if os.path.exists(path):
                 img = pygame.image.load(path).convert_alpha()
-                return pygame.transform.scale(img, STEP_DISPLAY_SIZE)
+                raw[num] = pygame.transform.scale(img, STEP_DISPLAY_SIZE)
             else:
-                print(f"[Stopy] BRAK: STEP_S32_{number}.png — używam kółka")
+                print(f"[Stopy] BRAK: STEP_S32_{num}.png")
                 surf = pygame.Surface(STEP_DISPLAY_SIZE, pygame.SRCALPHA)
-                cx = STEP_DISPLAY_SIZE[0] // 2
-                cy = STEP_DISPLAY_SIZE[1] // 2
-                r  = STEP_DISPLAY_SIZE[0] // 3
-                pygame.draw.circle(surf, (255, 255, 255), (cx, cy), r + 1)
-                pygame.draw.circle(surf, fallback_color,  (cx, cy), r)
-                return surf
+                cx, cy = STEP_DISPLAY_SIZE[0]//2, STEP_DISPLAY_SIZE[1]//2
+                r = STEP_DISPLAY_SIZE[0]//3
+                pygame.draw.circle(surf, (255,255,255), (cx,cy), r+1)
+                pygame.draw.circle(surf, (100,100,100), (cx,cy), r)
+                raw[num] = surf
  
-        black_imgs = {d: load_one(n, (20, 20, 20))    for d, n in STEP_BLACK.items()}
-        red_imgs   = {d: load_one(n, (220, 30, 30))   for d, n in STEP_RED.items()}
- 
-        Pathfinder._step_imgs = {"black": black_imgs, "red": red_imgs}
+        # Budujemy słowniki kierunek->Surface
+        Pathfinder._step_imgs = {
+            "black":        {k: raw[v] for k, v in STEP_BLACK.items()},
+            "red":          {k: raw[v] for k, v in STEP_RED.items()},
+            "black_single": {k: raw[v] for k, v in STEP_BLACK_SINGLE.items()},
+            "red_single":   {k: raw[v] for k, v in STEP_RED_SINGLE.items()},
+        }
         print("[Stopy] Załadowano grafiki kroków.")
  
     # -------------------------------------------------------
@@ -261,20 +333,43 @@ class Pathfinder:
     # -------------------------------------------------------
  
     def draw_path_dots(self, screen, unit, path):
+        """
+        Rysuje stopy wzdłuż trasy.
+        Każdy kafel dobiera grafikę na podstawie SKĄD i DOKĄD —
+        dzięki temu stopy płynnie łączą się w zakrętach (styki).
+        """
         w = self.world
  
         if Pathfinder._step_imgs is None:
             self._load_steps()
  
-        black_imgs = Pathfinder._step_imgs["black"]
-        red_imgs   = Pathfinder._step_imgs["red"]
- 
+        imgs        = Pathfinder._step_imgs
         current_x, current_y = unit.x, unit.y
         accumulated_cost = 0
  
-        for px, py in path:
-            dx = px - current_x
-            dy = py - current_y
+        # Budujemy listę kroków z poprzednim i następnym kierunkiem
+        # path = [(x0,y0), (x1,y1), ...]
+        # Dodajemy pozycję startową żeby móc wyliczyć "skąd"
+        full = [(unit.x, unit.y)] + list(path)
+ 
+        for i in range(1, len(full)):
+            px, py = full[i]
+            prev_x, prev_y = full[i-1]
+ 
+            # Kierunek DOKĄD (obecny krok)
+            dx = px - prev_x
+            dy = py - prev_y
+            to_dir = ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
+ 
+            # Kierunek SKĄD (skąd przyszedłem na ten kafel)
+            # = odwrotność kierunku poprzedniego kroku
+            if i >= 2:
+                ppx, ppy = full[i-2]
+                fdx = prev_x - ppx
+                fdy = prev_y - ppy
+                from_dir = ((fdx > 0) - (fdx < 0), (fdy > 0) - (fdy < 0))
+            else:
+                from_dir = None  # pierwszy krok — brak poprzedniego
  
             # Koszt kroku
             tile_char = w.map[py][px]
@@ -282,34 +377,36 @@ class Pathfinder:
             move_mod  = 1.41 if (dx != 0 and dy != 0) else 1.0
             accumulated_cost += base_cost * move_mod
  
+            in_range = accumulated_cost <= unit.move_points
+            pairs    = imgs["black"]        if in_range else imgs["red"]
+            singles  = imgs["black_single"] if in_range else imgs["red_single"]
+ 
+            # Szukamy grafiki — najpierw para (styk), potem pojedynczy kierunek
+            img = None
+            if from_dir is not None:
+                key = (from_dir[0], from_dir[1], to_dir[0], to_dir[1])
+                img = pairs.get(key)
+            if img is None:
+                img = singles.get(to_dir)
+ 
             # Pozycja na ekranie — środek kafla
             screen_x = px * TILE_SIZE + TILE_SIZE // 2 - w.camera_x
             screen_y = py * TILE_SIZE + TILE_SIZE // 2 - w.camera_y
  
-            # Poza ekranem — pomijamy
             margin = TILE_SIZE * 2
             if not (-margin < screen_x < SCREEN_WIDTH  + margin and
                     -margin < screen_y < SCREEN_HEIGHT + margin):
-                current_x, current_y = px, py
                 continue
- 
-            # Kierunek → normalizujemy do -1/0/1
-            direction = ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
- 
-            in_range = accumulated_cost <= unit.move_points
-            img      = (black_imgs if in_range else red_imgs).get(direction)
  
             if img:
                 blit_x = screen_x - img.get_width()  // 2
                 blit_y = screen_y - img.get_height() // 2
                 screen.blit(img, (blit_x, blit_y))
             else:
-                # Fallback: stare kółka
+                # Ostateczny fallback: kółko
                 color = (0, 0, 0) if in_range else (255, 0, 0)
-                pygame.draw.circle(screen, (255, 255, 255), (screen_x, screen_y), 5)
-                pygame.draw.circle(screen, color,           (screen_x, screen_y), 4)
- 
-            current_x, current_y = px, py
+                pygame.draw.circle(screen, (255,255,255), (screen_x, screen_y), 5)
+                pygame.draw.circle(screen, color,         (screen_x, screen_y), 4)
  
     # -------------------------------------------------------
     # STRZAŁKI BUDOWY DROGI
@@ -318,9 +415,9 @@ class Pathfinder:
     def _load_arrows(self):
         arrow_files = {
             (0, -1): "assets/MAP_BUTT_S32_27.png",  # góra
-            (-1, 0): "assets/MAP_BUTT_S32_28.png",  # lewo
+            (-1, 0): "assets/MAP_BUTT_S32_30.png",  # lewo
             (0,  1): "assets/MAP_BUTT_S32_29.png",  # dół
-            (1,  0): "assets/MAP_BUTT_S32_30.png",  # prawo
+            (1,  0): "assets/MAP_BUTT_S32_28.png",  # prawo
         }
         imgs = {}
         for direction, path in arrow_files.items():
@@ -330,44 +427,10 @@ class Pathfinder:
                 imgs[direction] = img
             else:
                 print(f"[Strzałki] BRAK: {path}")
-                surf = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                surf = pygame.Surface((10, 10), pygame.SRCALPHA)
                 surf.fill((200, 200, 200, 180))
                 imgs[direction] = surf
         Pathfinder._arrow_imgs = imgs
- 
-    def draw_road_arrows(self, screen):
-        w = self.world
-        u = w.selected_unit
-        if not u:
-            return
-
-        # Sprawdzenie czy załadowano grafiki
-        if getattr(Pathfinder, '_arrow_imgs', None) is None:
-            if hasattr(self, '_load_arrows'):
-                self._load_arrows()
-
-        for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
-            tx, ty = u.x + dx, u.y + dy
-            
-            # Jeśli nie można budować, pomijamy
-            if not self.can_build_road(tx, ty):
-                continue
-
-            # Obliczanie pozycji na ekranie
-            pos_x = tx * TILE_SIZE - w.camera_x
-            pos_y = ty * TILE_SIZE - w.camera_y
-
-            # Optymalizacja (nie rysujemy jeśli poza ekranem)
-            if pos_x < -TILE_SIZE or pos_x > SCREEN_WIDTH or \
-               pos_y < -TILE_SIZE or pos_y > SCREEN_HEIGHT:
-                continue
-
-            # Rysowanie grafiki
-            img = Pathfinder._arrow_imgs.get((dx, dy))
-            if img:
-                offset_x = (TILE_SIZE - img.get_width())  // 2
-                offset_y = (TILE_SIZE - img.get_height()) // 2
-                screen.blit(img, (pos_x + offset_x, pos_y + offset_y))
 
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
@@ -423,32 +486,48 @@ class Pathfinder:
     
     def can_build_trap(self, x, y):
         # gdzie można budować pułapkę
-        if not (0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[0])): return False
-        terrain = self.world.map[y][x]
-        # Blokada: l (las), g (niskie góry), G (wysokie góry), W (woda)
-        if terrain in ["l", "g", "#", "&","S","x","B","b", "G", "W"]: return False
+        w = self.world
+        if not (0 <= y < len(w.map) and 0 <= x < len(w.map[0])): 
+            return False
+            
+        bg_terrain = w.bg_map[y][x] # Warstwa podłoża (lasy, góry, woda)
+        obj_terrain = w.map[y][x]   # Warstwa obiektów (zamki, fundamenty)
+
+        # 1. Blokada ze względu na podłoże
+        if bg_terrain in ["l", "g", "G", "W", "M", "B", "b"]: 
+            return False
+            
+        # 2. Blokada ze względu na obiekty na mapie
+        if obj_terrain in ["#", "&", "S", "x", "X"]: 
+            return False
+            
         # Nie budujemy na budynkach (duże litery) ani innych pułapkach
-        if terrain == "X" or (terrain.isupper() and terrain not in ["P"]): return False
+        if obj_terrain.isupper() and obj_terrain not in ["P"]: 
+            return False
+            
         return True           
             
     def can_build_road(self, x, y):
         # gdzie można budować drogę
-        if not (0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[0])):
+        w = self.world
+        if not (0 <= y < len(w.map) and 0 <= x < len(w.map[0])):
             return False
         
-        terrain = self.world.map[y][x]
-        # Lista zakazana według Twoich wytycznych
-        forbidden = ["l", "g", "#", "&", "S", "x", "B", "b", "G", "W"]
+        bg_terrain = w.bg_map[y][x]
+        obj_terrain = w.map[y][x]
         
-        if terrain in forbidden:
+        # 1. Blokada ze względu na podłoże
+        if bg_terrain in ["l", "g", "G", "W", "M", "B", "b"]: 
             return False
             
-        # Nie budujemy na już istniejącej drodze (chyba że chcesz naprawiać?)
-        if terrain == "_":
+        # 2. Blokada ze względu na obiekty na mapie (nie budujemy na drodze "_")
+        if obj_terrain in ["#", "&", "S", "x", "X", "_"]: 
             return False
             
-        return True
-           
+        if obj_terrain.isupper() and obj_terrain not in ["P"]: 
+            return False
+            
+        return True       
 
 if __name__ == "__main__":
     import subprocess, sys, os

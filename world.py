@@ -11,6 +11,7 @@ from controls import ControlsHandler
 from UI_components import UnitInfoWindow  
 from castle_graphics import CastleGraphics
 from garrison_graphics import GarrisonGraphics
+from recruitment import RecruitmentManager
 
 @property
 def back_button(self):
@@ -45,7 +46,7 @@ class World(BuildingsMixin):
         self.garrison_gfx = GarrisonGraphics(w, h)
         self.unit_info_window = UnitInfoWindow()
         self.court = CourtHandler(self)
-
+        self.recruitment_manager = RecruitmentManager(self)
         pygame.font.init()
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)
@@ -647,8 +648,9 @@ class World(BuildingsMixin):
                 
                 # --- KLUCZOWA POPRAWKA: USUWANIE ZE SLOTU ---
                 for slot_idx in range(len(target.garrison)):
-                    if target.garrison[slot_idx] is solo_unit: # 'is' sprawdza konkretny obiekt
+                    if target.garrison[slot_idx] is unit_to_move: # lub solo_unit
                         target.garrison[slot_idx] = None
+                        self.garrison_gfx.trigger_door_open(slot_idx) # <--- DODAJ TO
                         break
                 # --------------------------------------------
 
@@ -677,9 +679,10 @@ class World(BuildingsMixin):
                         
                         # --- CZYŚCIMY SLOTY W BUDYNKU ---
                         for slot_idx in range(len(target.garrison)):
-                            if target.garrison[slot_idx] is unit_to_move:
+                            if target.garrison[slot_idx] is unit_to_move: # lub solo_unit
                                 target.garrison[slot_idx] = None
-                                break 
+                                self.garrison_gfx.trigger_door_open(slot_idx) # <--- DODAJ TO
+                                break
 
                         if unit_to_move in self.units:
                             self.units.remove(unit_to_move)
