@@ -98,30 +98,25 @@ class Pathfinder:
         w = self.world
         w.bg_map = self.load_map(f"{map_base_name}_terrain.txt")
         w.map    = self.load_map(f"{map_base_name}_objects.txt")
- 
-        objects       = load_fac_objects(fac_file)
+
+        objects = load_fac_objects(fac_file)
         castle_places = objects.get("zamek_place", [])
-        built_indices = objects.get("zbudowano_zamek", [0, 1])
- 
-        w.castles          = []
-        w.castle_locations = []
- 
+        
+        # WYMUSZONY SETUP TESTOWY:
+        # Zamki 0 i 1 należą do gracza 0. Zamki 2 i 3 należą do gracza 1.
+        test_setup = {0: 0, 1: 0, 2: 1, 3: 1} 
+
+        w.castles = []
         for i, (x, y) in enumerate(castle_places):
             ix, iy = int(x), int(y)
-            if i in built_indices:
-                owner_id = built_indices[i]
-                if owner_id < len(w.players):
-                    c = Castle(ix, iy, w.players[owner_id])
-                    c.gold = 20000
-                    w.castles.append(c)
-                else:
-                    w.castle_locations.append((ix, iy))
+            if i in test_setup:
+                owner_id = test_setup[i]
+                c = Castle(ix, iy, w.players[owner_id])
+                c.gold = 2000 if i % 2 == 0 else 1000 # Różne kwoty dla testu
+                w.castles.append(c)
             else:
                 w.castle_locations.append((ix, iy))
- 
-        print(f"Zbudowano zamków: {len(w.castles)}")
-        print(f"Miejsc pod budowę: {len(w.castle_locations)}")
- 
+                
     # -------------------------------------------------------
     # POMOCNICZE
     # -------------------------------------------------------

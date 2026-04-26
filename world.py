@@ -254,6 +254,7 @@ class World(BuildingsMixin):
         
      
 # Wewnątrz world.py, w sekcji inicjalizacji graczy:
+        num_players = 2  # Na razie wymuszamy 2 graczy
         self.players = []
         player_data = [
             ("Don Marek", (200, 0, 0), "red"),     # ID 0
@@ -264,11 +265,11 @@ class World(BuildingsMixin):
         ]
 
         from player import Player
-        for i, (name, color_rgb, color_name) in enumerate(player_data):
-            # Przekazujemy teraz też color_name
+        for i in range(num_players):
+            name, color_rgb, color_name = player_data[i]
             new_player = Player(i, name, color_rgb, color_name)
             self.players.append(new_player)
-
+            
             self.back_destination = "map" # Cel powrotu
    
     def setup_starting_units(self):
@@ -283,14 +284,12 @@ class World(BuildingsMixin):
                 infantry = Unit("INFL", start_x, start_y, owner_obj)
                 self.add_unit(infantry)
                 
-                # 2. BUDOWNICZY (Jeden kafelek w prawo, jeden w dół od zamku)
-                # Zmieniamy c.x na c.x + 1, żeby nie stał NA zamku
-                builder_x = int(c.x + 5)
-                builder_y = int(c.y - 65)
-                builder = Unit("BUDOW", builder_x, builder_y, owner_obj)
+                # Każdy zamek dostaje swojego budowniczego (razem 2 na gracza)
+                start_x = int(c.x + 2) # Stawiamy obok zamku
+                start_y = int(c.y)
+                builder = Unit("BUDOW", start_x, start_y, c.owner)
                 self.add_unit(builder)
                 
-                print(f"Rozstawiono jednostki dla: {owner_obj.color_name} na ({builder_x}, {builder_y})")
 
     def add_player(self, player):
         self.players.append(player)

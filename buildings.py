@@ -155,7 +155,8 @@ class BuildingsMixin:
             print("Nie wybrano zamku")
             return
             
-        if len(self.selected_castle.garrison) >= 12:
+        castle = self.selected_castle # Używamy skarbu zamku
+        if len(castle.garrison) >= 12:
             print("Zamek jest pełny")
             return
 
@@ -164,34 +165,23 @@ class BuildingsMixin:
             return
 
         player = self.players[self.current_player]
-        unit_code = self.selected_recruit_unit  # np. "INFL"
-
-        # 1. Pobieramy pełną nazwę, bo UNIT_STATS używa nazw (np. "Lekka piechota")
+        unit_code = self.selected_recruit_unit 
         full_name = UNIT_NAMES.get(unit_code, "Nieznany")
-
-        # 2. Pobieramy statystyki dla tej nazwy
         unit_data = UNIT_STATS.get(full_name, {})
-
-        # 3. Pobieramy koszt (w Twoim settings.py to "production_cost")
         cost = unit_data.get("production_cost", 0)
 
-        if player.gold < cost:
-            print(f"Za mało złota! Potrzeba {cost}, masz {player.gold}")
+        # KLUCZOWA ZMIANA: Sprawdzamy złoto w zamku, nie u gracza
+        if castle.gold < cost:
+            print(f"Za mało złota w zamku! Potrzeba {cost}, masz {castle.gold}")
             return
 
-        # 4. Odejmowanie złota i tworzenie jednostki
-        player.gold -= cost
+        # Odejmowanie złota ze skarbca zamku
+        castle.gold -= cost
 
-        u = Unit(
-            unit_code,            # Zmieniono z unit_type na unit_code!            
-            self.selected_castle.x,
-            self.selected_castle.y,
-            player
-        )
-
-        self.selected_castle.add_to_garrison(u)
-        print(f"Zrekrutowano {full_name}") # full_name ładniej wygląda w konsoli
-
+        u = Unit(unit_code, castle.x, castle.y, player)
+        castle.add_to_garrison(u)
+        print(f"Zrekrutowano {full_name} w zamku ({castle.x}, {castle.y})")
+        
     def train_selected_garrison_units(self):
         if not self.selected_castle or not self.selected_units:
             print("Błąd: Nie wybrano zamku lub jednostek!")
