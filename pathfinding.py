@@ -11,23 +11,6 @@ from castle import Castle
 #
 #  CZARNE stopy (0-66)  = jednostka DOTRZE w tej turze
 #  CZERWONE stopy (67-129) = ZABRAKNIE punktów ruchu
-#
-#  Czarne pliki ze zdjęcia — biorę najlepszy z każdej grupy:
-#  Grupa A (2-6):   ↗↘↓↙←
-#  Grupa B (11-16): ↖↑↗→↘↓
-#  Grupa C (19-25): ↙←↙↓↘→↗   (duplikaty kierunków, warianty animacji)
-#  Grupa D (29-35): ↖↑↗→↘↙←
-#  Grupa E (39-44): ↙←↖↑↗→
-#  Grupa F (48-52): ↖↑↗↙↙
-#  Grupa G (56-61): ↙←↖↑↗→
-#
-#  Wybieram grupę B (11-16) i D (29-35) jako najczytelniejsze
-#  bo mają pełne 8 kierunków w ciągłym bloku.
-#
-#  JEŚLI stopa jest ODWRÓCONA lub W ZŁYM KIERUNKU:
-#  Zmień numer po prawej stronie na inny z tej samej grupy.
-#  Np. góra to 12 — jeśli zła, spróbuj 30, 42, 49, 59
- 
 # ================================================================
 #  SYSTEM STYKÓW — każdy kafel trasy zna kierunek SKĄD i DOKĄD
 #
@@ -37,86 +20,141 @@ from castle import Castle
 #  Przykład: (1,0, 1,0) = szedłem w prawo i dalej idę w prawo → prosta linia
 #            (0,1, 1,0) = szedłem w dół, teraz skręcam w prawo → zakręt
 #
-#  skąd/dokąd to wartości -1, 0 lub 1
-#
-#  CZARNE (dotrę w tej turze) — zmień numery jeśli zła grafika
+#  CZARNE (dotrę w tej turze)
+#  CZERWONE (nie dotrę w tej turze)
 STEP_BLACK = {
     # Format: (skąd_x, skąd_y, dokąd_x, dokąd_y): numer_pliku
     # Zakręty używają grafiki kierunku DOKĄD (stopa "wchodzi" w nowy kierunek)
  
     # === PROSTO ===
-    ( 1, 0,  1, 0):  50,  # prawo → prawo 
-    (-1, 0, -1, 0):  22,  # lewo  → lewo  
-    ( 0, 1,  0, 1):   4,  # dół   → dół   
-    ( 0,-1,  0,-1):  32,  # góra  → góra  
-    ( 1, 1,  1, 1):  59,  # skos PD → PD  
-    (-1, 1, -1, 1):  13,  # skos LD → LD  
-    ( 1,-1,  1,-1):  41,  # skos PG → PG  
-    (-1,-1, -1,-1):  31,  # skos LG → LG
+    ( 1, 0,  1, 0):  50,  # → do →
+    (-1, 0, -1, 0):  22,  # ← do ←
+    ( 0, 1,  0, 1):   4,  # ↓ do ↓  
+    ( 0,-1,  0,-1):  32,  # ↑ do ↑
+    ( 1, 1,  1, 1):  59,  # ↘ do ↘
+    (-1, 1, -1, 1):  13,  # ↙ do ↙
+    ( 1,-1,  1,-1):  41,  # ↗ do ↗  
+    (-1,-1, -1,-1):  31,  # ↖ do ↖
  
     # === ZAKRĘTY 90° ===
-    ( 1, 0,  0,-1):  16,  # prawo  → góra 
-    ( 0, 1,  1, 0):  34,  # dół    → prawo
-    (-1, 0,  0, 1):  52,  # lewo   → dół  
-    ( 0,-1, -1, 0):   6,  # góra   → lewo 
-    ( 1, 0,  0, 1):  20,  # prawo  → dół  
-    ( 0,-1,  1, 0):   2,  # góra   → prawo
-    (-1, 0,  0,-1):  48,  # lewo   → góra 
-    ( 0, 1, -1, 0):  38,  # dół    → lewo 
- 
-    # === ZAKRĘTY ze skosu ===
-    ( 1,-1,  0, 1):  12,  # skos PG → dół 
-    (-1, 1,  0,-1):  40,  # skos LD → góra
-    ( 1, 1, -1, 0):  30,  # skos PD → lewo
-    (-1,-1,  1, 0):  58,  # skos LG → prawo
-    ( 1,-1, -1, 0):  14,  # skos PG → lewo
-    (-1, 1,  1, 0):  42,  # skos LD → prawo
-    ( 1, 1,  0,-1):  24,  # skos PD → góra
-    (-1,-1,  0, 1):  60,  # skos LG → dół 
+    ( 1, 0,  0,-1):  48,  # → do ↑
+    (-1, 0,  0, 1):  52,  # ↓ do →
+    ( 0, 1,  1, 0):   2,  # ↓ do →
+    ( 0,-1, -1, 0):  38,  # ↑ do ←
+    ( 1, 0,  0, 1):  20,  # → do ↓
+    (-1, 0,  0,-1):  16,  # ← do ↑
+    ( 0, 1, -1, 0):   6,  # ↓ do ←
+    ( 0,-1,  1, 0):  34,  # ↑ do →
+
+    # === ZE SKOSU W PROSTĄ ===
+    ( 1, 1,  1, 0):  58, # ↘ do →
+    ( 1, 1,  0, 1):  60, # ↘ do ↓
+    (-1, 1, -1, 0):  14, # ↙ do ←
+    (-1, 1,  0, 1):  12, # ↙ do ↓
+    ( 1,-1,  1, 0):  42, # ↗ do →
+    ( 1,-1,  0,-1):  40, # ↗ do ↑
+    (-1,-1, -1, 0):  30, # ↖ do ←
+    (-1,-1,  0,-1):  24, # ↖ do ↑
+
+    # === Z PROSTEJ W SKOS ===
+    ( 0,-1,  1,-1):  33, # ↑ do ↗
+    ( 0,-1, -1,-1):  39, # ↑ do ↖
+    ( 0, 1,  1, 1):   3, # ↓ do ↘
+    ( 0, 1, -1, 1):   5, # ↓ do ↙
+    ( 1, 0,  1,-1):  49, # → do ↗
+    ( 1, 0,  1, 1):  51, # → do ↘
+    (-1, 0, -1, 1):  21, # ← do ↙
+    (-1, 0, -1,-1):  23, # ← do ↖
+
+    # === Z SKOSU W SKOS ===
+    ( 1,-1, -1,-1):  47, # ↗ do ↖
+    (-1,-1,  1,-1):  25, # ↖ do ↗
+    ( 1, 1, -1, 1):  61, # ↘ do ↙
+    (-1, 1,  1, 1):  11, # ↙ do ↘
+
+    ( 1,-1,  1, 1):  43, # ↗ do ↘
+    (-1,-1, -1, 1):  29, # ↖ do ↙
+    ( 1, 1,  1,-1):  57, # ↘ do ↗
+    (-1, 1, -1,-1):  15, # ↙ do ↖
+
 }
+
  
 STEP_RED = {
     # === PROSTO ===
-    ( 1, 0,  1, 0): 115,  # prawo → prawo 
-    (-1, 0, -1, 0):  87,  # lewo  → lewo  
-    ( 0, 1,  0, 1):  69,  # dół   → dół   
-    ( 0,-1,  0,-1):  97,  # góra  → góra  
-    ( 1, 1,  1, 1): 124,  # skos PD → PD  
-    (-1, 1, -1, 1):  78,  # skos LD → LD  
-    ( 1,-1,  1,-1): 106,  # skos PG → PG  
-    (-1,-1, -1,-1):  96,  # skos LG → LG  
+    ( 1, 0,  1, 0): 115,  # → do → 
+    (-1, 0, -1, 0):  87,  # ← do ←  
+    ( 0, 1,  0, 1):  69,  # ↓ do ↓  
+    ( 0,-1,  0,-1):  97,  # ↑ do ↑
+    ( 1, 1,  1, 1): 124,  # ↘ do ↘
+    (-1, 1, -1, 1):  78,  # ↙ do ↙
+    ( 1,-1,  1,-1): 106,  # ↗ do ↗
+    (-1,-1, -1,-1):  96,  # ↖ do ↖
  
     # === ZAKRĘTY 90° ===
-    ( 1, 0,  0,-1):  97,  # prawo  → góra 
-    ( 0, 1,  1, 0): 115,  # dół    → prawo
-    (-1, 0,  0, 1):  69,  # lewo   → dół  
-    ( 0,-1, -1, 0):  87,  # góra   → lewo 
-    ( 1, 0,  0, 1):  69,  # prawo  → dół  
-    ( 0,-1,  1, 0): 115,  # góra   → prawo
-    (-1, 0,  0,-1):  97,  # lewo   → góra 
-    ( 0, 1, -1, 0):  87,  # dół    → lewo 
- 
-    # === ZAKRĘTY ze skosu ===
-    ( 1,-1,  0, 1):  69,  # skos PG → dół 
-    (-1, 1,  0,-1):  97,  # skos LD → góra
-    ( 1, 1, -1, 0):  87,  # skos PD → lewo
-    (-1,-1,  1, 0): 115,  # skos LG → prawo
-    ( 1,-1, -1, 0):  87,  # skos PG → lewo
-    (-1, 1,  1, 0): 115,  # skos LD → prawo
-    ( 1, 1,  0,-1):  97,  # skos PD → góra
-    (-1,-1,  0, 1):  69,  # skos LG → dół 
+    ( 1, 0,  0,-1): 113,  # → do ↑
+    (-1, 0,  0, 1):  85,  # ← do ↓
+    ( 0, 1,  1, 0):  67,  # ↓ do →
+    ( 0,-1, -1, 0): 103,  # ↑ do ←
+    ( 1, 0,  0, 1): 117,  # → do ↓
+    (-1, 0,  0,-1):  81,  # ← do ↑
+    ( 0, 1, -1, 0):  71,  # ↓ do ←
+    ( 0,-1,  1, 0):  99,  # ↑ do →
+
+    # === ZE SKOSU W PROSTĄ ===
+    ( 1, 1,  1, 0): 123, # ↘ do →
+    ( 1, 1,  0, 1): 125, # ↘ do ↓
+    (-1, 1, -1, 0):  79, # ↙ do ←
+    (-1, 1,  0, 1):  77, # ↙ do ↓
+    ( 1,-1,  1, 0): 107, # ↗ do →
+    ( 1,-1,  0,-1): 105, # ↗ do ↑
+    (-1,-1, -1, 0):  95, # ↖ do ←
+    (-1,-1,  0,-1):  89, # ↖ do ↑
+
+    # === Z PROSTEJ W SKOS ===
+    ( 0,-1,  1,-1):  98, # ↑ do ↗
+    ( 0,-1, -1,-1): 104, # ↑ do ↖
+    ( 0, 1,  1, 1):  68, # ↓ do ↘
+    ( 0, 1, -1, 1):  70, # ↓ do ↙
+    ( 1, 0,  1,-1): 114, # → do ↗
+    ( 1, 0,  1, 1): 116, # → do ↘
+    (-1, 0, -1, 1):  86, # ← do ↙
+    (-1, 0, -1,-1):  88, # ← do ↖
+
+    # === Z SKOSU W SKOS ===
+    ( 1,-1, -1,-1): 112, # ↗ do ↖
+    (-1,-1,  1,-1):  90, # ↖ do ↗
+    ( 1, 1, -1, 1): 126, # ↘ do ↙
+    (-1, 1,  1, 1):  76, # ↙ do ↘
+
+    ( 1,-1,  1, 1): 108, # ↗ do ↘
+    (-1,-1, -1, 1):  94, # ↖ do ↙
+    ( 1, 1,  1,-1): 122, # ↘ do ↗
+    (-1, 1, -1,-1):  80, # ↙ do ↖
 }
  
 #  FALLBACK — pierwszy krok trasy (brak poprzedniego kierunku)
 STEP_BLACK_SINGLE = {
-    ( 0,-1):  32,   ( 1,-1):  41,   ( 1, 0):  50,
-    ( 1, 1):  59,   ( 0, 1):   4,   (-1, 1):  13,
-    (-1, 0):  22,   (-1,-1):  31,
+    ( 0, 1):   4, # ↓↓↓↓↓↓
+    ( 0, 0):  64, # xxxxxx
+    ( 0,-1):  32, # ↑↑↑↑↑↑
+    ( 1, 1):  59, # ↘↘↘↘↘
+    ( 1, 0):  50, # →→→→→→→
+    ( 1,-1):  41, # ↗↗↗↗↗
+    (-1, 1):  13, # ↙↙↙↙↙
+    (-1, 0):  22, # ←←←←←←
+    (-1,-1):  31, # ↖↖↖↖↖
 }
 STEP_RED_SINGLE = {
-    ( 0,-1):  97,   ( 1,-1): 106,   ( 1, 0): 115,
-    ( 1, 1): 124,   ( 0, 1):  69,   (-1, 1):  78,
-    (-1, 0):  87,   (-1,-1):  96,
+    ( 0, 1):  69, # ↓↓↓↓↓↓
+    ( 0, 0):  64, # xxxxxx
+    ( 0,-1):  97, # ↑↑↑↑↑↑
+    ( 1, 1): 124, # ↘↘↘↘↘
+    ( 1, 0): 115, # →→→→→→→
+    ( 1,-1): 106, # ↗↗↗↗↗
+    (-1, 1):  78, # ↙↙↙↙↙
+    (-1, 0):  87, # ←←←←←←
+    (-1,-1):  96, # ↖↖↖↖↖
 }
  
 # ================================================================
@@ -130,7 +168,7 @@ STEP_FOLDER = os.path.join("assets", "STEP_S32")
 #  Zwiększ żeby były bardziej widoczne, zmniejsz jeśli za duże
 STEP_DISPLAY_SIZE = (32, 32)
  
-#  63 i 129 to pliki z X (cel/znacznik) — na razie nieużywane
+#  64 i 129 to pliki z X (cel/znacznik) — na razie nieużywane
 #  Możesz je przypisać do specjalnych celów w przyszłości
  
 # ================================================================
@@ -302,8 +340,9 @@ class Pathfinder:
         """
         # Zbieramy wszystkie unikalne numery
         all_nums = set(STEP_BLACK.values()) | set(STEP_RED.values()) | \
-                   set(STEP_BLACK_SINGLE.values()) | set(STEP_RED_SINGLE.values())
- 
+                   set(STEP_BLACK_SINGLE.values()) | set(STEP_RED_SINGLE.values()) | \
+                   {64, 129}
+        
         raw = {}  # numer -> Surface
         for num in all_nums:
             path = os.path.join(STEP_FOLDER, f"STEP_S32_{num}.png")
@@ -325,6 +364,7 @@ class Pathfinder:
             "red":          {k: raw[v] for k, v in STEP_RED.items()},
             "black_single": {k: raw[v] for k, v in STEP_BLACK_SINGLE.items()},
             "red_single":   {k: raw[v] for k, v in STEP_RED_SINGLE.items()},
+            "marks":        {64: raw[64], 129: raw[129]},
         }
         print("[Stopy] Załadowano grafiki kroków.")
  
@@ -335,69 +375,87 @@ class Pathfinder:
     def draw_path_dots(self, screen, unit, path):
         """
         Rysuje stopy wzdłuż trasy.
-        Każdy kafel dobiera grafikę na podstawie SKĄD i DOKĄD —
-        dzięki temu stopy płynnie łączą się w zakrętach (styki).
+        Każdy kafel dobiera grafikę sprawdzając wektor wejścia (skąd przyszliśmy)
+        i wektor wyjścia (gdzie idziemy w następnym kroku).
         """
         w = self.world
- 
+
         if Pathfinder._step_imgs is None:
             self._load_steps()
- 
-        imgs        = Pathfinder._step_imgs
+
+        imgs = Pathfinder._step_imgs
         current_x, current_y = unit.x, unit.y
         accumulated_cost = 0
- 
-        # Budujemy listę kroków z poprzednim i następnym kierunkiem
-        # path = [(x0,y0), (x1,y1), ...]
-        # Dodajemy pozycję startową żeby móc wyliczyć "skąd"
+
+        # Dodajemy pozycję startową żeby poprawnie wyliczyć wejście na pierwszy kafel
         full = [(unit.x, unit.y)] + list(path)
- 
+
         for i in range(1, len(full)):
             px, py = full[i]
             prev_x, prev_y = full[i-1]
- 
-            # Kierunek DOKĄD (obecny krok)
-            dx = px - prev_x
-            dy = py - prev_y
-            to_dir = ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
- 
-            # Kierunek SKĄD (skąd przyszedłem na ten kafel)
-            # = odwrotność kierunku poprzedniego kroku
-            if i >= 2:
-                ppx, ppy = full[i-2]
-                fdx = prev_x - ppx
-                fdy = prev_y - ppy
-                from_dir = ((fdx > 0) - (fdx < 0), (fdy > 0) - (fdy < 0))
+
+            # 1. Kierunek WEJŚCIA na obecny kafel
+            in_dx = px - prev_x
+            in_dy = py - prev_y
+            in_dir = ((in_dx > 0) - (in_dx < 0), (in_dy > 0) - (in_dy < 0))
+
+            # 2. Kierunek WYJŚCIA z obecnego kafla na następny
+            if i < len(full) - 1:
+                next_x, next_y = full[i+1]
+                out_dx = next_x - px
+                out_dy = next_y - py
+                out_dir = ((out_dx > 0) - (out_dx < 0), (out_dy > 0) - (out_dy < 0))
             else:
-                from_dir = None  # pierwszy krok — brak poprzedniego
- 
-            # Koszt kroku
+                # Jeśli to ostatni kafel trasy, kontynuujemy wizualnie ten sam kierunek
+                out_dir = in_dir
+
+            # 3. Koszt ruchu
             tile_char = w.map[py][px]
             base_cost = TERRAIN_TYPES.get(tile_char, {}).get("cost", 4)
-            move_mod  = 1.41 if (dx != 0 and dy != 0) else 1.0
+            move_mod  = 1.41 if (in_dx != 0 and in_dy != 0) else 1.0
             accumulated_cost += base_cost * move_mod
- 
+
             in_range = accumulated_cost <= unit.move_points
             pairs    = imgs["black"]        if in_range else imgs["red"]
             singles  = imgs["black_single"] if in_range else imgs["red_single"]
- 
-            # Szukamy grafiki — najpierw para (styk), potem pojedynczy kierunek
-            img = None
-            if from_dir is not None:
-                key = (from_dir[0], from_dir[1], to_dir[0], to_dir[1])
-                img = pairs.get(key)
+
+            # 4. Klucz słownika: (wejście_x, wejście_y, wyjście_x, wyjście_y)
+            key = (in_dir[0], in_dir[1], out_dir[0], out_dir[1])
+            img = pairs.get(key)
+            
+            # Jeśli z jakiegoś powodu brakuje takiej kombinacji w słowniku, użyj prostej stopy
             if img is None:
-                img = singles.get(to_dir)
- 
-            # Pozycja na ekranie — środek kafla
+                img = singles.get(in_dir)
+
+            #========================
+
+            in_range = accumulated_cost <= unit.move_points
+            
+            # --- NOWA LOGIKA WYBORU GRAFIKI ---
+            if i == len(full) - 1:
+                # Jeśli to OSTATNI kafel trasy, rysujemy X
+                img = imgs["marks"][64] if in_range else imgs["marks"][129]
+            else:
+                # Jeśli to środek trasy, rysujemy stopy
+                pairs   = imgs["black"]        if in_range else imgs["red"]
+                singles = imgs["black_single"] if in_range else imgs["red_single"]
+                
+                key = (in_dir[0], in_dir[1], out_dir[0], out_dir[1])
+                img = pairs.get(key)
+                
+                if img is None:
+                    img = singles.get(in_dir)
+            # ----------------------------------
+
+            # 5. Rysowanie
             screen_x = px * TILE_SIZE + TILE_SIZE // 2 - w.camera_x
             screen_y = py * TILE_SIZE + TILE_SIZE // 2 - w.camera_y
- 
+
             margin = TILE_SIZE * 2
             if not (-margin < screen_x < SCREEN_WIDTH  + margin and
                     -margin < screen_y < SCREEN_HEIGHT + margin):
                 continue
- 
+
             if img:
                 blit_x = screen_x - img.get_width()  // 2
                 blit_y = screen_y - img.get_height() // 2
