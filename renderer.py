@@ -630,6 +630,12 @@ class Renderer:
      
     def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
         w = self.world
+        
+        # --- BLOKADA: Rysuj globalne okienko TYLKO na mapie ---
+        # Jeśli jesteśmy w koszarach, garnizonie lub menu, przerywamy funkcję!
+        if getattr(w, 'screen', "map") != "map":
+            return
+
         if not stats_source:
             return
 

@@ -112,19 +112,31 @@ class RecruitmentManager:
                 
                 screen.blit(self.font_main.render(unit_name, True, t_col), (rect.x, rect.y + 4))
 
-        # --- OBSZAR 9 i 8 (Statystyki i Koszty) ---
+       # --- OBSZAR 9 i 8 (Statystyki i Koszty) ---
         idx_on_center = self.scroll + center_index
         if 0 <= idx_on_center < len(unit_types):
             unit_to_show = unit_types[idx_on_center]
             stats = UNIT_STATS.get(unit_to_show, {}) 
             
             if stats:
-                sx, sy = self.layout["stats_box"]
-                screen.blit(self.font_main.render(f"ATK: {stats.get('attack', 0)}", True, (200, 200, 200)), (sx, sy))
-                screen.blit(self.font_main.render(f"DEF: {stats.get('defense', 0)}", True, (200, 200, 200)), (sx, sy + 30))
-                screen.blit(self.font_main.render(f"HP: {stats.get('hp', 0)}", True, (200, 200, 200)), (sx + 100, sy))
-                screen.blit(self.font_main.render(f"MOV: {stats.get('moves', 0)}", True, (200, 200, 200)), (sx + 100, sy + 30))
+                # 1. Tworzymy symulowaną jednostkę ze słownika statystyk
+                simulated_unit = {
+                    'type_code': unit_to_show,
+                    'hp': stats.get('hp', 0),
+                    'max_hp': stats.get('hp', 0), # Rekrut to nówka sztuka
+                    'attack': stats.get('attack', 0),
+                    'defense': stats.get('defense', 0),
+                    'moves': stats.get('moves', 0),
+                    'morale': 50, # neutralne
+                    'experience': 0
+                }
                 
+                # 2. Rysujemy piękny panel graficzny z użyciem Twojego UnitInfoWindow z UI_components
+                # Współrzędne (160, 260) możesz delikatnie przesuwać o kilka pikseli, żeby trafić idealnie w czarne pole
+                if hasattr(self.world, 'unit_info_window'):
+                    self.world.unit_info_window.draw(screen, 115, 300, simulated_unit, "COMBAT")
+                
+                # 3. Zachowujemy Twoje rysowanie kosztów na dole (Obszar 8)
                 cx, cy = self.layout["cost_box"]
                 screen.blit(self.font_main.render(f"{stats.get('patent_cost', 0)}", True, (255, 215, 0)), (cx + 50, cy))
                 screen.blit(self.font_main.render(f"{stats.get('production_cost', 0)}", True, (255, 215, 0)), (cx + 200, cy))

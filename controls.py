@@ -18,6 +18,14 @@ class ControlsHandler:
             
             # --- 1. KLAWIATURA ---
             elif event.type == pygame.KEYDOWN:
+                # --- DEBUG: MAGIGCZNY KLAWISZ F1 ---
+                if event.key == pygame.K_F1:
+                    print("DEBUG: Teleportacja do koszar!")
+                    for c in self.world.castles:
+                        if c.owner == self.world.players[self.world.current_player]:
+                            self.world.selected_castle = c
+                            self.world.screen = "recruitment"
+                            break
                 # Zamiast self.screen używamy self.world.screen
                 if event.key == pygame.K_ESCAPE:
                     self.world.road_build_mode = False
@@ -581,7 +589,7 @@ class ControlsHandler:
 
         # 2. Jeśli nie garnizon, sprawdź mapę
         if not self.world.inspected_unit:
-            self.world.inspected_unit = self.world.find_unit_at(mx, my)
+            self.world.inspected_unit = self.world.get_unit_at(mx, my)
 
         # 3. Jeśli coś znalazłeś, ustal tryb
         if self.world.inspected_unit:

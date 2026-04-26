@@ -1,12 +1,13 @@
 import os
 import pygame
+from UI_components import UnitInfoWindow  # <--- IMPORTUJEMY TWOJE NOWE OKIENKO!
 
 # =====================================================
 #   GARRISON_GRAPHICS.PY
 # =====================================================
 
 GARRISON_BG    = os.path.join("assets", "garninon.png")
-GARRISON_TABLE = os.path.join("assets", "DW_12_GFX.png")
+# Stara tabelka (DW_12_GFX) usunięta!
 
 ORIG_W, ORIG_H = 640, 480
 
@@ -16,11 +17,9 @@ ORIG_SLOT_Y2 = 205
 ORIG_SLOT_W  = 31
 ORIG_SLOT_H  = 65
 
+# Zostawiamy tylko koordynaty, żeby wiedzieć, gdzie narysować nowe okienko
 ORIG_TABLE_X = 124
 ORIG_TABLE_Y = 300
-ORIG_TABLE_W = 390
-ORIG_TABLE_H = 140
-
 
 class GarrisonGraphics:
 
@@ -33,26 +32,12 @@ class GarrisonGraphics:
         self.sx = self.bg_w / ORIG_W
         self.sy = self.bg_h / ORIG_H
 
-        self.bg    = self._load(GARRISON_BG,    self.bg_w, self.bg_h)
-        self.table = self._load(GARRISON_TABLE,
-                                int(ORIG_TABLE_W * self.sx),
-                                int(ORIG_TABLE_H * self.sy))
-
-# --- TESTOWE ŁADOWANIE 5 GRAFIK PASKA (BEZ PIKSELOZY) ---
-        self.top_bar_parts = []
-        for i in range(5):
-            path = os.path.join("assets", f"DZ_INFO_S32_{i}.png")
-            if os.path.exists(path):
-                img = pygame.image.load(path).convert_alpha()
-                # Używamy SMOOTHSCALE dla efektu "ładnego wygładzenia"
-                # Skalujemy o 2.5x żeby były dobrze widoczne na górze
-                w, h = img.get_size()
-                smooth_img = pygame.transform.smoothscale(img, (int(w * 2.5), int(h * 2.5)))
-                self.top_bar_parts.append(smooth_img)
+        self.bg = self._load(GARRISON_BG, self.bg_w, self.bg_h)
+        
+        # Inicjalizacja nowego, uniwersalnego okienka statystyk
+        self.info_window = UnitInfoWindow()
 
         # --- ANIMACJA DRZWI ---
-        # Kolejność od zamkniętych do otwartych:
-        # KEEP7=zamknięte, KEEP6..KEEP1=pośrednie, KEEP=otwarte
         door_files = [
             "assets/KEEP.png",
             "assets/KEEP1.png",
@@ -78,18 +63,10 @@ class GarrisonGraphics:
        # --- INDYWIDUALNA ANIMACJA DRZWI ---
         self.door_anim_timers = [0] * 12
         self.door_anim_opening = [False] * 12
-        self.door_frame_indices = [0] * 12 # 0 to stan domyślny (np. zamknięte)   
+        self.door_frame_indices = [0] * 12 
 
         # --- SLOTY ---
         self.slot_rects = self._build_slot_rects()
-
-        # --- TABELKA ---
-        self.table_rect = pygame.Rect(
-            int(ORIG_TABLE_X * self.sx),
-            int(ORIG_TABLE_Y * self.sy),
-            int(ORIG_TABLE_W * self.sx),
-            int(ORIG_TABLE_H * self.sy)
-        )
 
         # --- PRZYCISK WYPUŚĆ ---
         BTN_W, BTN_H = 212, 83
@@ -98,7 +75,7 @@ class GarrisonGraphics:
         self.btn_release_rect       = pygame.Rect(805, 690, BTN_W, BTN_H)
         self.btn_release_anim_timer = 0
 
-        # --- PRZYCISK PRODUKCJA (tylko gdy koszary zbudowane) ---
+        # --- PRZYCISK PRODUKCJA ---
         BTN_P_W, BTN_P_H = 117, 51
         self.btn_prod_normal     = self._load("assets/prod.png",  BTN_P_W, BTN_P_H)
         self.btn_prod_pressed    = self._load("assets/pprod.png", BTN_P_W, BTN_P_H)
@@ -114,9 +91,8 @@ class GarrisonGraphics:
             print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
             return None
         img = pygame.image.load(path).convert_alpha()
-            # smoothscale tutaj też zapewni lepszą jakość tła
-        return pygame.transform.smoothscale(img, (w, h))
-    
+        return pygame.transform.scale(img, (w, h))
+
     def _load_raw(self, path: str):
         if not os.path.exists(path):
             print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
@@ -143,14 +119,12 @@ class GarrisonGraphics:
     # --------------------------------------------------
 
     def trigger_door_open(self, slot_idx):
-        """Uruchamia animację tylko dla konkretnego slotu."""
         if 0 <= slot_idx < 12:
             self.door_anim_timers[slot_idx] = pygame.time.get_ticks()
             self.door_anim_opening[slot_idx] = True
             self.door_frame_indices[slot_idx] = 0
 
     def _update_doors(self):
-        """Aktualizuje stan animacji dla każdego slotu z osobna."""
         now = pygame.time.get_ticks()
         frame_duration = 80 
 
@@ -171,29 +145,14 @@ class GarrisonGraphics:
                     self.door_frame_indices[i] = 0
 
     def draw(self, screen, castle, selected_units, inspected_unit=None) -> list:
-        """
-        Rysuje ekran garnizonu.
-        Zwraca slot_rects do obsługi kliknięć w world.py.
-        """
-
         # 1. Tło
         if self.bg:
             screen.blit(self.bg, (0, 0))
         else:
             screen.fill((40, 30, 20))
 
-        # 2. Aktualizacja animacji drzwi (indywidualna dla każdego slotu!)
-        self._update_doors() # <--- WAŻNE: Tu musi być liczba mnoga (doors)
-
-        # 2. --- RYSOWANIE TESTOWEGO PASKA NA GÓRZE ---
-        # Układamy te 5 grafik jedna obok drugiej na środku ekranu
-        if self.top_bar_parts:
-            total_w = sum(img.get_width() for img in self.top_bar_parts)
-            start_x = (self.bg_w - total_w) // 2
-            current_x = start_x
-            for img in self.top_bar_parts:
-                screen.blit(img, (current_x, 10)) # 10 pikseli od górnej krawędzi
-                current_x += img.get_width()
+        # 2. Aktualizacja animacji drzwi
+        self._update_doors()
 
         # 3. Sloty jednostek
         font     = pygame.font.SysFont("Arial", 14, bold=True)
@@ -204,14 +163,10 @@ class GarrisonGraphics:
             unit = garrison[i] if i < len(garrison) else None
 
             if unit is None:
-                # --- PUSTY SLOT: rysuj drzwi z INDYWIDUALNĄ klatką animacji ---
-                # Każdy slot (i) ma swój własny index klatki
                 idx = self.door_frame_indices[i] 
                 if self.door_frames:
                     screen.blit(self.door_frames[idx], rect.topleft)
                 continue
-
-            # --- SLOT Z JEDNOSTKĄ ---
 
             # Żółta ramka zaznaczenia
             if unit in selected_units:
@@ -244,18 +199,21 @@ class GarrisonGraphics:
                 t_txt = font.render(str(turns), True, (255, 255, 0))
                 screen.blit(t_txt, t_txt.get_rect(center=rect.center))
 
-        # 4. Tabelka statystyk (prawy klik)
+        # 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
         if inspected_unit is not None:
-            self._draw_unit_table(screen, inspected_unit)
+            info_x = int(ORIG_TABLE_X * self.sx)
+            info_y = int(ORIG_TABLE_Y * self.sy)
+            # Rysujemy nasze piękne, uniwersalne okno w starych koordynatach
+            self.info_window.draw_combat_info(screen, info_x, info_y, inspected_unit)
 
-        # 5. Przycisk WYPUŚĆ (zawsze widoczny)
+        # 5. Przycisk WYPUŚĆ
         elapsed    = pygame.time.get_ticks() - self.btn_release_anim_timer
         is_pressed = self.btn_release_anim_timer > 0 and elapsed < 400
         btn_img    = self.btn_release_pressed if is_pressed else self.btn_release_normal
         if btn_img:
             screen.blit(btn_img, self.btn_release_rect.topleft)
 
-        # 6. Przycisk PRODUKCJA (tylko gdy koszary zbudowane)
+        # 6. Przycisk PRODUKCJA
         has_koszary = "koszary" in [b.lower() for b in getattr(castle, 'buildings', [])]
         if has_koszary:
             elapsed_p    = pygame.time.get_ticks() - self.btn_prod_anim_timer
@@ -265,49 +223,12 @@ class GarrisonGraphics:
                 screen.blit(prod_img, self.btn_prod_rect.topleft)
 
         return self.slot_rects
-    # --------------------------------------------------
-    # TABELKA JEDNOSTKI
-    # --------------------------------------------------
-
-    def _draw_unit_table(self, screen: pygame.Surface, unit) -> None:
-        r = self.table_rect
-
-        if self.table:
-            screen.blit(self.table, r.topleft)
-        else:
-            pygame.draw.rect(screen, (40, 30, 25), r)
-            pygame.draw.rect(screen, (200, 180, 100), r, 3)
-
-        font  = pygame.font.SysFont("Arial", 16, bold=True)
-        font2 = pygame.font.SysFont("Arial", 14)
-
-        header = font.render(unit.type, True, (255, 255, 200))
-        screen.blit(header, (r.x + 10, r.y + 8))
-
-        stats = [
-            ("ATK", getattr(unit, 'attack',      0)),
-            ("DEF", getattr(unit, 'defense',     0)),
-            ("HP",  getattr(unit, 'health',      0)),
-            ("MOR", getattr(unit, 'morale',      0)),
-            ("MOV", int(getattr(unit, 'move_points', 0))),
-            ("EXP", getattr(unit, 'experience',  0)),
-        ]
-
-        col_w = r.w // 3
-        for idx, (label, val) in enumerate(stats):
-            col = idx % 3
-            row = idx // 3
-            x   = r.x + 10 + col * col_w
-            y   = r.y + 35 + row * 22
-            txt = font2.render(f"{label}: {val}", True, (255, 255, 255))
-            screen.blit(txt, (x, y))
 
     # --------------------------------------------------
     # OBSŁUGA KLIKNIĘĆ
     # --------------------------------------------------
 
     def handle_release_click(self, mx, my, selected_units: list) -> bool:
-        """Zwraca True jeśli kliknięto WYPUŚĆ i są zaznaczone jednostki."""
         if not self.btn_release_rect.collidepoint(mx, my):
             return False
         if not selected_units:
@@ -316,7 +237,6 @@ class GarrisonGraphics:
         return True
 
     def handle_prod_click(self, mx, my, castle) -> bool:
-        """Zwraca True jeśli kliknięto PRODUKCJA i koszary są zbudowane."""
         has_koszary = "koszary" in [b.lower() for b in getattr(castle, 'buildings', [])]
         if not has_koszary:
             return False
@@ -324,7 +244,6 @@ class GarrisonGraphics:
             return False
         self.btn_prod_anim_timer = pygame.time.get_ticks()
         return True
-    
     
     if __name__ == "__main__":
         import subprocess, sys, os

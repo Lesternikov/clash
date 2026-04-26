@@ -1,15 +1,17 @@
+import os
 import pygame
-from settings import UNIT_STATS, UNIT_NAMES
-
+from settings import UNIT_STATS, UNIT_NAMES, NAME_TO_CODE
 
 class UnitInfoWindow:
     def __init__(self):
-        self.scale = 1.15  # Nasz mnożnik powiększenia
+        self.scale = 1.6  # Nasz mnożnik powiększenia
 
+        # Funkcja pomocnicza do ładowania i skalowania
         # Funkcja pomocnicza do ładowania i skalowania
         def load_scaled(path):
             img = pygame.image.load(path).convert_alpha()
             w, h = img.get_size()
+            # Używamy smoothscale do wygładzenia przy powiększeniu!
             return pygame.transform.smoothscale(img, (int(w * self.scale), int(h * self.scale)))
         # Ładowanie przeskalowanych teł
         self.bg_combat = load_scaled("assets/minimum/INFO_S32/INFO_S32_0.png")
@@ -27,7 +29,7 @@ class UnitInfoWindow:
         self.icon_ranged = load_scaled("assets/minimum/INFO_S32/INFO_S32_10.png")
         # Czcionki - je też warto odrobinę powiększyć (np. z 20 na 23)
         self.font_main = pygame.font.SysFont("Times New Roman", 23, bold=True)
-        self.font_stats = pygame.font.SysFont("Arial", 16, bold=True)
+        self.font_stats = pygame.font.SysFont("Arial", 24, bold=True)
 
     def draw(self, screen, x, y, unit, mode):
         if mode == "SIMPLE":
@@ -70,7 +72,7 @@ class UnitInfoWindow:
             screen.blit(val_txt, (x + 180, y + 45))
 
     def draw_combat_info(self, screen, x, y, unit):
-        s = self.scale # Skrót dla czytelności kodu
+        s = self.scale
 
         screen.blit(self.bg_combat, (x, y))
 
@@ -80,130 +82,128 @@ class UnitInfoWindow:
 
         # A. Jeśli to żywa jednostka na mapie (ma gotowe sprites)
         if hasattr(unit, 'sprites') and unit.sprites:
-            portrait_img = unit.sprites[frame_idx]
-        
-        # B. Jeśli to menu rekrutacji (unit to słownik lub nie ma sprites)
-        else:
-            # Pobieramy kod (np. "INFL") zależnie od tego czy to dict czy obiekt
-            u_code = unit.get('type_code') if isinstance(unit, dict) else getattr(unit, 'type_code', None)
+            raw_img = unit.sprites[frame_idx]
+           # --- JEDNOLITE RYSOWANIE I SKALOWANIE ---
+        if raw_img:
+            # 1. Definiujemy sztywny rozmiar bazy (np. 36 pikseli). 
+            # Jeśli ludzik jest za duży/mały na tle innych ikon w oknie, zmień po prostu tę liczbę (np. na 32 lub 40).
+            base_size = 36 
             
-            if u_code:
-                # Szukamy grafiki dla gracza 1 (czerwony) jako podgląd
-                # Możesz zmienić "1" na dynamiczny kolor: getattr(self, 'current_player', 0) + 1
-                path = f"assets/minimum/{u_code}1_I_S32/{u_code}1_I_S32_{frame_idx}.png"
-                if os.path.exists(path):
-                    try:
-                        raw_img = pygame.image.load(path).convert_alpha()
-                        # Skalujemy o 1.15 tak jak resztę UI
-                        w, h = raw_img.get_size()
-                        portrait_img = pygame.transform.smoothscale(raw_img, (int(w * s), int(h * s)))
-                    except:
-                        pass
-
-        # RYSOWANIE PORTRETU
-        if portrait_img:
+            # 2. Mnożymy to przez Twoją idealną skalę (1.6)
+            target_size = (int(base_size * s), int(base_size * s)) 
+            
+            # 3. Przeskalowujemy bez względu na to, skąd przyszedł obrazek!
+            portrait_img = pygame.transform.scale(raw_img, target_size)
+            
+            # 4. Rysujemy na ekranie
             screen.blit(portrait_img, (x + int(15 * s), y + int(25 * s)))
         else:
-            # Fallback: Różowy kwadrat jeśli pliku nie ma wcale
+            # Fallback: Różowy kwadrat
             pygame.draw.rect(screen, (255, 0, 255), (x + int(15 * s), y + int(25 * s), int(32 * s), int(32 * s)), 1)
-
-        # 1. Wewnętrzna funkcja pomocnicza do bezpiecznego wyciągania danych
-        def get_v(key, attr_name=None):
+            # 1. Pobieranie danych
+        def get_v(key, attr_name=None, default=0):
             if isinstance(unit, dict):
-                return unit.get(key, 0)
-            return getattr(unit, attr_name if attr_name else key, 0)
+                return unit.get(key, default)
+            return getattr(unit, attr_name if attr_name else key, default)
 
-        # 2. Wyciąganie statystyk z użyciem get_v
-        u_code = get_v('type_code') if isinstance(unit, dict) else getattr(unit, 'type_code', 'Unknown')
-        
-        # Ty decydujesz, że Max HP jest równe, więc dajemy np. stałe 100, ale hp wyciągamy
+        # --- NIEZAWODNE POBIERANIE NAZWY I KODU ---
+        # Sprawdzamy surowy identyfikator (może to być polskie "Łucznik" lub kod "ARCH")
+        if isinstance(unit, dict):
+            raw_id = unit.get('type_code', 'Unknown')
+        else:
+            raw_id = getattr(unit, 'type_code', getattr(unit, 'type', 'Unknown'))
+
+        # Jeśli raw_id to polska nazwa (np. "Łucznik"), NAME_TO_CODE zamieni to na "ARCH"
+        # Jeśli to już jest "ARCH", get() zwróci wartość domyślną, czyli zostawi "ARCH"
+        u_code = NAME_TO_CODE.get(raw_id, raw_id)
+
+        # Pobieranie Tagi (zabezpieczenie na wypadek, gdyby ich nie było)
+        if isinstance(unit, dict):
+            tags = unit.get('tags', [])
+        else:
+            tags = getattr(unit, 'tags', [])
+            
+        is_ranged = "ranged" in tags
+
         u_hp = get_v('hp')
         u_max_hp = get_v('max_hp')
-        if u_max_hp == 0: u_max_hp = 100 # Zabezpieczenie przed dzieleniem przez zero
+        if u_max_hp == 0: u_max_hp = 100 
         
+        # Pobieranie dwóch wartości ataku 
         atk_val = get_v('attack')
+        melee_val = get_v('melee_attack') 
+        
         def_val = get_v('defense')
         mor_val = get_v('morale')
-        exp_val = get_v('experience')
-        
-        moves_raw = get_v('moves', 'move_points')
-        mov_val = int(moves_raw) if moves_raw is not None else 0
+        fat_val = get_v('fatigule')
+        mov_val = int(get_v('moves', 'move_points') or 0)
 
-        # 3. Rysowanie Tła
-        screen.blit(self.bg_combat, (x, y))
-
-        # 4. Nazwa
-        name_str = UNIT_NAMES.get(u_code, "Nieznany")
+        # 2. Tytuł (Nazwa jednostki)
+        # Zawsze pobieramy ładną, polską nazwę na podstawie u_code (np. ARCH -> Łucznik)
+        name_str = UNIT_NAMES.get(u_code, raw_id)
         name_surf = self.font_main.render(name_str, True, (255, 255, 255))
         screen.blit(name_surf, (x + int(100 * s), y + int(6 * s)))
 
-        # 5. Miecz HP i Portret
-        # Zmieniłem x+60 dla miecza, żeby był bliżej portretu. Dopasuj to w razie potrzeby!
+        # 3. Miecz HP
         self.draw_health_sword(screen, x + int(42 * s), y + int(0 * s), u_hp, u_max_hp)
-        
-        frame_idx = (pygame.time.get_ticks() // 150) % 8
-        
-        # ==========================================
-        # 6. LOGIKA NADPISYWANIA IKON (Atak, Morale, Exp)
-        # ==========================================
-        
-        # --- ATAK ---
-        # Domyślnie tło ma ŁUK+RĘKĘ (mixed). Nie rysujemy nic dla jednostek strzelająco-walczących.
-        ranged_only = ["KATAP", "ARMAT"] 
-        # UWAGA: Tu musisz wypisać jednostki, które NIE strzelają (tylko miecz/pika)
-        melee_only = ["SPRL","SPRH","INFL","INFH","CAVL","CAVH","RYC","TARAN","PEON","GORAL","BUDOW","WORM","SLON","TROL","SCORP","SZK","DUCH","ORZEL","PEGAZ","WAZKA"] 
-        
-        if u_code in ranged_only:
-            screen.blit(self.icon_ranged, (x + 120, y + 45))
-        elif u_code in melee_only:
-            screen.blit(self.icon_melee, (x + 71, y + 75))
-        # else: nic nie blitujemy, tło robi robotę!
-
-        # --- MORALE ---
-        # Domyślnie tło ma ŚREDNIE morale. Rysujemy ikonę tylko gdy jest niskie lub wysokie.
-        # Załóżmy, że średnie to przedział 40-60.
-        if mor_val < 40:
-            # Wymaga dodania self.icon_morale_low w __init__
-            pass # screen.blit(self.icon_morale_low, (x + X, y + Y))
-        elif mor_val > 60:
-            # Wymaga dodania self.icon_morale_high w __init__
-            pass # screen.blit(self.icon_morale_high, (x + X, y + Y))
-
-        # --- DOŚWIADCZENIE (EXP) ---
-        # Domyślnie tło ma podstawowe ubranie/posąg.
-        if exp_val >= 100: # Jakiś próg dla "Weterana"
-            pass # screen.blit(self.icon_exp_veteran, (x + X, y + Y))
-        elif exp_val >= 250: # Próg dla "Elity"
-            pass # screen.blit(self.icon_exp_elite, (x + X, y + Y))
 
         # ==========================================
-        # 7. WYSWIETLANIE SAMYCH LICZB W OKIENKACH
+        # 4. GÓRNY RZĄD (Ruch, Morale, Doświadczenie)
         # ==========================================
-
-        # Poniższe współrzędne (X+..., Y+...) to czysty strzał. 
-        # Zmieniaj je o kilka pikseli góra/dół, żeby trafić idealnie w puste kratki Twojej grafiki!
+        # Zmieniaj mnożniki przy 's' aby przesuwać tekst precyzyjnie w lewo/prawo i góra/dół
         
-        font = self.font_stats # Systemowa lub wczytana czcionka do liczb
+        # Ruch (Górny lewy)
+        screen.blit(self.font_stats.render(str(mov_val), True, (255, 255, 255)), (x + int(90 * s), y + int(50 * s)))
+        
+        # Morale (Górny środek)
+        screen.blit(self.font_stats.render(str(mor_val), True, (255, 255, 255)), (x + int(133 * s), y + int(50 * s)))
+        
+        # Doświadczenie (Górny prawy)
+        screen.blit(self.font_stats.render(str(fat_val), True, (255, 255, 0)),   (x + int(180 * s), y + int(50 * s)))
 
-        # ATK i DEF (Pierwsza kolumna)
-        screen.blit(self.font_stats.render(str(atk_val), True, (255, 255, 255)), 
-                    (x + int(165 * s), y + int(55 * s)))
-        screen.blit(self.font_stats.render(str(def_val), True, (255, 255, 255)), (x + int(165 * s), y + int(85 * s)))
+       # ==========================================
+        # 5. DOLNY RZĄD (Atak, Obrona)
+        # ==========================================
+        
+        # 1. Najpierw pobieramy OBRONĘ (środkowa kolumna na dole)
+        def_val = get_v('defense')
+        screen.blit(self.font_stats.render(str(def_val), True, (255, 255, 255)), (x + int(133 * s), y + int(95 * s)))
 
-        # HP i MORALE (Druga kolumna)
-        screen.blit(self.font_stats.render(str(u_hp), True, (255, 255, 255)), (x + int(225 * s), y + int(55 * s)))
-        screen.blit(self.font_stats.render(str(mor_val), True, (255, 255, 255)), (x + int(225 * s), y + int(85 * s)))
+        # 2. POBIERAMY DANE Z SETTINGS NA BAZIE NAZWY (np. "Kusznik")
+        # To jest kluczowe: raw_id to polska nazwa jednostki
+        base_stats = UNIT_STATS.get(raw_id, {})
+        
+        # Sprawdzamy tagi i wartości ataku bezpośrednio ze słownika
+        is_ranged = "ranged" in base_stats.get("tags", [])
+        melee_val = base_stats.get("melee_attack", 0) # Dla Kusznika to będzie 5
+        atk_val = get_v('attack')                     # Główny atak (dla Kusznika 40)
 
-        # MOVES (Trzecia kolumna, góra)
-        screen.blit(self.font_stats.render(str(mov_val), True, (255, 255, 255)), (x + int(285 * s), y + int(55 * s)))
+        # --- LOGIKA DYNAMICZNYCH IKON I LICZB ---
+        # Przypominam: Podstawowe tło bg_combat ma już narysowaną RĘKĘ i ŁUK.
+        
+        if is_ranged and melee_val > 0:
+            # SCENARIUSZ: OBA ATAKI (np. Kusznik)
+            # Nie nakładamy żadnych ikon (patchy), bo tło ma już obie.
+            
+            # Liczba przy RĘCE (Góra) - melee_val
+            screen.blit(self.font_stats.render(str(melee_val), True, (255, 255, 255)), (x + int(90 * s), y + int(68 * s)))
+            
+            # Liczba przy ŁUKU (Dół) - atk_val
+            screen.blit(self.font_stats.render(str(atk_val), True, (255, 255, 255)), (x + int(90 * s), y + int(95 * s)))
 
-        # EXP / ATC (Trzecia kolumna, dół)
-        if not isinstance(unit, dict):
-            # Jeśli klikasz na mapie -> pokazujemy Doświadczenie (na żółto)
-            screen.blit(self.font_stats.render(str(exp_val), True, (255, 255, 0)), (x + int(285 * s), y + int(85 * s)))
+        elif is_ranged:
+            # SCENARIUSZ: TYLKO STRZAŁ (np. Katapulta)
+            # Nakładamy ikonę "tylko łuk", żeby zakryć ramię na tle
+            screen.blit(self.icon_ranged, (x + int(62 * s), y + int(65 * s)))
+            # Wypisujemy główny atak na środku ramki
+            screen.blit(self.font_stats.render(str(atk_val), True, (255, 255, 255)), (x + int(90 * s), y + int(95 * s)))
+
         else:
-            # Jeśli koszary -> pokazujemy ATC na biało (wg Twojego dawnego planu)
-            screen.blit(self.font_stats.render(str(atk_val), True, (255, 255, 255)), (x + int(285 * s), y + int(85 * s)))
+            # SCENARIUSZ: TYLKO WRĘCZ (np. Lekka piechota)
+            # Nakładamy ikonę "tylko ramię", żeby zakryć łuk na tle
+            screen.blit(self.icon_melee, (x + int(62 * s), y + int(65 * s)))
+            # Wypisujemy główny atak na środku ramki
+            screen.blit(self.font_stats.render(str(atk_val), True, (255, 255, 255)), (x + int(90 * s), y + int(95 * s)))
 
     def draw_health_sword(self, screen, x, y, hp, max_hp):
         # self.sword_full to u nas "szary miecz" (miecz obrażeń/śmierci)
