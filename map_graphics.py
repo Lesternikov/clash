@@ -35,6 +35,7 @@ class MapGraphics:
         self.pathfinder = Pathfinder(self.world)        
 
     def load_ui_assets(self):
+        
         """Ładuje wszystkie grafiki interfejsu"""
         path_ui = "assets/minimum/MAP_BUTT_S32"
         
