@@ -647,8 +647,9 @@ class World(BuildingsMixin):
                 
                 # --- KLUCZOWA POPRAWKA: USUWANIE ZE SLOTU ---
                 for slot_idx in range(len(target.garrison)):
-                    if target.garrison[slot_idx] is solo_unit: # 'is' sprawdza konkretny obiekt
+                    if target.garrison[slot_idx] is unit_to_move: # lub solo_unit
                         target.garrison[slot_idx] = None
+                        self.garrison_gfx.trigger_door_open(slot_idx) # <--- DODAJ TO
                         break
                 # --------------------------------------------
 
@@ -677,9 +678,10 @@ class World(BuildingsMixin):
                         
                         # --- CZYŚCIMY SLOTY W BUDYNKU ---
                         for slot_idx in range(len(target.garrison)):
-                            if target.garrison[slot_idx] is unit_to_move:
+                            if target.garrison[slot_idx] is unit_to_move: # lub solo_unit
                                 target.garrison[slot_idx] = None
-                                break 
+                                self.garrison_gfx.trigger_door_open(slot_idx) # <--- DODAJ TO
+                                break
 
                         if unit_to_move in self.units:
                             self.units.remove(unit_to_move)

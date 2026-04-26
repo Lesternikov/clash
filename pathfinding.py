@@ -334,40 +334,6 @@ class Pathfinder:
                 surf.fill((200, 200, 200, 180))
                 imgs[direction] = surf
         Pathfinder._arrow_imgs = imgs
- 
-    def draw_road_arrows(self, screen):
-        w = self.world
-        u = w.selected_unit
-        if not u:
-            return
-
-        # Sprawdzenie czy załadowano grafiki
-        if getattr(Pathfinder, '_arrow_imgs', None) is None:
-            if hasattr(self, '_load_arrows'):
-                self._load_arrows()
-
-        for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
-            tx, ty = u.x + dx, u.y + dy
-            
-            # Jeśli nie można budować, pomijamy
-            if not self.can_build_road(tx, ty):
-                continue
-
-            # Obliczanie pozycji na ekranie
-            pos_x = tx * TILE_SIZE - w.camera_x
-            pos_y = ty * TILE_SIZE - w.camera_y
-
-            # Optymalizacja (nie rysujemy jeśli poza ekranem)
-            if pos_x < -TILE_SIZE or pos_x > SCREEN_WIDTH or \
-               pos_y < -TILE_SIZE or pos_y > SCREEN_HEIGHT:
-                continue
-
-            # Rysowanie grafiki
-            img = Pathfinder._arrow_imgs.get((dx, dy))
-            if img:
-                offset_x = (TILE_SIZE - img.get_width())  // 2
-                offset_y = (TILE_SIZE - img.get_height()) // 2
-                screen.blit(img, (pos_x + offset_x, pos_y + offset_y))
 
     def _find_nearest_base_terrain(self, start_x, start_y, base_terrains):
         """Skanuje okolicę promieniście, żeby zgadnąć tło pod obiektem."""
@@ -423,32 +389,48 @@ class Pathfinder:
     
     def can_build_trap(self, x, y):
         # gdzie można budować pułapkę
-        if not (0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[0])): return False
-        terrain = self.world.map[y][x]
-        # Blokada: l (las), g (niskie góry), G (wysokie góry), W (woda)
-        if terrain in ["l", "g", "#", "&","S","x","B","b", "G", "W"]: return False
+        w = self.world
+        if not (0 <= y < len(w.map) and 0 <= x < len(w.map[0])): 
+            return False
+            
+        bg_terrain = w.bg_map[y][x] # Warstwa podłoża (lasy, góry, woda)
+        obj_terrain = w.map[y][x]   # Warstwa obiektów (zamki, fundamenty)
+
+        # 1. Blokada ze względu na podłoże
+        if bg_terrain in ["l", "g", "G", "W", "M", "B", "b"]: 
+            return False
+            
+        # 2. Blokada ze względu na obiekty na mapie
+        if obj_terrain in ["#", "&", "S", "x", "X"]: 
+            return False
+            
         # Nie budujemy na budynkach (duże litery) ani innych pułapkach
-        if terrain == "X" or (terrain.isupper() and terrain not in ["P"]): return False
+        if obj_terrain.isupper() and obj_terrain not in ["P"]: 
+            return False
+            
         return True           
             
     def can_build_road(self, x, y):
         # gdzie można budować drogę
-        if not (0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[0])):
+        w = self.world
+        if not (0 <= y < len(w.map) and 0 <= x < len(w.map[0])):
             return False
         
-        terrain = self.world.map[y][x]
-        # Lista zakazana według Twoich wytycznych
-        forbidden = ["l", "g", "#", "&", "S", "x", "B", "b", "G", "W"]
+        bg_terrain = w.bg_map[y][x]
+        obj_terrain = w.map[y][x]
         
-        if terrain in forbidden:
+        # 1. Blokada ze względu na podłoże
+        if bg_terrain in ["l", "g", "G", "W", "M", "B", "b"]: 
             return False
             
-        # Nie budujemy na już istniejącej drodze (chyba że chcesz naprawiać?)
-        if terrain == "_":
+        # 2. Blokada ze względu na obiekty na mapie (nie budujemy na drodze "_")
+        if obj_terrain in ["#", "&", "S", "x", "X", "_"]: 
             return False
             
-        return True
-           
+        if obj_terrain.isupper() and obj_terrain not in ["P"]: 
+            return False
+            
+        return True       
 
 if __name__ == "__main__":
     import subprocess, sys, os

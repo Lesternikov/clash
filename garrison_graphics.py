@@ -63,9 +63,10 @@ class GarrisonGraphics:
                 surf.fill((10, 10, 10))
                 self.door_frames.append(surf)
 
-        self.door_anim_timer   = 0
-        self.door_anim_opening = False
-        self.door_frame_index  = 0      # 0=zamknięte, 7=otwarte
+       # --- INDYWIDUALNA ANIMACJA DRZWI ---
+        self.door_anim_timers = [0] * 12
+        self.door_anim_opening = [False] * 12
+        self.door_frame_indices = [0] * 12 # 0 to stan domyślny (np. zamknięte)   
 
         # --- SLOTY ---
         self.slot_rects = self._build_slot_rects()
@@ -128,39 +129,35 @@ class GarrisonGraphics:
     # ANIMACJA DRZWI
     # --------------------------------------------------
 
-    def trigger_door_open(self):
-        """Uruchamia animację: otwórz → zamknij. Wywołaj przy wypuszczaniu."""
-        self.door_anim_timer   = pygame.time.get_ticks()
-        self.door_anim_opening = True
-        self.door_frame_index  = 0
+    def trigger_door_open(self, slot_idx):
+        """Uruchamia animację tylko dla konkretnego slotu."""
+        if 0 <= slot_idx < 12:
+            self.door_anim_timers[slot_idx] = pygame.time.get_ticks()
+            self.door_anim_opening[slot_idx] = True
+            self.door_frame_indices[slot_idx] = 0
 
-    def _update_door(self):
-        """Oblicza aktualną klatkę drzwi. Wywołuje się automatycznie w draw()."""
-        if self.door_anim_timer == 0:
-            return
+    def _update_doors(self):
+        """Aktualizuje stan animacji dla każdego slotu z osobna."""
+        now = pygame.time.get_ticks()
+        frame_duration = 80 
 
-        elapsed        = pygame.time.get_ticks() - self.door_anim_timer
-        frame_duration = 80  # ms na klatkę → 8 klatek ≈ 640ms
+        for i in range(12):
+            if self.door_anim_timers[i] == 0:
+                continue
 
-        if self.door_anim_opening:
-            self.door_frame_index = min(7, elapsed // frame_duration)
-            if self.door_frame_index >= 7:
-                # Pełne otwarcie — zaczynamy zamykać
-                self.door_anim_opening = False
-                self.door_anim_timer   = pygame.time.get_ticks()
-        else:
-            self.door_frame_index = max(0, 7 - elapsed // frame_duration)
-            if self.door_frame_index <= 0:
-                # Pełne zamknięcie — koniec animacji
-                self.door_anim_timer  = 0
-                self.door_frame_index = 0
+            elapsed = now - self.door_anim_timers[i]
+            if self.door_anim_opening[i]:
+                self.door_frame_indices[i] = min(7, elapsed // frame_duration)
+                if self.door_frame_indices[i] >= 7:
+                    self.door_anim_opening[i] = False
+                    self.door_anim_timers[i] = now
+            else:
+                self.door_frame_indices[i] = max(0, 7 - elapsed // frame_duration)
+                if self.door_frame_indices[i] <= 0:
+                    self.door_anim_timers[i] = 0
+                    self.door_frame_indices[i] = 0
 
-    # --------------------------------------------------
-    # GŁÓWNA FUNKCJA RYSOWANIA
-    # --------------------------------------------------
-
-    def draw(self, screen: pygame.Surface, castle,
-             selected_units: list, inspected_unit=None) -> list:
+    def draw(self, screen, castle, selected_units, inspected_unit=None) -> list:
         """
         Rysuje ekran garnizonu.
         Zwraca slot_rects do obsługi kliknięć w world.py.
@@ -172,10 +169,8 @@ class GarrisonGraphics:
         else:
             screen.fill((40, 30, 20))
 
-        # 2. Aktualizacja animacji drzwi (raz na klatkę)
-        self._update_door()
-        current_door_frame = self.door_frames[self.door_frame_index] \
-                             if self.door_frames else None
+        # 2. Aktualizacja animacji drzwi (indywidualna dla każdego slotu!)
+        self._update_doors() # <--- WAŻNE: Tu musi być liczba mnoga (doors)
 
         # 3. Sloty jednostek
         font     = pygame.font.SysFont("Arial", 14, bold=True)
@@ -186,9 +181,11 @@ class GarrisonGraphics:
             unit = garrison[i] if i < len(garrison) else None
 
             if unit is None:
-                # --- PUSTY SLOT: rysuj drzwi (zamknięte lub animacja) ---
-                if current_door_frame:
-                    screen.blit(current_door_frame, rect.topleft)
+                # --- PUSTY SLOT: rysuj drzwi z INDYWIDUALNĄ klatką animacji ---
+                # Każdy slot (i) ma swój własny index klatki
+                idx = self.door_frame_indices[i] 
+                if self.door_frames:
+                    screen.blit(self.door_frames[idx], rect.topleft)
                 continue
 
             # --- SLOT Z JEDNOSTKĄ ---
@@ -245,7 +242,6 @@ class GarrisonGraphics:
                 screen.blit(prod_img, self.btn_prod_rect.topleft)
 
         return self.slot_rects
-
     # --------------------------------------------------
     # TABELKA JEDNOSTKI
     # --------------------------------------------------
@@ -305,3 +301,10 @@ class GarrisonGraphics:
             return False
         self.btn_prod_anim_timer = pygame.time.get_ticks()
         return True
+    
+    
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])
+        

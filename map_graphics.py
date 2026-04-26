@@ -46,11 +46,11 @@ class MapGraphics:
         # 15,16=Droga, 17,18=Pułapka, 19,20=Wieża(?), 21=Puste(?), 22,23=Wyjście
         build_files = [
             "MAP_BUTT_S32_15.png", "MAP_BUTT_S32_16.png",
-            "MAP_BUTT_S32_17.png", "MAP_BUTT_S32_18.png",
             "MAP_BUTT_S32_19.png", "MAP_BUTT_S32_20.png",
+            "MAP_BUTT_S32_17.png", "MAP_BUTT_S32_18.png",
             "MAP_BUTT_S32_21.png", "MAP_BUTT_S32_22.png", # Powtórka jako placeholder
             "MAP_BUTT_S32_23.png", "MAP_BUTT_S32_24.png",
-            "MAP_BUTT_S32_26.png", "MAP_BUTT_S32_26.png",
+            "MAP_BUTT_S32_25.png", "MAP_BUTT_S32_26.png",
 
         ]
         self.build_button_images = self._load_button_set(path_ui, build_files)
@@ -539,3 +539,9 @@ class MapGraphics:
                     pygame.draw.line(screen, trap_color, (pos[0] + TILE_SIZE - offset, pos[1] + offset), (pos[0] + offset, pos[1] + TILE_SIZE - offset), 3)
                 elif obj_tile in self.terrain_images:
                     screen.blit(self.terrain_images[obj_tile], pos)
+
+
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])

@@ -244,4 +244,7 @@ class PeasantGroup:
     def __repr__(self):
         return f"Peasants({self.amount})"
 
-    
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])
