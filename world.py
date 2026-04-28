@@ -12,6 +12,7 @@ from UI_components import UnitInfoWindow
 from castle_graphics import CastleGraphics
 from garrison_graphics import GarrisonGraphics
 from recruitment import RecruitmentManager
+from peasant_menu import PeasantMenu
 
 @property
 def back_button(self):
@@ -70,7 +71,7 @@ class World(BuildingsMixin):
         self.unit_info_window = UnitInfoWindow()
         self.court = CourtHandler(self)
         self.recruitment_manager = RecruitmentManager(self)
-
+        self.peasant_menu = PeasantMenu(w, h)
         pygame.font.init()
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)
@@ -82,7 +83,7 @@ class World(BuildingsMixin):
         # ====================================================
         # Uniwersalny przycisk powrotu i jego animacja
         self.back_button_castle = pygame.Rect(45, 690, 130, 74)
-        self.back_button_bldg   = pygame.Rect(46, 685, 190, 91)
+        self.back_button_bldg   = pygame.Rect(68, 680, 150, 80)
         self.back_button        = self.back_button_bldg
         self.back_anim_timer    = 0
         self.back_destination   = "map"
@@ -90,8 +91,8 @@ class World(BuildingsMixin):
         try:
             self.back_img_castle_normal  = pygame.transform.scale(pygame.image.load("assets/back_castlen.png").convert_alpha(), (130, 74))
             self.back_img_castle_pressed = pygame.transform.scale(pygame.image.load("assets/back_castlec.png").convert_alpha(), (130, 74))
-            self.back_img_bldg_normal    = pygame.transform.scale(pygame.image.load("assets/back_normal.png").convert_alpha(),  (190, 91))
-            self.back_img_bldg_pressed   = pygame.transform.scale(pygame.image.load("assets/back_clicked.png").convert_alpha(), (190, 91))
+            self.back_img_bldg_normal    = pygame.transform.scale(pygame.image.load("assets/back_normal.png").convert_alpha(),  (150, 80))
+            self.back_img_bldg_pressed   = pygame.transform.scale(pygame.image.load("assets/back_clicked.png").convert_alpha(), (150, 80))
             print("Grafiki przycisku powrotu załadowane!")
         except Exception as e:
             print(f"Błąd grafik przycisku: {e}")
@@ -129,20 +130,6 @@ class World(BuildingsMixin):
         self.train_button = pygame.Rect(660, 600, 120, 40)
         self.button_send_army = pygame.Rect(860, 600, 150, 40)
         self.destroy_button = pygame.Rect(0, 0, 1, 1)  # Dla Strażnicy
-
-        # EKRAN CHŁOPÓW (PODATKI / WYSYŁKA)
-        self.peasants_plus_button = pygame.Rect(300, 200, 40, 40)
-        self.peasants_minus_button = pygame.Rect(100, 200, 40, 40)
-        self.gold_plus_button = pygame.Rect(300, 300, 40, 40)
-        self.gold_minus_button = pygame.Rect(100, 300, 40, 40)
-        self.tax_plus_button = pygame.Rect(300, 400, 40, 40)
-        self.tax_minus_button = pygame.Rect(100, 400, 40, 40)
-        self.send_button = pygame.Rect(100, 500, 160, 45)
-        self.castle_up_button = pygame.Rect(800, 150, 40, 40)
-        self.castle_down_button = pygame.Rect(800, 450, 40, 40)
-        self.castle_list_offset = 0
-        self.send_peasants_amount = 10
-        self.send_gold_amount = 100 
 
         # DOLNY PANEL AKCJI (MAPA)
         self.action_buttons = []
@@ -712,3 +699,34 @@ if __name__ == "__main__":
     import subprocess, sys, os
     main_path = os.path.join(os.path.dirname(__file__), "main.py")
     subprocess.run([sys.executable, main_path])
+
+
+    # 4. TEREN (POPRAWKA 2: Delegujemy sprawdzanie do profesjonalnego Pathfindera)
+       # if hasattr(self, 'pathfinder'):
+         #   if not self.pathfinder.is_walkable(nx, ny, unit):
+        #        print(f"DEBUG: Blokada! Teren na ({nx}, {ny}) jest nieprzejezdny.")
+       #         return False
+
+        # ==========================================
+        # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
+        # ==========================================
+      #  if self.map[ny][nx] == "X":
+     #       print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
+            
+            # 1. Usuwamy jednostkę z gry (ginie)
+    #        if unit in self.units: 
+   #             self.units.remove(unit)
+  #          if unit in unit.owner.units: 
+ #               unit.owner.units.remove(unit)
+#            if self.selected_unit == unit: 
+            #    self.selected_unit = None
+                
+            # 2. Usuwamy pułapkę z mapy i przywracamy oryginalne tło
+           # original_bg = getattr(self, 'trap_backgrounds', {}).get((nx, ny), ".")
+          #  self.map[ny][nx] = original_bg
+            
+            # 3. Zwracamy True, bo ruch się wykonał (choć jednostka go nie przeżyła)
+         #   return True
+
+        # 5. WALKA 
+        #for other in self.units[:]:
