@@ -228,47 +228,45 @@ class World(BuildingsMixin):
             print(f"OSTRZEŻENIE: Jednostka {unit.type} ma błędnego właściciela: {unit.owner}")
             
     def next_turn(self):
-        print("CASTLES:", [type(c) for c in self.castles])
-
         if not self.players:
             return
 
-        self.turn += 1
+        # Przełączamy gracza
         self.current_player = (self.current_player + 1) % len(self.players)
+        
+        # resetujemy UI i flagi dla nowego gracza
         self.reset_units()
-
-        # --- LOGIKA BUDOWANIA (Wywołujemy funkcję, którą stworzyliśmy) ---
-        self.process_construction() 
-
-        # Logika zamków
-        for castle in self.castles:
-            if not getattr(castle, 'destroyed', False):
-                castle.next_turn()
-                castle.collect_taxes()
-                
-        # Odnowienie punktów ruchu jednostek
-        for unit in self.units:
-            if unit.type in UNIT_STATS:
-                unit.move_points = UNIT_STATS[unit.type].get("moves", 5) 
-            else:
-                unit.move_points = 5
-
-        # --- CZYSZCZENIE UI ---
         self.active_dropdown = None 
         self.build_menu_open = False 
         self.selected_castle = None
         self.selected_unit = None
-        self.show_top_ui = False
         self.screen = "map"
 
-    def move_unit(self, unit, dx, dy, cost=1): # <--- Dodajemy parametr cost
+        # --- KLUCZ: Logika zamków i budowania odpala się TYLKO raz na rundę ---
+        # (Np. gdy kolejka wraca do gracza 0)
+        if self.current_player == 0:
+            self.turn += 1
+            self.process_construction() 
+
+            for castle in self.castles:
+                if not getattr(castle, 'destroyed', False):
+                    castle.next_turn() # Tu jest process_production()
+                    # castle.collect_taxes() # To już masz w castle.next_turn()
+
+    def move_unit(self, unit, dx, dy, cost=1):
         """
-        KOMPLETNA LOGIKA RUCHU:
-        Łączy ruch gracza, AI, interakcje z obiektami i walkę.
+        ZAKTUALIZOWANA LOGIKA RUCHU:
+        Dodano: Blokadę tur, obsługę pułapek i poprawne przejmowanie zamków.
         """
-        # 1. Sprawdzenie punktów ruchu (używamy przekazanego kosztu)
+        # 0. BLOKADA TURY (Bezpieczeństwo)
+        # Sprawdzamy, czy jednostka należy do gracza, który ma teraz turę
+        if unit.owner != self.players[self.current_player]:
+            print("DEBUG: Nie Twoja tura!")
+            return False
+
+        # 1. Sprawdzenie punktów ruchu
         if unit.move_points < cost:
-            print(f"DEBUG: Jednostka {unit.type} nie ma wystarczającej liczby punktów ruchu ({cost}).")
+            print(f"DEBUG: Jednostka {unit.type} nie ma MP ({unit.move_points} < {cost}).")
             return False
 
         nx, ny = unit.x + dx, unit.y + dy
@@ -277,83 +275,80 @@ class World(BuildingsMixin):
         if not (0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map)):
             return False
 
-    # 3. INTERAKCJA Z ZAMKIEM (Obszar 2x2)
+        # 3. INTERAKCJA Z ZAMKIEM (Obszar 2x2 dla Zamków, 1x1 dla Strażnic)
         for castle in self.castles:
-            if castle.x <= nx <= castle.x + 1 and castle.y <= ny <= castle.y + 1:
-                if castle.destroyed:
+            size = 2 if castle.building_type in ["Zamek", "Twierdza"] else 1
+            if castle.x <= nx < castle.x + size and castle.y <= ny < castle.y + size:
+                if getattr(castle, 'destroyed', False):
                     return False
 
-                if hasattr(unit, 'planned_path') and unit.planned_path:
-                    final_x, final_y = unit.planned_path[-1]
-                    is_targeting_this_castle = (castle.x <= final_x <= castle.x + 1 and 
-                                                castle.y <= final_y <= castle.y + 1)
-                    
-                    if not is_targeting_this_castle:
-                        print("Zamek blokuje drogę — musisz go obejść!")
-                        return False
-
+                # Jeśli zamek jest wrogi -> PRZEJMUJEMY
                 if castle.owner != unit.owner:
+                    print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color}!")
                     castle.owner = unit.owner
-                    # Przy przejmowaniu zamku czyścimy cały stary garnizon!
-                    castle.garrison = [None] * len(castle.garrison)
-                    print(f"Zamek na ({castle.x}, {castle.y}) został PRZEJĘTY!")
+                    # Czyścimy garnizon wroga
+                    castle.garrison = [None] * castle.garrison_limit 
+                    # Przerywamy wrogą produkcję
+                    castle.production_enabled = False
+                    castle.production_unit_type = None
 
-                # === KLUCZOWA ZMIANA ===
-                # Wywołujemy funkcję enter_castle, która rozpakuje całą armię
-                # do osobnych slotów w zamku
-                if self.enter_castle(unit, castle):
-                    unit.move_points -= cost
-                    return True
-                else:
-                    return False # Zamek jest pełny, jednostka nie wchodzi
+                # Próba wejścia do garnizonu (automatyczna, jeśli jest miejsce)
+                for i in range(len(castle.garrison)):
+                    if castle.garrison[i] is None:
+                        castle.garrison[i] = unit
+                        if unit in self.units: self.units.remove(unit)
+                        if unit in unit.owner.units: unit.owner.units.remove(unit)
+                        
+                        unit.move_points -= cost
+                        if self.selected_unit == unit:
+                            self.selected_unit = None
+                        return True
                 
-        # 4. TEREN - Lista znaków, po których wolno chodzić
-        # Dodałem kropkę, l, g oraz znaki drogi
-        walkable_chars = [".", "l", "g", "p", "_", "#", "$", " "] 
-        
-        # Pobieramy co jest na mapie w miejscu docelowym
-        map_char = self.map[ny][nx]
+                print("Garnizon pełny! Nie możesz wejść.")
+                return False
 
+        # 4. TEREN
+        walkable_chars = [".", "l", "g", "p", "_", "#", "$","x", " "] 
+        map_char = self.map[ny][nx]
         if map_char not in walkable_chars:
-            # Jeśli to np. 'W' (Woda) lub 'M' (Góry), ruch jest zablokowany
-            print(f"DEBUG: Blokada! Teren '{map_char}' na ({nx}, {ny}) jest nieprzejezdny.")
             return False
 
-        # 5. WALKA LUB ŁĄCZENIE
-        for other in self.units[:]: 
+        # 5. PUŁAPKI (Nowość!)
+        pos = (nx, ny)
+        if pos in self.traps and self.traps[pos]["active"]:
+            # Jeśli wdepnęliśmy w pułapkę wroga
+            if self.traps[pos]["owner"] != unit.owner:
+                self.trap_active = True
+                self.unit_on_trap = unit
+                # Ruch zostaje przerwany - reszta logiki obsłużona w pop-upie
+                unit.x, unit.y = nx, ny
+                print("Wdepnięto w pułapkę!")
+                return True # Zwracamy True, żeby jednostka "stanęła" na polu
+
+        # 6. WALKA 
+        for other in self.units[:]:
             if other.x == nx and other.y == ny:
                 if other.owner != unit.owner:
                     # To jest wróg -> Walka (zostawiasz jak masz)
                     self.units.remove(other)
                     # ...
                 else:
-                    # TO JEST SOJUSZNIK!
-                    if getattr(self, 'merge_mode', False):
-                        # Odpalamy procedurę łączenia
-                        return self.merge_units(unit, other, cost)
-                    else:
-                        # Normalnie sojusznik blokuje drogę
-                        return False
+                    return False # Nie można wejść na sojusznika
             
-        # 6. ZBIERANIE CHŁOPÓW
+        # 7. ZBIERANIE ZASOBÓW (Chłopi / Złoto)
         for group in self.peasant_groups[:]:
-            if group.x == nx and group.y == ny:
-                if group.owner != unit.owner:
-                    unit.carried_peasants += group.amount
-                    self.peasant_groups.remove(group)
-                    print(f"Chłopi ({group.amount}) dołączyli do armii.")
+            if group.x == nx and group.y == ny and group.owner != unit.owner:
+                unit.carried_peasants += group.amount
+                self.peasant_groups.remove(group)
 
-        # 7. PRZEJMOWANIE ZŁOTA
         for t in self.gold_transports[:]:
-            if t.x == nx and t.y == ny:
-                if t.owner != unit.owner:
-                    unit.carried_gold += t.gold
-                    self.gold_transports.remove(t)
-                    print(f"Przejęto {t.gold} złota z transportu!")
+            if t.x == nx and t.y == ny and t.owner != unit.owner:
+                unit.carried_gold += t.gold
+                self.gold_transports.remove(t)
 
-        # 8. FINALIZACJA
+        # 8. FINALIZACJA RUCHU
         unit.x, unit.y = nx, ny
-        unit.move_points -= cost # <--- KLUCZ: Odejmujemy koszt (1 lub 1.5)
+        unit.move_points -= cost
         return True
     
     def reset_units(self):

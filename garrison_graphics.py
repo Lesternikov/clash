@@ -69,19 +69,32 @@ class GarrisonGraphics:
         self.slot_rects = self._build_slot_rects()
 
         # --- PRZYCISK WYPUŚĆ ---
-        BTN_W, BTN_H = 212, 83
-        self.btn_release_normal     = self._load("assets/wyrzut.png",  BTN_W, BTN_H)
-        self.btn_release_pressed    = self._load("assets/wyrzutp.png", BTN_W, BTN_H)
-        self.btn_release_rect       = pygame.Rect(805, 690, BTN_W, BTN_H)
+        BTN_W, BTN_H = 155, 82
+        self.btn_release_normal     = self._load("assets/przyciski/PRZ_9.png",  BTN_W, BTN_H)
+        self.btn_release_pressed    = self._load("assets/przyciski/PRZ_10.png", BTN_W, BTN_H)
+        self.btn_release_rect       = pygame.Rect(806, 680, BTN_W, BTN_H)
         self.btn_release_anim_timer = 0
 
-        # --- PRZYCISK PRODUKCJA ---
-        BTN_P_W, BTN_P_H = 117, 51
-        self.btn_prod_normal     = self._load("assets/prod.png",  BTN_P_W, BTN_P_H)
-        self.btn_prod_pressed    = self._load("assets/pprod.png", BTN_P_W, BTN_P_H)
-        self.btn_prod_rect       = pygame.Rect(620, 710, BTN_P_W, BTN_P_H)
+        # --- PRZYCISK PRODUKCJA (tylko gdy koszary zbudowane) ---
+        BTN_P_W, BTN_P_H = 140, 80
+        self.btn_prod_normal     = self._load("assets/przyciski/PRZ_3.png",  BTN_P_W, BTN_P_H)
+        self.btn_prod_pressed    = self._load("assets/przyciski/PRZ_4.png", BTN_P_W, BTN_P_H)
+        self.btn_prod_rect       = pygame.Rect(255, 680, BTN_P_W, BTN_P_H)
         self.btn_prod_anim_timer = 0
 
+        # ---PRZYCISK LECZENIA (tylko gdy zbudowany szpital)
+        BTN_H_W, BTN_H_H = 140, 80
+        self.btn_hosp_normal     = self._load("assets/przyciski/PRZ_5.png",  BTN_H_W, BTN_H_H)
+        self.btn_hosp_pressed    = self._load("assets/przyciski/PRZ_6.png", BTN_H_W, BTN_H_H)
+        self.btn_hosp_rect       = pygame.Rect(355, 680, BTN_H_W, BTN_H_H)
+        self.btn_hosp_anim_timer = 0
+
+        # ----PRZYCISK SZKOLENIA (tylko gdy zbuowana szkoła)
+        BTN_S_W, BTN_S_H = 140, 80
+        self.btn_school_normal     = self._load("assets/przyciski/PRZ_7.png",  BTN_S_W, BTN_S_H)
+        self.btn_school_pressed    = self._load("assets/przyciski/PRZ_8.png", BTN_S_W, BTN_S_H)
+        self.btn_school_rect       = pygame.Rect(405, 680, BTN_S_W, BTN_S_H)
+        self.btn_school_anim_timer = 0
     # --------------------------------------------------
     # ŁADOWANIE
     # --------------------------------------------------
@@ -151,11 +164,18 @@ class GarrisonGraphics:
         else:
             screen.fill((40, 30, 20))
 
-        # 2. Aktualizacja animacji drzwi
-        self._update_doors()
+        # 2. Aktualizacja animacji drzwi (indywidualna dla każdego slotu!)
+        self._update_doors() # <--- WAŻNE: Tu musi być liczba mnoga (doors)
 
         # 3. Sloty jednostek
         font     = pygame.font.SysFont("Arial", 14, bold=True)
+        font_cnt = pygame.font.SysFont("Arial", 12)
+        garrison = getattr(castle, 'garrison', [])
+
+        for i, rect in enumerate(self.slot_rects):
+            unit = garrison[i] if i < len(garrison) else None
+
+        # 3. Sloty jednostek
         font_cnt = pygame.font.SysFont("Arial", 12)
         garrison = getattr(castle, 'garrison', [])
 
@@ -168,7 +188,7 @@ class GarrisonGraphics:
                     screen.blit(self.door_frames[idx], rect.topleft)
                 continue
 
-            # Żółta ramka zaznaczenia
+            # --- SLOT Z JEDNOSTKĄ ---
             if unit in selected_units:
                 pygame.draw.rect(screen, (255, 255, 0), rect.inflate(4, 4), 3)
 
@@ -212,40 +232,84 @@ class GarrisonGraphics:
                 screen.blit(c_txt, (rect.right - c_txt.get_width() - 2,
                                     rect.bottom - c_txt.get_height() - 2))
 
-            # Overlay szkolenia
-            if hasattr(castle, 'training') and unit in castle.training:
-                ov = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
-                ov.fill((0, 0, 0, 140))
-                screen.blit(ov, rect.topleft)
-                turns = castle.training[unit]
-                t_txt = font.render(str(turns), True, (255, 255, 0))
-                screen.blit(t_txt, t_txt.get_rect(center=rect.center))
-
-        # 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
+# 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
         if inspected_unit is not None:
             info_x = int(ORIG_TABLE_X * self.sx)
             info_y = int(ORIG_TABLE_Y * self.sy)
             # Rysujemy nasze piękne, uniwersalne okno w starych koordynatach
             self.info_window.draw_combat_info(screen, info_x, info_y, inspected_unit)
 
-        # 5. Przycisk WYPUŚĆ
-        elapsed    = pygame.time.get_ticks() - self.btn_release_anim_timer
-        is_pressed = self.btn_release_anim_timer > 0 and elapsed < 400
-        btn_img    = self.btn_release_pressed if is_pressed else self.btn_release_normal
+        # --- PRZYCISKI DOLNE (SZPITAL, SZKOŁA, KOSZARY) ---
+        built = [b.lower() for b in getattr(castle, 'buildings', [])]
+        now = pygame.time.get_ticks()
+
+        # 6. Przycisk PRODUKCJA (Koszary) - PRZ_3 / PRZ_4
+        if "koszary" in built:
+            elapsed_p = now - self.btn_prod_anim_timer
+            # Jeśli kliknięto w ciągu ostatnich 200ms, pokaż mniejszą/wciśniętą grafikę
+            is_pressed = self.btn_prod_anim_timer > 0 and elapsed_p < 200
+            img = self.btn_prod_pressed if is_pressed else self.btn_prod_normal
+            if img:
+                screen.blit(img, self.btn_prod_rect.topleft)
+
+        # 7. Przycisk LECZENIA (Szpital) - PRZ_5 / PRZ_6
+        if "szpital" in built:
+            elapsed_h = now - self.btn_hosp_anim_timer
+            is_pressed = self.btn_hosp_anim_timer > 0 and elapsed_h < 200
+            img = self.btn_hosp_pressed if is_pressed else self.btn_hosp_normal
+            if img:
+                screen.blit(img, self.btn_hosp_rect.topleft)
+
+        # 8. Przycisk SZKOLENIA (Szkoła) - PRZ_7 / PRZ_8
+        if "szkoła" in built or "szkola" in built:
+            elapsed_s = now - self.btn_school_anim_timer
+            is_pressed = self.btn_school_anim_timer > 0 and elapsed_s < 200
+            img = self.btn_school_pressed if is_pressed else self.btn_school_normal
+            if img:
+                screen.blit(img, self.btn_school_rect.topleft)
+                
+        # Przycisk WYPUŚĆ (zawsze widoczny)
+        elapsed_r = now - self.btn_release_anim_timer
+        is_pressed_r = self.btn_release_anim_timer > 0 and elapsed_r < 200
+        btn_img = self.btn_release_pressed if is_pressed_r else self.btn_release_normal
         if btn_img:
             screen.blit(btn_img, self.btn_release_rect.topleft)
 
-        # 6. Przycisk PRODUKCJA
-        has_koszary = "koszary" in [b.lower() for b in getattr(castle, 'buildings', [])]
-        if has_koszary:
-            elapsed_p    = pygame.time.get_ticks() - self.btn_prod_anim_timer
-            is_pressed_p = self.btn_prod_anim_timer > 0 and elapsed_p < 400
-            prod_img     = self.btn_prod_pressed if is_pressed_p else self.btn_prod_normal
-            if prod_img:
-                screen.blit(prod_img, self.btn_prod_rect.topleft)
-
         return self.slot_rects
+        
+    def _draw_unit_table(self, screen: pygame.Surface, unit) -> None:
+        r = self.table_rect
 
+        if self.table:
+            screen.blit(self.table, r.topleft)
+        else:
+            pygame.draw.rect(screen, (40, 30, 25), r)
+            pygame.draw.rect(screen, (200, 180, 100), r, 3)
+
+        font  = pygame.font.SysFont("Arial", 16, bold=True)
+        font2 = pygame.font.SysFont("Arial", 14)
+
+        header = font.render(unit.type, True, (255, 255, 200))
+        screen.blit(header, (r.x + 10, r.y + 8))
+
+        stats = [
+            ("ATK", getattr(unit, 'attack',      0)),
+            ("DEF", getattr(unit, 'defense',     0)),
+            ("HP",  getattr(unit, 'health',      0)),
+            ("MOR", getattr(unit, 'morale',      0)),
+            ("MOV", int(getattr(unit, 'move_points', 0))),
+            ("EXP", getattr(unit, 'experience',  0)),
+        ]
+
+        col_w = r.w // 3
+        for idx, (label, val) in enumerate(stats):
+            col = idx % 3
+            row = idx // 3
+            x   = r.x + 10 + col * col_w
+            y   = r.y + 35 + row * 22
+            txt = font2.render(f"{label}: {val}", True, (255, 255, 255))
+            screen.blit(txt, (x, y))
+        
     # --------------------------------------------------
     # OBSŁUGA KLIKNIĘĆ
     # --------------------------------------------------
@@ -265,6 +329,27 @@ class GarrisonGraphics:
         if not self.btn_prod_rect.collidepoint(mx, my):
             return False
         self.btn_prod_anim_timer = pygame.time.get_ticks()
+        return True
+    
+    def handle_hosp_click(self, mx, my, castle) -> bool:
+        """Zwraca True jeśli kliknięto LECZENIE i szpital jest zbudowany."""
+        has_szpital = "szpital" in [b.lower() for b in getattr(castle, 'buildings', [])]
+        if not has_szpital:
+            return False
+        if not self.btn_hosp_rect.collidepoint(mx, my):
+            return False
+        self.btn_hosp_anim_timer = pygame.time.get_ticks()
+        return True
+
+    def handle_school_click(self, mx, my, castle) -> bool:
+        """Zwraca True jeśli kliknięto SZKOLENIE i szkoła jest zbudowana."""
+        built = [b.lower() for b in getattr(castle, 'buildings', [])]
+        has_szkola = "szkoła" in built or "szkola" in built
+        if not has_szkola:
+            return False
+        if not self.btn_school_rect.collidepoint(mx, my):
+            return False
+        self.btn_school_anim_timer = pygame.time.get_ticks()
         return True
     
     if __name__ == "__main__":

@@ -247,7 +247,7 @@ class ControlsHandler:
         tile_x = (mx + self.world.camera_x) // TILE_SIZE
         tile_y = (my + self.world.camera_y) // TILE_SIZE
 
-        # --- PRAWY PRZYCISK (Podgląd statystyk) ---
+        # --- PRAWY PRZYCISK (Podgląd statystyk jednostki) ---
         if button == 3:
             target_unit = self.world.get_unit_at(tile_x, tile_y) 
             if target_unit:
@@ -256,11 +256,24 @@ class ControlsHandler:
 
         # --- LEWY PRZYCISK ---
         if button == 1:
-            # ========================================================
-            # 1. TRYB ŁĄCZENIA JEDNOSTEK (Tylko jeśli world.merge_mode jest ON)
-            # ========================================================
-            if getattr(self.world, 'merge_mode', False) and self.world.selected_unit:
-                target_unit = self.world.get_unit_at(tile_x, tile_y)
+            # 1. ZAZNACZANIE JEDNOSTKI (tylko własnej!)
+            unit_at_tile = self.world.get_unit_at(tile_x, tile_y)
+            if unit_at_tile:
+                # Sprawdzamy, czy jednostka należy do aktualnego gracza
+                current_player_obj = self.world.players[self.world.current_player]
+                if unit_at_tile.owner == current_player_obj:
+                    self.world.selected_unit = unit_at_tile
+                    unit_at_tile.target_x = unit_at_tile.target_y = None
+                    unit_at_tile.planned_path = []
+                    print(f"Wybrano jednostkę: {unit_at_tile.type}")
+                    return
+                else:
+                    print("To jednostka przeciwnika!")
+                    return
+
+            # 2. RUCH (Jeśli mamy już kogoś wybranego)
+            if self.world.selected_unit:
+                u = self.world.selected_unit
                 
                 # Jeśli kliknięto w sojusznika (i to nie jest ta sama jednostka)
                 if target_unit and target_unit.owner == self.world.selected_unit.owner and target_unit != self.world.selected_unit:
@@ -316,17 +329,30 @@ class ControlsHandler:
                     print("Nie można tam dojść!")
                 return
 
-            # 3. WEJŚCIE DO MENU ZAMKU/STRAŻNICY
+           # 3. WEJŚCIE DO MENU ZAMKU/STRAŻNICY (Z blokadą właściciela i rozmiarem)
             for castle in self.world.castles:
+                # Zamki i Twierdze zajmują 2x2, Strażnice 1x1
                 size = 2 if castle.building_type in ["Zamek", "Twierdza"] else 1
+                
                 if castle.x <= tile_x < castle.x + size and castle.y <= tile_y < castle.y + size:
                     if not getattr(castle, 'destroyed', False):
-                        self.world.selected_castle = castle # POPRAWKA: self.world
-                        if castle.building_type == "Strażnica":
-                            self.world.screen = "garrison" # POPRAWKA: self.world
+                        
+                        # SPRAWDZENIE WŁAŚCICIELA (To serce naszej blokady tur)
+                        current_player_obj = self.world.players[self.world.current_player]
+                        if castle.owner == current_player_obj:
+                            self.world.selected_castle = castle
+                            
+                            # Wybór odpowiedniego ekranu
+                            if castle.building_type == "Strażnica":
+                                self.world.screen = "garrison"
+                            else:
+                                self.world.screen = "castle"
+                            
+                            print(f"Wchodzisz do: {castle.building_type}")
                         else:
-                            self.world.screen = "castle" # POPRAWKA: self.world
-                        return
+                            print("To budowla przeciwnika! Nie masz dostępu.")
+                        
+                        return # Znaleźliśmy zamek, wychodzimy z pętli
                     
     def handle_ui_click(self, mx, my, button=1):
         # 1. SPRAWDZANIE GÓRNEGO PASKA (System/Mapa/Tura)

@@ -96,6 +96,7 @@ class Castle:
         self.work_done = 0.0             # Ile punktów pracy już włożono
         self.total_work_needed = 12.0    # Bazowa wartość (12 tur dla 1 budowniczego)
         self.mury_procent = 0            # Wytrzymałość murów (0-100%)
+        self.production_owner = None # Tu zapiszemy właściciela w momencie kliknięcia "Produkuj"
     @property
     def owner(self):
         # Jeśli _owner_data to liczba (ID), spróbujmy znaleźć gracza w świecie gry
