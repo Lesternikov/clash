@@ -243,12 +243,12 @@ class ControlsHandler:
                         self.inspected_unit = unit
                         break
     def handle_map_click(self, mx, my, button):
+        # Przeliczamy kliknięcie na współrzędne kafelków
         tile_x = (mx + self.world.camera_x) // TILE_SIZE
         tile_y = (my + self.world.camera_y) // TILE_SIZE
 
         # --- PRAWY PRZYCISK (Podgląd statystyk) ---
         if button == 3:
-            # POPRAWKA: dodano self.world.
             target_unit = self.world.get_unit_at(tile_x, tile_y) 
             if target_unit:
                 self.world.inspected_unit = target_unit
@@ -256,32 +256,60 @@ class ControlsHandler:
 
         # --- LEWY PRZYCISK ---
         if button == 1:
-            # 1. Zmiana zaznaczonej JEDNOSTKI
-            for player in self.world.players:
-                for unit in player.units:
-                    if unit.x == tile_x and unit.y == tile_y:
-                        if unit.owner == self.world.players[self.world.current_player]:
-                            self.world.selected_unit = unit # POPRAWKA: self.world
-                            unit.target_x = unit.target_y = None
-                            unit.planned_path = []
-                            print(f"Wybrano jednostkę: {unit.type}")
-                            return
-
-            # 2. RUCH (Jeśli kliknięto w pole, a mamy kogoś wybranego)
-            if self.world.selected_unit:
-                u = self.world.selected_unit # POPRAWKA: self.world
+            # ========================================================
+            # 1. TRYB ŁĄCZENIA JEDNOSTEK (Tylko jeśli world.merge_mode jest ON)
+            # ========================================================
+            if getattr(self.world, 'merge_mode', False) and self.world.selected_unit:
+                target_unit = self.world.get_unit_at(tile_x, tile_y)
                 
-                # Potwierdzenie ruchu (Drugi klik w to samo miejsce)
+                # Jeśli kliknięto w sojusznika (i to nie jest ta sama jednostka)
+                if target_unit and target_unit.owner == self.world.selected_unit.owner and target_unit != self.world.selected_unit:
+                    u = self.world.selected_unit
+                    
+                    # Drugi klik w sojusznika -> Wykonanie marszu do połączenia
+                    if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
+                        print("Wyruszam do połączenia armii!")
+                        u.move_along_path(self.world)
+                        # Po ruchu sprawdzamy, czy doszło do fuzji (logika merge jest w move_unit)
+                        return # Bardzo ważne: kończymy tutaj, żeby nie zmienić zaznaczenia!
+                        
+                    # Pierwszy klik w sojusznika -> Wyznaczenie trasy
+                    u.target_x, u.target_y = tile_x, tile_y
+                    u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
+                    
+                    if not u.planned_path:
+                        u.target_x = u.target_y = None
+                        print("BŁĄD: Nie można dojść do sojusznika!")
+                    else:
+                        print("Trasa do sojusznika wyznaczona. Kliknij jeszcze raz, aby połączyć.")
+                    return # Kończymy, żeby nie przełączyło jednostki na tę klikniętą!
+
+            # ========================================================
+            # 2. STANDARDOWA LOGIKA (Wybór lub normalny ruch)
+            # ========================================================
+            # Sprawdzamy czy na polu stoi jakaś jednostka gracza
+            clicked_unit = self.world.get_unit_at(tile_x, tile_y)
+            if clicked_unit and clicked_unit.owner == self.world.players[self.world.current_player]:
+                # Wybieramy nową jednostkę
+                self.world.selected_unit = clicked_unit
+                clicked_unit.target_x = clicked_unit.target_y = None
+                clicked_unit.planned_path = []
+                print(f"Wybrano jednostkę: {clicked_unit.type}")
+                return
+
+            # Jeśli mamy kogoś wybranego i kliknęliśmy w puste pole (lub wroga)
+            if self.world.selected_unit:
+                u = self.world.selected_unit
+                
+                # Potwierdzenie zwykłego ruchu (Drugi klik)
                 if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
-                    # POPRAWKA: Przekazujemy self.world, żeby jednostka mogła wejść w interakcję z mapą
                     u.move_along_path(self.world) 
-                    self.world.check_unit_castle_entry(u) # POPRAWKA: self.world.
+                    self.world.check_unit_castle_entry(u)
                     return
 
-                # Pierwszy klik - wyliczenie trasy
+                # Pierwszy klik - wyliczenie trasy marszu
                 u.target_x, u.target_y = tile_x, tile_y
-                # POPRAWKA: dodano self.world.
-                u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)                
+                u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
                 
                 if not u.planned_path:
                     u.target_x = u.target_y = None
@@ -358,7 +386,7 @@ class ControlsHandler:
                 self.world.execute_build_action(index, u)
             return # Ważne: kończymy tutaj, nie sprawdzamy standardowych akcji!
 
-        # --- KROK 2: STANDARDOWE AKCJE (Gdy build_menu_open == False) ---
+       # --- KROK 2: STANDARDOWE AKCJE (Gdy build_menu_open == False) ---
         
         # Indeks 0: Powrót/System
         if index == 0:
@@ -368,11 +396,12 @@ class ControlsHandler:
         # Indeksy 1 i 2: Przełączanie jednostek/zamków
         if index == 1:
             print("Szukam kolejnego oddziału...")
-            # self.world.select_next_unit()
+            self.world.select_next_active_unit() # Zmieniona nazwa na tę z world.py
             return
+            
         elif index == 2:
             print("Szukam kolejnego zamku...")
-            # self.world.select_next_castle()
+            self.world.select_next_building() # Zmieniona nazwa na tę z world.py
             return
 
         # Pozostałe akcje wymagają zaznaczonej jednostki
@@ -399,7 +428,6 @@ class ControlsHandler:
                     print("Zbyt blisko wroga!")
             else:
                 print("Wymagany Generał lub 6 lvl.")
-
     
     def handle_camera(self):
         w = self.world  # Alias dla wygody

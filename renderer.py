@@ -788,13 +788,26 @@ class Renderer:
             
             if i < len(castle.garrison) and castle.garrison[i]:
                 unit = castle.garrison[i]
-                u_txt = font.render(unit.type[:5], True, (255, 255, 255))
-                screen.blit(u_txt, (slot_rect.centerx - u_txt.get_width()//2, 
-                                    slot_rect.centery - u_txt.get_height()//2))
+                
+                # --- NOWOŚĆ: Animowany szary Sprite zamiast tekstu ---
+                frame = (pygame.time.get_ticks() // 150) % 8
+                if hasattr(unit, 'sprites') and unit.sprites:
+                    # Pobieramy obecną klatkę animacji i odbarwiamy ją na szaro
+                    gray_img = pygame.transform.grayscale(unit.sprites[frame])
+                    
+                    # Rysujemy idealnie na środku slotu
+                    screen.blit(gray_img, (slot_rect.centerx - gray_img.get_width()//2, 
+                                           slot_rect.centery - gray_img.get_height()//2))
+                else:
+                    # Fallback w razie braku grafik
+                    u_txt = font.render(unit.type[:5], True, (255, 255, 255))
+                    screen.blit(u_txt, (slot_rect.centerx - u_txt.get_width()//2, 
+                                        slot_rect.centery - u_txt.get_height()//2))
 
+                # Ramka dla zaznaczonych jednostek
                 if unit in w.selected_units:
-                    pygame.draw.rect(screen, (0, 255, 0), slot_rect, 4) 
-
+                    pygame.draw.rect(screen, (0, 255, 0), slot_rect, 4)
+                    
         self.draw_building_footer(screen)
 
         w.release_tower = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)

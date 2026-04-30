@@ -119,7 +119,7 @@ class GarrisonGraphics:
     # --------------------------------------------------
 
     def trigger_door_open(self, slot_idx):
-        if 0 <= slot_idx < 12:
+        if 0 <= slot_idx < 8:
             self.door_anim_timers[slot_idx] = pygame.time.get_ticks()
             self.door_anim_opening[slot_idx] = True
             self.door_frame_indices[slot_idx] = 0
@@ -178,11 +178,33 @@ class GarrisonGraphics:
                 owner_color = getattr(unit.owner, 'color', (80, 120, 200))
             pygame.draw.rect(screen, owner_color, rect.inflate(-4, -4))
 
-            # Nazwa jednostki
-            label = unit.type[:4].upper()
-            txt   = font.render(label, True, (255, 255, 255))
-            screen.blit(txt, txt.get_rect(centerx=rect.centerx, top=rect.top + 4))
-
+            # --- ANIMOWANA SZARA SYLWETKA ---
+            drawn = False
+            frame = (pygame.time.get_ticks() // 150) % 8
+            
+            if hasattr(unit, 'sprites') and unit.sprites and len(unit.sprites) > frame:
+                # Pobieramy klatkę i konwertujemy na szarość
+                gray_img = pygame.transform.grayscale(unit.sprites[frame])
+                
+                # Zabezpieczenie przed zbyt dużymi sprite'ami (opcjonalne, ale bezpieczne)
+                img_w, img_h = gray_img.get_size()
+                if img_w > rect.width or img_h > rect.height:
+                    scale_factor = min(rect.width / img_w, rect.height / img_h) * 0.9 # 90% rozmiaru slota
+                    new_w = int(img_w * scale_factor)
+                    new_h = int(img_h * scale_factor)
+                    gray_img = pygame.transform.smoothscale(gray_img, (new_w, new_h))
+                
+                # Rysowanie na środku slota
+                screen.blit(gray_img, (rect.centerx - gray_img.get_width()//2, 
+                                       rect.centery - gray_img.get_height()//2))
+                drawn = True
+                
+            # Fallback: Jeśli jednostka nie ma sprite'ów, rysujemy stary tekst
+            if not drawn:
+                label = unit.type[:4].upper()
+                txt   = font.render(label, True, (255, 255, 255))
+                screen.blit(txt, txt.get_rect(centerx=rect.centerx, top=rect.top + 4))
+                
             # Liczba jednostek
             count = getattr(unit, 'count', 1)
             if count > 1:

@@ -59,7 +59,7 @@ class World(BuildingsMixin):
 
         self.show_grid = False
         self.show_top_ui = False
-
+        self.merge_mode = False  # Tryb łączenia jednostek
         # ====================================================
         # 2. INICJALIZACJA MENEDŻERÓW I KLAS POMOCNICZYCH
         # ====================================================
@@ -277,7 +277,7 @@ class World(BuildingsMixin):
         if not (0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map)):
             return False
 
-        # 3. INTERAKCJA Z ZAMKIEM (Obszar 2x2)
+    # 3. INTERAKCJA Z ZAMKIEM (Obszar 2x2)
         for castle in self.castles:
             if castle.x <= nx <= castle.x + 1 and castle.y <= ny <= castle.y + 1:
                 if castle.destroyed:
@@ -294,21 +294,19 @@ class World(BuildingsMixin):
 
                 if castle.owner != unit.owner:
                     castle.owner = unit.owner
-                    castle.garrison = [None] * 12
+                    # Przy przejmowaniu zamku czyścimy cały stary garnizon!
+                    castle.garrison = [None] * len(castle.garrison)
                     print(f"Zamek na ({castle.x}, {castle.y}) został PRZEJĘTY!")
 
-                for i in range(len(castle.garrison)):
-                    if castle.garrison[i] is None:
-                        castle.garrison[i] = unit
-                        if unit in self.units: self.units.remove(unit)
-                        if unit in unit.owner.units: unit.owner.units.remove(unit)
-                        
-                        unit.move_points -= cost # <--- ODEJMUJEMY KOSZT
-                        if self.selected_unit == unit:
-                            self.selected_unit = None
-                        return True
-                return False
-
+                # === KLUCZOWA ZMIANA ===
+                # Wywołujemy funkcję enter_castle, która rozpakuje całą armię
+                # do osobnych slotów w zamku
+                if self.enter_castle(unit, castle):
+                    unit.move_points -= cost
+                    return True
+                else:
+                    return False # Zamek jest pełny, jednostka nie wchodzi
+                
         # 4. TEREN - Lista znaków, po których wolno chodzić
         # Dodałem kropkę, l, g oraz znaki drogi
         walkable_chars = [".", "l", "g", "p", "_", "#", "$", " "] 
@@ -321,16 +319,21 @@ class World(BuildingsMixin):
             print(f"DEBUG: Blokada! Teren '{map_char}' na ({nx}, {ny}) jest nieprzejezdny.")
             return False
 
-        # 5. WALKA 
-        for other in self.units[:]: # Używamy kopii listy do bezpiecznego usuwania
+        # 5. WALKA LUB ŁĄCZENIE
+        for other in self.units[:]: 
             if other.x == nx and other.y == ny:
                 if other.owner != unit.owner:
-                    print(f"ATAK! {unit.type} uderza w {other.type}!")
+                    # To jest wróg -> Walka (zostawiasz jak masz)
                     self.units.remove(other)
-                    if other in other.owner.units:
-                        other.owner.units.remove(other)
+                    # ...
                 else:
-                    return False
+                    # TO JEST SOJUSZNIK!
+                    if getattr(self, 'merge_mode', False):
+                        # Odpalamy procedurę łączenia
+                        return self.merge_units(unit, other, cost)
+                    else:
+                        # Normalnie sojusznik blokuje drogę
+                        return False
             
         # 6. ZBIERANIE CHŁOPÓW
         for group in self.peasant_groups[:]:
@@ -483,24 +486,42 @@ class World(BuildingsMixin):
         return False  
                   
     def enter_castle(self, unit, castle):
-        # 1. Szukamy pierwszego wolnego slotu (None)
-        for i in range(len(castle.garrison)):
-            if castle.garrison[i] is None:
-                # 2. Wkładamy jednostkę w puste miejsce
-                castle.garrison[i] = unit
-                
-                # 3. Usuwamy z mapy
-                if unit in self.units: self.units.remove(unit)
-                if unit in unit.owner.units: unit.owner.units.remove(unit)
-                
-                unit.x, unit.y = -1, -1
-                self.selected_unit = None
-                print(f"DEBUG: Jednostka schowana w slocie {i}")
-                return True
-                
-        print("DEBUG: Brak wolnych slotów!")
-        return False
-    
+        """Przenosi lidera i wszystkich jego pasażerów do osobnych slotów w zamku."""
+        # 1. Przygotowujemy listę wszystkich jednostek, które chcą wejść
+        to_enter = [unit]
+        if hasattr(unit, 'garrison') and unit.garrison:
+            # Wyciągamy wszystkich pasażerów, którzy nie są None
+            to_enter.extend([u for u in unit.garrison if u is not None])
+
+        # 2. Sprawdzamy, czy w zamku jest dość miejsca dla wszystkich
+        free_slots = [i for i, slot in enumerate(castle.garrison) if slot is None]
+        
+        if len(to_enter) > len(free_slots):
+            print(f"Brak miejsca w zamku! Próbujesz wprowadzić {len(to_enter)} oddziałów, a wolnych jest {len(free_slots)}.")
+            return False
+
+        # 3. Rozpakowujemy jednostki do osobnych slotów zamku
+        for idx, u_to_add in enumerate(to_enter):
+            target_slot = free_slots[idx]
+            castle.garrison[target_slot] = u_to_add
+            
+            # Czyścimy dane jednostki o pozycji na mapie
+            u_to_add.x, u_to_add.y = -1, -1
+            
+            # Jeśli jednostka była fizycznie na mapie (lider), usuwamy ją ze świata
+            if u_to_add in self.units:
+                self.units.remove(u_to_add)
+            if u_to_add.owner and u_to_add in u_to_add.owner.units:
+                u_to_add.owner.units.remove(u_to_add)
+
+        # 4. Czyścimy garnizon lidera, bo teraz wszyscy są już w zamku jako osobne byty
+        if hasattr(unit, 'garrison'):
+            unit.garrison = [None] * 10
+
+        self.selected_unit = None
+        print(f"DEBUG: Pomyślnie wprowadzono i rozpakowano {len(to_enter)} jednostek w zamku.")
+        return True
+ 
     def remove_unit_or_builder(self, army, builder):
         # Jeśli armia to po prostu jeden budowniczy
         if army == builder:
@@ -554,21 +575,25 @@ class World(BuildingsMixin):
         
         for idx, group in enumerate(groups_to_spawn):
             pos = spawn_positions[idx] if idx < len(spawn_positions) else None
-            if not pos: continue
+            
+            # --- ZABEZPIECZENIE: Jeśli nie ma wolnego miejsca, informujemy gracza ---
+            if not pos: 
+                print(f"BŁĄD: Brak wolnego terenu na mapie! Oddział {idx + 1} utknął w zamku.")
+                continue
             
             nx, ny = pos
 
             if len(group) == 1:
-                # ================= SCENARIUSZ A: SOLO (np. Budowniczy) =================
+                # ================= SCENARIUSZ A: SOLO (np. pojedynczy Budowniczy) =================
                 solo_unit = group[0]
                 
-                # --- KLUCZOWA POPRAWKA: USUWANIE ZE SLOTU ---
+                # Usuwanie ze slotu zamku
                 for slot_idx in range(len(target.garrison)):
-                    if target.garrison[slot_idx] is unit_to_move: # lub solo_unit
+                    if target.garrison[slot_idx] is solo_unit:
                         target.garrison[slot_idx] = None
-                        self.garrison_gfx.trigger_door_open(slot_idx) # <--- DODAJ TO
+                        if hasattr(self, 'garrison_gfx'):
+                            self.garrison_gfx.trigger_door_open(slot_idx)
                         break
-                # --------------------------------------------
 
                 solo_unit.x, solo_unit.y = nx, ny
                 if hasattr(solo_unit, 'rect'):
@@ -581,70 +606,80 @@ class World(BuildingsMixin):
                 if target.owner and solo_unit not in target.owner.units:
                     target.owner.units.append(solo_unit)
                     
-                print(f"Wypuszczono solo: {solo_unit.type} i wyczyszczono slot.")
+                print(f"Wypuszczono solo: {solo_unit.type} na pole ({nx}, {ny}).")
 
             else:
                 # ================= SCENARIUSZ B: GRUPA (ARMIA) =================
-                army_type = group[0].type 
-                new_army = Unit(army_type, nx, ny, target.owner)
-                new_army.garrison = [None] * 10
-
-                for i, unit_to_move in enumerate(group):
-                    if i < 10:
-                        new_army.garrison[i] = unit_to_move
-                        
-                        # --- CZYŚCIMY SLOTY W BUDYNKU ---
-                        for slot_idx in range(len(target.garrison)):
-                            if target.garrison[slot_idx] is unit_to_move: # lub solo_unit
-                                target.garrison[slot_idx] = None
-                                self.garrison_gfx.trigger_door_open(slot_idx) # <--- DODAJ TO
-                                break
-
-                        if unit_to_move in self.units:
-                            self.units.remove(unit_to_move)
+                # Bierzemy pierwszą jednostkę z grupy jako Lidera (ona będzie widoczna na mapie)
+                leader = group[0]
+                leader.x, leader.y = nx, ny
+                leader.garrison = [None] * 10 # Inicjujemy jej garnizon
                 
-                self.units.append(new_army)
-                if target.owner:
-                    target.owner.units.append(new_army)
+                # Wszystkie jednostki z grupy (wliczając lidera) muszą zniknąć ze slotów zamku
+                for unit_to_clear in group:
+                    for slot_idx in range(len(target.garrison)):
+                        if target.garrison[slot_idx] is unit_to_clear:
+                            target.garrison[slot_idx] = None
+                            break
 
-        # --- KLUCZOWA ZMIANA ---
+                # Resztę jednostek (od indeksu 1) chowamy do garnizonu lidera
+                for i, unit_to_hide in enumerate(group[1:]):
+                    if i < 10:
+                        leader.garrison[i] = unit_to_hide
+                        unit_to_hide.x, unit_to_hide.y = -1, -1 # Pasażerowie znikają z mapy
+                        if unit_to_hide in self.units:
+                            self.units.remove(unit_to_hide)
+
+                # Tylko Lidera dodajemy do świata na mapę
+                if leader not in self.units:
+                    self.units.append(leader)
+                if target.owner and leader not in target.owner.units:
+                    target.owner.units.append(leader)
+                
+                print(f"Wypuszczono oddział: Lider {leader.type} prowadzi {len(group)-1} jednostek.")
+        # --- Finał ---
         self.selected_units.clear()
         
         if not stay_in_menu:
             self.screen = "map"
             self.selected_castle = None
-        
-        print("Jednostki wypuszczone.")
 
     def find_multiple_spawn_positions(self, castle, num_groups):
-        # gdzie wychodzą jednostki
-        """Szuka wolnych miejsc dla X grup według Twojej ścisłej kolejności."""
-        directions = [
-            (0, 2), (1, 2), (2, 2), (-1, 2),
-            (2, 1),                 (-1, 1),
-            (2, 0),                 (-1, 0),
-            (2, -1), (-1, -1), (1, -1), (0, -1)
-        ]
-        
+        """Szuka wolnych miejsc dla X grup promieniście, powiększając obszar."""
         results = []
-        # Aktualna lista zajętych pól (jednostki na mapie + już przypisane nowe pozycje)
         occupied = {(u.x, u.y) for u in self.units}
         
-        for _ in range(num_groups):
-            found = False
-            for dx, dy in directions:
-                nx, ny = castle.x + dx, castle.y + dy
-                if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
-                    if (nx, ny) not in occupied and self.map[ny][nx] in [".", "_", "p", "#", "$","l","g"]:
-                        results.append((nx, ny))
-                        occupied.add((nx, ny)) # Rezerwujemy to miejsce dla kolejnej grupy
-                        found = True
-                        break
-            if not found:
-                results.append(None) # Brak miejsca dla tej konkretnej grupy
+        # Ustalamy rozmiar zamku (Zamek/Twierdza = 2x2, Strażnica = 1x1)
+        size = 2 if getattr(castle, 'building_type', 'Zamek') in ["Zamek", "Twierdza"] else 1
+        
+        # DOZWOLONE TERENY (dodano spację " ", żeby krawędzie mapy nie blokowały)
+        allowed = [".", "_", "p", "#", "$", "l", "g", " "]
+        
+        # Skanujemy otoczenie (od 1 kafelka od murów, aż do 5 kafelków w głąb mapy)
+        for radius in range(1, 6):
+            if len(results) >= num_groups:
+                break
                 
+            min_x = int(castle.x) - radius
+            max_x = int(castle.x) + size + radius - 1
+            min_y = int(castle.y) - radius
+            max_y = int(castle.y) + size + radius - 1
+            
+            for dy in range(min_y, max_y + 1):
+                for dx in range(min_x, max_x + 1):
+                    # Sprawdzamy tylko obwódkę (ignorujemy środek, gdzie stoi zamek)
+                    if dx == min_x or dx == max_x or dy == min_y or dy == max_y:
+                        if 0 <= dx < len(self.map[0]) and 0 <= dy < len(self.map):
+                            if (dx, dy) not in occupied and self.map[dy][dx] in allowed:
+                                if len(results) < num_groups:
+                                    results.append((dx, dy))
+                                    occupied.add((dx, dy)) # Rezerwujemy na przyszłość
+                                    
+        # Wypełniamy ewentualne braki wartością None, żeby program nie crashował
+        while len(results) < num_groups:
+            results.append(None)
+            
         return results
- 
 
 # Dodaj te funkcje do klasy World:
 
@@ -666,6 +701,114 @@ class World(BuildingsMixin):
         if hasattr(u, 'garrison'):
             return any(slot and (slot.type == "BUDOW" or slot.type == "Budowniczy") for slot in u.garrison)
         return False
+    
+    def merge_units(self, moving_unit, target_unit, cost):
+        """Łączy jednostkę ruchomą z docelową bez duplikowania liderów."""
+        
+        # 1. Przygotowujemy listę jednostek do dodania (ruchomy lider + jego ewentualny garnizon)
+        to_add = [moving_unit]
+        if hasattr(moving_unit, 'garrison') and moving_unit.garrison:
+            to_add.extend([u for u in moving_unit.garrison if u is not None])
+            # Czyścimy stary garnizon wędrowca, bo teraz staje się on zwykłym żołnierzem
+            moving_unit.garrison = [None] * 10 
+
+        # 2. Upewniamy się, że jednostka docelowa (target) ma miejsce w środku
+        if not hasattr(target_unit, 'garrison') or not target_unit.garrison:
+            target_unit.garrison = [None] * 10
+            
+        free_slots = [i for i, slot in enumerate(target_unit.garrison) if slot is None]
+        
+        if len(to_add) > len(free_slots):
+            print(f"Brak miejsca! Próbujesz dodać {len(to_add)} oddziałów, a masz {len(free_slots)} wolnych slotów.")
+            self.merge_mode = False
+            return False
+
+        # 3. Przenosimy jednostki do środka target_unit
+        for i, unit_to_hide in enumerate(to_add):
+            slot_idx = free_slots[i]
+            target_unit.garrison[slot_idx] = unit_to_hide
+            
+            # Jednostka wchodząca do środka znika z mapy głównej
+            unit_to_hide.x, unit_to_hide.y = -1, -1
+            if unit_to_hide in self.units:
+                self.units.remove(unit_to_hide)
+            if unit_to_hide.owner and unit_to_hide in unit_to_hide.owner.units:
+                unit_to_hide.owner.units.remove(unit_to_hide)
+
+        # 4. Finalizacja
+        self.merge_mode = False
+        self.selected_unit = target_unit # Kamera zostaje na "nowej" armii
+        target_unit.move_points = min(target_unit.move_points, moving_unit.move_points - cost)
+        
+        print(f"Połączono! Liderem jest {target_unit.type}. W środku: {10 - target_unit.garrison.count(None)} oddziałów.")
+        return True
+    
+    def center_camera_on(self, tx, ty):
+        """Centruje kamerę na podanych współrzędnych kafelka."""
+        from settings import SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE
+        
+        # Przeliczamy pozycję kafelka na piksele
+        target_px = tx * TILE_SIZE
+        target_py = ty * TILE_SIZE
+        
+        # Ustawiamy kamerę tak, by środek ekranu celował w ten piksel
+        self.camera_x = target_px - (SCREEN_WIDTH // 2)
+        self.camera_y = target_py - (SCREEN_HEIGHT // 2)
+        
+        # Zabezpieczenie przed wyjechaniem kamery poza mapę
+        if self.map and self.map[0]:
+            max_x = len(self.map[0]) * TILE_SIZE - SCREEN_WIDTH
+            max_y = len(self.map) * TILE_SIZE - SCREEN_HEIGHT
+            self.camera_x = max(0, min(self.camera_x, max_x))
+            self.camera_y = max(0, min(self.camera_y, max_y))
+
+    def select_next_active_unit(self):
+        """Wybiera następną jednostkę gracza, która ma punkty ruchu."""
+        current_owner = self.players[self.current_player]
+        
+        # Tworzymy listę jednostek na mapie (x >= 0), które mają ruch i należą do nas
+        active_units = [u for u in self.units if u.owner == current_owner and u.move_points > 0 and u.x >= 0]
+        
+        if not active_units:
+            print("Żadna Twoja jednostka nie ma już punktów ruchu!")
+            return
+
+        # Szukamy indeksu aktualnie zaznaczonej jednostki w naszej aktywnej liście
+        start_idx = -1
+        if self.selected_unit in active_units:
+            start_idx = active_units.index(self.selected_unit)
+
+        # Wybieramy następną z rzędu (modulo zapewnia zapętlenie listy na koniec)
+        next_idx = (start_idx + 1) % len(active_units)
+        next_u = active_units[next_idx]
+        
+        # Zaznaczamy i centrujemy
+        self.selected_unit = next_u
+        self.center_camera_on(next_u.x, next_u.y)
+        print(f"Centrowanie na: {next_u.type} (Punkty ruchu: {next_u.move_points})")
+
+    def select_next_building(self):
+        """Wybiera następny budynek gracza (Zamek, Twierdza, Strażnica)."""
+        current_owner = self.players[self.current_player]
+        
+        # Zbieramy wszystkie nasze nieniszczone zamki
+        my_castles = [c for c in self.castles if c.owner == current_owner and not getattr(c, 'destroyed', False)]
+        
+        if not my_castles:
+            print("Nie posiadasz żadnych budynków!")
+            return
+            
+        start_idx = -1
+        if self.selected_castle in my_castles:
+            start_idx = my_castles.index(self.selected_castle)
+            
+        next_idx = (start_idx + 1) % len(my_castles)
+        next_c = my_castles[next_idx]
+        
+        # Wybieramy budynek i centrujemy
+        self.selected_castle = next_c
+        self.center_camera_on(next_c.x, next_c.y)
+        print(f"Centrowanie na: {next_c.building_type} na pozycji ({next_c.x}, {next_c.y})")
 
 # --- URUCHOMIENIE ---
 # generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")

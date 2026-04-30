@@ -265,49 +265,45 @@ class Castle:
         self.production_unit_type = None
         self.production_turns_left = 0
 
-
     def process_production(self):
+        # Sprawdzamy czy produkcja jest w ogóle zlecona
         if not self.production_enabled or self.production_unit_type is None:
             return
 
-        # ZMIANA: Sprawdzamy, czy jest jakiekolwiek wolne miejsce (None)
+        # Sprawdzamy, czy jest jakiekolwiek wolne miejsce w garnizonie
         if None not in self.garrison:
-            print("Garnizon pełny — produkcja zatrzymana")
-            self.production_enabled = False
+            print("Garnizon pełny — produkcja czeka na wolne miejsce")
             return
 
         self.production_turns_left -= 1
-        print("Produkcja — zostało:", self.production_turns_left)
+        print(f"Produkcja {self.production_unit_type} — zostało tur: {self.production_turns_left}")
 
+        # Gdy jednostka jest gotowa
         if self.production_turns_left <= 0:
-            stats = UNIT_STATS[self.production_unit_type]
-            cost = stats["production_cost"]
+            stats = UNIT_STATS.get(self.production_unit_type, {})
+            cost = stats.get("production_cost", 0)
 
             if self.gold < cost:
-                print("Brak złota — produkcja zatrzymana")
+                print("Brak złota — produkcja wstrzymana")
                 self.production_enabled = False
                 return
 
-            # SZUKAMY PIERWSZEGO WOLNEGO MIEJSCA
-            free_slot = -1
+            # Szukamy pierwszego wolnego miejsca
             for i in range(len(self.garrison)):
                 if self.garrison[i] is None:
-                    free_slot = i
+                    self.gold -= cost
+                    
+                    # --- TUTAJ BYŁ BŁĄD! TERAZ JEST POPRAWNIE ---
+                    # Przekazujemy tylko: kod, X, Y, obiekt gracza
+                    from unit import Unit
+                    unit = Unit(self.production_unit_type, self.x, self.y, self.owner)                
+                    
+                    self.garrison[i] = unit 
+                    print(f"Wyprodukowano {self.production_unit_type} i umieszczono w slocie {i}")
+                    
+                    # Restart cyklu produkcji (jeśli gracz nie wciśnie STOP)
+                    self.production_turns_left = stats.get("production_time", 2)
                     break
-
-            if free_slot != -1:
-                self.gold -= cost
-                full_name = UNIT_NAMES.get(self.production_unit_type, "Jednostka")
-                # Tworzymy jednostkę
-                unit = Unit(self.production_unit_type, full_name, self.x, self.y, self.owner)                
-                # Wstawiamy w konkretny slot
-                self.garrison[free_slot] = unit 
-
-                print(f"Wyprodukowano {self.production_unit_type} i umieszczono w slocie {free_slot}")
-                
-                # Restart cyklu produkcji
-                self.production_turns_left = stats["production_time"]
-
 
     def start_healing_unit(self, unit):
         if "hospital" not in self.buildings:
@@ -535,47 +531,7 @@ class Castle:
         self.process_training()           
         self.build_limit_reached = False
 
-    def finish_production(self):
-        from unit import Unit
-
-        new_unit = Unit(
-            self.production_unit_type,
-            self.x,
-            self.y,
-            self.owner
-        )
-
-        self.garrison.append(new_unit)
-
-        print("Wyprodukowano:", self.production_unit_type)
-
-        self.production_enabled = False
-        self.production_turns_left = 0
     
-    def update_production(self, world):
-        if not self.production_enabled:
-            return
-
-        self.production_turns_left -= 1
-        print("Produkcja — zostało tur:", self.production_turns_left)
-
-        if self.production_turns_left <= 0:
-                unit = Unit(
-                    self.production_unit_type,
-                    self.x,
-                    self.y,
-                    self.owner
-                )
-
-                for i in range(len(self.garrison)):
-                    if self.garrison[i] is None:
-                        self.garrison[i] = unit
-                        break
-                print("Jednostka dodana do garnizonu")
-
-                self.production_enabled = False
-                self.production_unit_type = None
-
     def demolish(self):
         self.destroyed = True
         self.owner = None
@@ -636,3 +592,8 @@ class Castle:
                 self.garrison[i] = unit
                 return True
         return False # Wszystkie 10/12 slotów zajęte
+    
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])
