@@ -450,6 +450,38 @@ class World(BuildingsMixin):
         self.add_unit(u)
         return u
      
+    def handle_garrison_click(self, mx, my, button):
+        castle = self.selected_castle
+        if not castle:
+            return
+
+        # ================= BACK =================
+        if hasattr(self, 'back_button_castle') and self.back_button_castle.collidepoint(mx, my):
+            self.selected_units.clear()
+            self.screen = "castle"
+            return
+
+        # ================= RECRUITMENT =================
+        if self.garrison_gfx.handle_prod_click(mx, my, castle):
+            self.prod_anim_timer = pygame.time.get_ticks() # Nowy stoper dla animacji
+            return
+
+        # ================= HEAL =================
+        if self.garrison_gfx.handle_hosp_click(mx, my, castle):
+            for unit in self.selected_units:
+                castle.start_healing_unit(unit)
+            return
+
+        # ================= TRAIN ================= 
+        if self.garrison_gfx.handle_school_click(mx, my, castle):
+            if self.selected_units:
+                castle.start_training_group(self.selected_units) 
+                self.selected_units.clear() 
+                print("Zakończono wydawanie rozkazów szkolenia")
+            else:
+                print("Brak zaznaczonych jednostek do szkolenia")
+            return
+        
     def get_unit_at(self, x, y):
         for unit in self.units:
             # Ignoruj jednostki, które są w trakcie budowy!
@@ -611,12 +643,17 @@ class World(BuildingsMixin):
                 leader.garrison = [None] * 10 # Inicjujemy jej garnizon
                 
                 # Wszystkie jednostki z grupy (wliczając lidera) muszą zniknąć ze slotów zamku
+                # Wszystkie jednostki z grupy (wliczając lidera) muszą zniknąć ze slotów zamku
                 for unit_to_clear in group:
                     for slot_idx in range(len(target.garrison)):
                         if target.garrison[slot_idx] is unit_to_clear:
                             target.garrison[slot_idx] = None
+                            
+                            # DODANE: Animacja drzwi działa teraz też dla całych armii!
+                            if hasattr(self, 'garrison_gfx'):
+                                self.garrison_gfx.trigger_door_open(slot_idx)
+                                
                             break
-
                 # Resztę jednostek (od indeksu 1) chowamy do garnizonu lidera
                 for i, unit_to_hide in enumerate(group[1:]):
                     if i < 10:

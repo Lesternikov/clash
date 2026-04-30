@@ -79,21 +79,21 @@ class GarrisonGraphics:
         BTN_P_W, BTN_P_H = 140, 80
         self.btn_prod_normal     = self._load("assets/przyciski/PRZ_3.png",  BTN_P_W, BTN_P_H)
         self.btn_prod_pressed    = self._load("assets/przyciski/PRZ_4.png", BTN_P_W, BTN_P_H)
-        self.btn_prod_rect       = pygame.Rect(255, 680, BTN_P_W, BTN_P_H)
+        self.btn_prod_rect       = pygame.Rect(255, 677, BTN_P_W, BTN_P_H)
         self.btn_prod_anim_timer = 0
 
         # ---PRZYCISK LECZENIA (tylko gdy zbudowany szpital)
         BTN_H_W, BTN_H_H = 140, 80
         self.btn_hosp_normal     = self._load("assets/przyciski/PRZ_5.png",  BTN_H_W, BTN_H_H)
         self.btn_hosp_pressed    = self._load("assets/przyciski/PRZ_6.png", BTN_H_W, BTN_H_H)
-        self.btn_hosp_rect       = pygame.Rect(355, 680, BTN_H_W, BTN_H_H)
+        self.btn_hosp_rect       = pygame.Rect(440, 677, BTN_H_W, BTN_H_H)
         self.btn_hosp_anim_timer = 0
 
         # ----PRZYCISK SZKOLENIA (tylko gdy zbuowana szkoła)
         BTN_S_W, BTN_S_H = 140, 80
         self.btn_school_normal     = self._load("assets/przyciski/PRZ_7.png",  BTN_S_W, BTN_S_H)
         self.btn_school_pressed    = self._load("assets/przyciski/PRZ_8.png", BTN_S_W, BTN_S_H)
-        self.btn_school_rect       = pygame.Rect(405, 680, BTN_S_W, BTN_S_H)
+        self.btn_school_rect       = pygame.Rect(622, 677, BTN_S_W, BTN_S_H)
         self.btn_school_anim_timer = 0
     # --------------------------------------------------
     # ŁADOWANIE
@@ -132,7 +132,7 @@ class GarrisonGraphics:
     # --------------------------------------------------
 
     def trigger_door_open(self, slot_idx):
-        if 0 <= slot_idx < 8:
+        if 0 <= slot_idx < 12:
             self.door_anim_timers[slot_idx] = pygame.time.get_ticks()
             self.door_anim_opening[slot_idx] = True
             self.door_frame_indices[slot_idx] = 0
@@ -175,14 +175,8 @@ class GarrisonGraphics:
         for i, rect in enumerate(self.slot_rects):
             unit = garrison[i] if i < len(garrison) else None
 
-        # 3. Sloty jednostek
-        font_cnt = pygame.font.SysFont("Arial", 12)
-        garrison = getattr(castle, 'garrison', [])
-
-        for i, rect in enumerate(self.slot_rects):
-            unit = garrison[i] if i < len(garrison) else None
-
-            if unit is None:
+            # 1. PUSTY SLOT = DRZWI
+            if unit is None or not hasattr(unit, 'type'):
                 idx = self.door_frame_indices[i] 
                 if self.door_frames:
                     screen.blit(self.door_frames[idx], rect.topleft)
@@ -192,46 +186,90 @@ class GarrisonGraphics:
             if unit in selected_units:
                 pygame.draw.rect(screen, (255, 255, 0), rect.inflate(4, 4), 3)
 
-            # Tło koloru gracza
             owner_color = (80, 120, 200)
             if hasattr(unit, 'owner') and unit.owner:
                 owner_color = getattr(unit.owner, 'color', (80, 120, 200))
             pygame.draw.rect(screen, owner_color, rect.inflate(-4, -4))
 
-            # --- ANIMOWANA SZARA SYLWETKA ---
+            # --- RYSOWANIE SYLWETKI ---
             drawn = False
-            frame = (pygame.time.get_ticks() // 150) % 8
+            raw_img = None
             
-            if hasattr(unit, 'sprites') and unit.sprites and len(unit.sprites) > frame:
-                # Pobieramy klatkę i konwertujemy na szarość
-                gray_img = pygame.transform.grayscale(unit.sprites[frame])
-                
-                # Zabezpieczenie przed zbyt dużymi sprite'ami (opcjonalne, ale bezpieczne)
-                img_w, img_h = gray_img.get_size()
-                if img_w > rect.width or img_h > rect.height:
-                    scale_factor = min(rect.width / img_w, rect.height / img_h) * 0.9 # 90% rozmiaru slota
-                    new_w = int(img_w * scale_factor)
-                    new_h = int(img_h * scale_factor)
+            # Bezpieczne wyciąganie nazwy (nawet jeśli to słownik)
+            u_name = getattr(unit, 'type_code', getattr(unit, 'type', 'Unknown'))
+            if isinstance(u_name, dict):
+                u_name = u_name.get("unit_type", str(u_name))
+            
+            u_code = u_name 
+            try:
+                from settings import NAME_TO_CODE, UNIT_NAMES
+                if u_name in NAME_TO_CODE:
+                    u_code = NAME_TO_CODE[u_name]
+                else:
+                    for code, name in UNIT_NAMES.items():
+                        if name == u_name:
+                            u_code = code
+                            break
+            except Exception:
+                pass
+
+            # PRIORYTET: Szukamy bezpośrednio na dysku, żeby ominąć fałszywe grafiki w pamięci gry!
+            frame = (pygame.time.get_ticks() // 150) % 8
+            path = f"assets/minimum/{u_code}1_I_S32/{u_code}1_I_S32_{frame}.png"
+            
+            if os.path.exists(path):
+                raw_img = pygame.image.load(path).convert_alpha()
+            else:
+                # Ratunek z pamięci
+                frames_list = getattr(unit, 'walk_frames', getattr(unit, 'sprites', []))
+                if frames_list and len(frames_list) > 0:
+                    raw_img = frames_list[frame % len(frames_list)]
+
+            # Wykrywamy awaryjne "niewidzialne" kwadraty (zniszczy to pusty czerwony prostokąt)
+            if raw_img and raw_img.get_size() == (32, 32):
+                test_col = raw_img.get_at((16, 16))
+                if test_col[3] == 0 or test_col == (255, 0, 255, 255) or test_col == (0, 0, 0, 255):
+                    raw_img = None 
+
+            if raw_img:
+                try:
+                    # Gwarancja przezroczystości (usuwamy tło magenta)
+                    alpha_img = pygame.Surface(raw_img.get_size(), pygame.SRCALPHA)
+                    if raw_img.get_colorkey() is None:
+                        raw_img.set_colorkey((255, 0, 255))
+                    alpha_img.blit(raw_img, (0, 0))
+                    
+                    if hasattr(pygame.transform, 'grayscale'):
+                        gray_img = pygame.transform.grayscale(alpha_img)
+                    else:
+                        gray_img = alpha_img.copy()
+                        
+                    # --- POWIĘKSZENIE BEZ BLOKAD ---
+                    POWIEKSZENIE = 1.6  # Teraz 1.8 wystarczy by ładnie wypełnić slot!
+                    
+                    img_w, img_h = gray_img.get_size()
+                    new_w = int(img_w * POWIEKSZENIE - 5)
+                    new_h = int(img_h * POWIEKSZENIE)
+                    
                     gray_img = pygame.transform.smoothscale(gray_img, (new_w, new_h))
-                
-                # Rysowanie na środku slota
-                screen.blit(gray_img, (rect.centerx - gray_img.get_width()//2, 
-                                       rect.centery - gray_img.get_height()//2))
-                drawn = True
-                
-            # Fallback: Jeśli jednostka nie ma sprite'ów, rysujemy stary tekst
+                    screen.blit(gray_img, (rect.centerx - gray_img.get_width()//2, 
+                                           rect.centery - gray_img.get_height()//2))
+                    drawn = True
+                except Exception as e:
+                    print(f"Błąd grafiki jednostki: {e}")
+                    
+            # Fallback tekstowy (teraz zadziała, jeśli usunęliśmy fałszywą grafikę)
             if not drawn:
-                label = unit.type[:4].upper()
+                label = str(u_name)[:4].upper()
                 txt   = font.render(label, True, (255, 255, 255))
-                screen.blit(txt, txt.get_rect(centerx=rect.centerx, top=rect.top + 4))
+                screen.blit(txt, txt.get_rect(centerx=rect.centerx, centery=rect.centery))
                 
-            # Liczba jednostek
             count = getattr(unit, 'count', 1)
             if count > 1:
                 c_txt = font_cnt.render(str(count), True, (255, 255, 0))
                 screen.blit(c_txt, (rect.right - c_txt.get_width() - 2,
                                     rect.bottom - c_txt.get_height() - 2))
-
+                             
 # 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
         if inspected_unit is not None:
             info_x = int(ORIG_TABLE_X * self.sx)
@@ -253,7 +291,7 @@ class GarrisonGraphics:
                 screen.blit(img, self.btn_prod_rect.topleft)
 
         # 7. Przycisk LECZENIA (Szpital) - PRZ_5 / PRZ_6
-        if "szpital" in built:
+        if "hospital" in built:
             elapsed_h = now - self.btn_hosp_anim_timer
             is_pressed = self.btn_hosp_anim_timer > 0 and elapsed_h < 200
             img = self.btn_hosp_pressed if is_pressed else self.btn_hosp_normal
@@ -261,7 +299,7 @@ class GarrisonGraphics:
                 screen.blit(img, self.btn_hosp_rect.topleft)
 
         # 8. Przycisk SZKOLENIA (Szkoła) - PRZ_7 / PRZ_8
-        if "szkoła" in built or "szkola" in built:
+        if "school" in built:
             elapsed_s = now - self.btn_school_anim_timer
             is_pressed = self.btn_school_anim_timer > 0 and elapsed_s < 200
             img = self.btn_school_pressed if is_pressed else self.btn_school_normal
@@ -333,8 +371,8 @@ class GarrisonGraphics:
     
     def handle_hosp_click(self, mx, my, castle) -> bool:
         """Zwraca True jeśli kliknięto LECZENIE i szpital jest zbudowany."""
-        has_szpital = "szpital" in [b.lower() for b in getattr(castle, 'buildings', [])]
-        if not has_szpital:
+        has_hospital = "hospital" in [b.lower() for b in getattr(castle, 'buildings', [])]
+        if not has_hospital:
             return False
         if not self.btn_hosp_rect.collidepoint(mx, my):
             return False
@@ -344,8 +382,8 @@ class GarrisonGraphics:
     def handle_school_click(self, mx, my, castle) -> bool:
         """Zwraca True jeśli kliknięto SZKOLENIE i szkoła jest zbudowana."""
         built = [b.lower() for b in getattr(castle, 'buildings', [])]
-        has_szkola = "szkoła" in built or "szkola" in built
-        if not has_szkola:
+        has_school = "school" in built or "szkola" in built
+        if not has_school:
             return False
         if not self.btn_school_rect.collidepoint(mx, my):
             return False

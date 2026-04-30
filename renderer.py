@@ -35,6 +35,18 @@ class Renderer:
                 w.back_anim_timer = 0
                 return
 
+        # --- DODAJ TO: Stoper animacji przejścia do Koszar ---
+        if getattr(w, 'prod_anim_timer', 0) > 0:
+            elapsed = pygame.time.get_ticks() - w.prod_anim_timer
+            if elapsed > 200:
+                w.screen = "recruitment"
+                w.recruitment_open = True
+                w.recruitment_scroll = -2  
+                w.selected_unit_type = 0   
+                w.selected_patent_index = None
+                w.prod_anim_timer = 0
+                return
+            
         screen.fill((30, 30, 30))
 
         # Rysujemy mapę pod ekranami które tego wymagają
@@ -75,10 +87,11 @@ class Renderer:
             w.peasant_menu.draw(screen, w)
 
         elif w.screen in ["forge", "workshop", "hospital", "school"]:
-            draw_func = getattr(w, f"draw_{w.screen}", None)
+            # ZMIANA Z getattr(w, ...) NA getattr(self, ...) !!!
+            draw_func = getattr(self, f"draw_{w.screen}", None) 
             if draw_func:
                 draw_func(screen)
-
+                
         elif w.screen == "unit_info":
             self.draw_unit_info(screen, w)
 
@@ -802,7 +815,7 @@ class Renderer:
                 # Ramka dla zaznaczonych jednostek
                 if unit in w.selected_units:
                     pygame.draw.rect(screen, (0, 255, 0), slot_rect, 4)
-                    
+
         self.draw_building_footer(screen)
 
         w.release_tower = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)

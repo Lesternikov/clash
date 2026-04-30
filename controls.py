@@ -254,62 +254,40 @@ class ControlsHandler:
                 self.world.inspected_unit = target_unit
             return 
 
-        # --- LEWY PRZYCISK ---
+       # --- LEWY PRZYCISK ---
         if button == 1:
-            # 1. ZAZNACZANIE JEDNOSTKI (tylko własnej!)
-            unit_at_tile = self.world.get_unit_at(tile_x, tile_y)
-            if unit_at_tile:
-                # Sprawdzamy, czy jednostka należy do aktualnego gracza
-                current_player_obj = self.world.players[self.world.current_player]
-                if unit_at_tile.owner == current_player_obj:
-                    self.world.selected_unit = unit_at_tile
-                    unit_at_tile.target_x = unit_at_tile.target_y = None
-                    unit_at_tile.planned_path = []
-                    print(f"Wybrano jednostkę: {unit_at_tile.type}")
-                    return
-                else:
-                    print("To jednostka przeciwnika!")
-                    return
-
-            # 2. RUCH (Jeśli mamy już kogoś wybranego)
-            if self.world.selected_unit:
+            # POBIERAMY JEDNOSTKĘ NA SAMYM POCZĄTKU
+            target_unit = self.world.get_unit_at(tile_x, tile_y)
+            
+            # 1. LOGIKA ŁĄCZENIA ARMII (Jeśli klikamy własną jednostkę inną niż wybrana)
+            if self.world.selected_unit and target_unit and target_unit.owner == self.world.players[self.world.current_player] and target_unit != self.world.selected_unit:
                 u = self.world.selected_unit
                 
-                # Jeśli kliknięto w sojusznika (i to nie jest ta sama jednostka)
-                if target_unit and target_unit.owner == self.world.selected_unit.owner and target_unit != self.world.selected_unit:
-                    u = self.world.selected_unit
+                # Drugi klik w sojusznika -> Wykonanie marszu do połączenia
+                if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
+                    print("Wyruszam do połączenia armii!")
+                    u.move_along_path(self.world)
+                    return 
                     
-                    # Drugi klik w sojusznika -> Wykonanie marszu do połączenia
-                    if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
-                        print("Wyruszam do połączenia armii!")
-                        u.move_along_path(self.world)
-                        # Po ruchu sprawdzamy, czy doszło do fuzji (logika merge jest w move_unit)
-                        return # Bardzo ważne: kończymy tutaj, żeby nie zmienić zaznaczenia!
-                        
-                    # Pierwszy klik w sojusznika -> Wyznaczenie trasy
-                    u.target_x, u.target_y = tile_x, tile_y
-                    u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
-                    
-                    if not u.planned_path:
-                        u.target_x = u.target_y = None
-                        print("BŁĄD: Nie można dojść do sojusznika!")
-                    else:
-                        print("Trasa do sojusznika wyznaczona. Kliknij jeszcze raz, aby połączyć.")
-                    return # Kończymy, żeby nie przełączyło jednostki na tę klikniętą!
-
-            # ========================================================
-            # 2. STANDARDOWA LOGIKA (Wybór lub normalny ruch)
-            # ========================================================
-            # Sprawdzamy czy na polu stoi jakaś jednostka gracza
-            clicked_unit = self.world.get_unit_at(tile_x, tile_y)
-            if clicked_unit and clicked_unit.owner == self.world.players[self.world.current_player]:
-                # Wybieramy nową jednostkę
-                self.world.selected_unit = clicked_unit
-                clicked_unit.target_x = clicked_unit.target_y = None
-                clicked_unit.planned_path = []
-                print(f"Wybrano jednostkę: {clicked_unit.type}")
+                # Pierwszy klik w sojusznika -> Wyznaczenie trasy
+                u.target_x, u.target_y = tile_x, tile_y
+                u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
+                
+                if not u.planned_path:
+                    u.target_x = u.target_y = None
+                    print("BŁĄD: Nie można dojść do sojusznika!")
+                else:
+                    print("Trasa do sojusznika wyznaczona. Kliknij jeszcze raz, aby połączyć.")
                 return
 
+            # 2. ZAZNACZANIE NOWEJ JEDNOSTKI (Gdy nie ma łączenia)
+            if target_unit and target_unit.owner == self.world.players[self.world.current_player]:
+                self.world.selected_unit = target_unit
+                target_unit.target_x = target_unit.target_y = None
+                target_unit.planned_path = []
+                print(f"Wybrano jednostkę: {target_unit.type}")
+                return
+            
             # Jeśli mamy kogoś wybranego i kliknęliśmy w puste pole (lub wroga)
             if self.world.selected_unit:
                 u = self.world.selected_unit
