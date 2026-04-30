@@ -20,6 +20,8 @@ class Renderer:
         self.active_dropdown = None
         self.show_top_ui = False
         self.top_ui_full_area = pygame.Rect(0, 0, 1024, 55)
+        self.img_army_slots = pygame.image.load("assets//minimum/MARKS_S32/MARKS_S32_35.png").convert_alpha()
+        # To jest pasek 12 slotów (384x32 px)
 
     def draw(self, screen):
         w = self.world
@@ -410,46 +412,49 @@ class Renderer:
     def draw_army_panel(self, screen):
         u = self.world.selected_unit
         if not u:
-            return # Nie rysujemy, jeśli nic nie jest wybrane
+            return 
 
-        # Zbieramy jednostki do jednej listy
+        # Pobieramy garnizon jednostki (jeśli istnieje)
         garrison = getattr(u, 'garrison', [])
         display_units = [unit for unit in ([u] + garrison) if unit is not None]
 
-        # Pokazujemy panel TYLKO jeśli to armia (minimum 2 oddziały)
-        if len(display_units) >= 2:
-            # Zakładam, że Twoje przyciski akcji zaczynają się od x=800
-            # Więc panel armii zajmuje lewą stronę: od x=0 do x=800, od y=620 w dół
-            panel_rect = pygame.Rect(0, 620, 800, 148) 
+        # Pokazujemy panel, jeśli to armia lub po prostu wybrana jednostka
+        if len(display_units) >= 1:
+            # Pozycja paska (dopasuj y=700, żeby był na samym dole)
+            panel_y = 700 
+            panel_x = 50
             
-            # 1. Rysowanie drewnianego tła (Kafelkowanie MARKS_S32_35)
-            bg_w = self.gfx.army_panel_bg.get_width()
-            bg_h = self.gfx.army_panel_bg.get_height()
-            
-            for x in range(panel_rect.x, panel_rect.right, bg_w):
-                for y in range(panel_rect.y, panel_rect.bottom, bg_h):
-                    screen.blit(self.gfx.army_panel_bg, (x, y))
+            # 1. RYSOWANIE DREWNIANEGO TŁA (Twoja grafika MARKS_S32_35)
+            # Rysujemy pierwszy rząd slotów
+            screen.blit(self.gfx.army_panel_bg, (panel_x, panel_y))
+            # Jeśli masz więcej niż 12 jednostek, rysujemy drugi pasek pod spodem
+            if len(display_units) > 12:
+                screen.blit(self.gfx.army_panel_bg, (panel_x, panel_y + 32))
 
-            # 2. Rysowanie slotów i ikon jednostek
-            self.world.army_slot_rects = [] # Zapisujemy recty, żeby można było w nie klikać
-            margin_x, margin_y = 20, 20
-            slot_size = 50 # Przykładowy rozmiar ikony jednostki
+            # 2. RYSOWANIE IKON JEDNOSTEK
+            self.world.army_slot_rects = []
             
             for i, unit in enumerate(display_units):
-                # Obliczanie pozycji (np. w dwóch rzędach, tak jak na zdjęciu)
-                col = i % 10 # Maksymalnie 10 jednostek w rzędzie
-                row = i // 10
+                # Obliczamy pozycję ikony (każdy slot w MARKS ma 32x32 px)
+                col = i % 12 # Pasek ma 12 slotów
+                row = i // 12
                 
-                slot_x = panel_rect.x + margin_x + col * (slot_size + 15)
-                slot_y = panel_rect.y + margin_y + row * (slot_size + 20)
+                slot_x = panel_x + (col * 32)
+                slot_y = panel_y + (row * 32)
                 
-                slot_rect = pygame.Rect(slot_x, slot_y, slot_size, slot_size)
-                self.world.army_slot_rects.append(slot_rect) # Zapisujemy dla handle_ui_click
+                slot_rect = pygame.Rect(slot_x, slot_y, 32, 32)
+                self.world.army_slot_rects.append(slot_rect)
 
-                # Tutaj wywołujesz swoją funkcję rysującą ikonkę jednostki
-                # np.: screen.blit(unit.image, (slot_x, slot_y))
-                # Zastąp to tym, czego używasz do rysowania ikonek!
-                pygame.draw.rect(screen, (100, 100, 100), slot_rect, 2) # Pomocnicza ramka                
+                # RYSOWANIE IKONKI
+                # Używamy koloru właściciela jednostki do pobrania grafiki
+                color_name = "red" if unit.owner.color == (255, 50, 50) else "blue"
+                unit_img = self.gfx.get_unit_image(unit.type, color_name)
+                
+                if unit_img:
+                    # Wyśrodkowanie ikonki w slocie (jeśli ikonka jest mniejsza niż 32)
+                    img_x = slot_x + (32 - unit_img.get_width()) // 2
+                    img_y = slot_y + (32 - unit_img.get_height()) // 2
+                    screen.blit(unit_img, (img_x, img_y))
 
     def draw_unit_info(self, screen):
         # Historyczne informacje o jednostce w koszarach.
@@ -584,16 +589,6 @@ class Renderer:
         # Zapisujemy recty do świata
         w.garrison_slot_rects = slot_rects
 
-        # Przyciski funkcyjne
-        built = [b.lower() for b in castle.buildings]
-        if "koszary" in built:
-            self.draw_button(screen, "RECRUIT", w.recruit_button, (240, 120, 20))
-        if "hospital" in built:
-            self.draw_button(screen, "HEAL", w.heal_button, (80, 160, 80))
-        if "school" in built:
-            self.draw_button(screen, "TRAIN", w.train_button, (160, 160, 80))
-            
-        self.draw_button(screen, "WYPUŚĆ", w.button_send_army, (160, 120, 60))
         self.draw_building_footer(screen)
   
     def draw_castle_on_map(self, screen, castle):

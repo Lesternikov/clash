@@ -22,7 +22,7 @@ class MapGraphics:
         self.waterfall_gfx = {"N": {}, "S": {}, "W": {}, "E": {}}
         self.river_overlays = {}
         self.treasure_imgs = {}
-
+        self.army_panel_bg = pygame.image.load("assets//minimum/MARKS_S32/MARKS_S32_35.png").convert_alpha()
         # --- NOWE: Grafiki interfejsu ---
         self.button_images = []
         self.load_ui_assets() # Ładujemy przyciski na starcie

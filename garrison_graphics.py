@@ -92,19 +92,32 @@ class GarrisonGraphics:
         )
 
         # --- PRZYCISK WYPUŚĆ ---
-        BTN_W, BTN_H = 212, 83
-        self.btn_release_normal     = self._load("assets/wyrzut.png",  BTN_W, BTN_H)
-        self.btn_release_pressed    = self._load("assets/wyrzutp.png", BTN_W, BTN_H)
-        self.btn_release_rect       = pygame.Rect(805, 690, BTN_W, BTN_H)
+        BTN_W, BTN_H = 155, 82
+        self.btn_release_normal     = self._load("assets/przyciski/PRZ_9.png",  BTN_W, BTN_H)
+        self.btn_release_pressed    = self._load("assets/przyciski/PRZ_10.png", BTN_W, BTN_H)
+        self.btn_release_rect       = pygame.Rect(806, 680, BTN_W, BTN_H)
         self.btn_release_anim_timer = 0
 
         # --- PRZYCISK PRODUKCJA (tylko gdy koszary zbudowane) ---
-        BTN_P_W, BTN_P_H = 117, 51
-        self.btn_prod_normal     = self._load("assets/prod.png",  BTN_P_W, BTN_P_H)
-        self.btn_prod_pressed    = self._load("assets/pprod.png", BTN_P_W, BTN_P_H)
-        self.btn_prod_rect       = pygame.Rect(620, 710, BTN_P_W, BTN_P_H)
+        BTN_P_W, BTN_P_H = 140, 80
+        self.btn_prod_normal     = self._load("assets/przyciski/PRZ_3.png",  BTN_P_W, BTN_P_H)
+        self.btn_prod_pressed    = self._load("assets/przyciski/PRZ_4.png", BTN_P_W, BTN_P_H)
+        self.btn_prod_rect       = pygame.Rect(255, 680, BTN_P_W, BTN_P_H)
         self.btn_prod_anim_timer = 0
 
+        # ---PRZYCISK LECZENIA (tylko gdy zbudowany szpital)
+        BTN_H_W, BTN_H_H = 140, 80
+        self.btn_hosp_normal     = self._load("assets/przyciski/PRZ_5.png",  BTN_H_W, BTN_H_H)
+        self.btn_hosp_pressed    = self._load("assets/przyciski/PRZ_6.png", BTN_H_W, BTN_H_H)
+        self.btn_hosp_rect       = pygame.Rect(355, 680, BTN_H_W, BTN_H_H)
+        self.btn_hosp_anim_timer = 0
+
+        # ----PRZYCISK SZKOLENIA (tylko gdy zbuowana szkoła)
+        BTN_S_W, BTN_S_H = 140, 80
+        self.btn_school_normal     = self._load("assets/przyciski/PRZ_7.png",  BTN_S_W, BTN_S_H)
+        self.btn_school_pressed    = self._load("assets/przyciski/PRZ_8.png", BTN_S_W, BTN_S_H)
+        self.btn_school_rect       = pygame.Rect(405, 680, BTN_S_W, BTN_S_H)
+        self.btn_school_anim_timer = 0
     # --------------------------------------------------
     # ŁADOWANIE
     # --------------------------------------------------
@@ -185,16 +198,6 @@ class GarrisonGraphics:
         # 2. Aktualizacja animacji drzwi (indywidualna dla każdego slotu!)
         self._update_doors() # <--- WAŻNE: Tu musi być liczba mnoga (doors)
 
-        # 2. --- RYSOWANIE TESTOWEGO PASKA NA GÓRZE ---
-        # Układamy te 5 grafik jedna obok drugiej na środku ekranu
-        if self.top_bar_parts:
-            total_w = sum(img.get_width() for img in self.top_bar_parts)
-            start_x = (self.bg_w - total_w) // 2
-            current_x = start_x
-            for img in self.top_bar_parts:
-                screen.blit(img, (current_x, 10)) # 10 pikseli od górnej krawędzi
-                current_x += img.get_width()
-
         # 3. Sloty jednostek
         font     = pygame.font.SysFont("Arial", 14, bold=True)
         font_cnt = pygame.font.SysFont("Arial", 12)
@@ -203,72 +206,69 @@ class GarrisonGraphics:
         for i, rect in enumerate(self.slot_rects):
             unit = garrison[i] if i < len(garrison) else None
 
+        # 3. Sloty jednostek
+        font_cnt = pygame.font.SysFont("Arial", 12)
+        garrison = getattr(castle, 'garrison', [])
+
+        for i, rect in enumerate(self.slot_rects):
+            unit = garrison[i] if i < len(garrison) else None
+
             if unit is None:
-                # --- PUSTY SLOT: rysuj drzwi z INDYWIDUALNĄ klatką animacji ---
-                # Każdy slot (i) ma swój własny index klatki
                 idx = self.door_frame_indices[i] 
                 if self.door_frames:
                     screen.blit(self.door_frames[idx], rect.topleft)
                 continue
 
             # --- SLOT Z JEDNOSTKĄ ---
-
-            # Żółta ramka zaznaczenia
             if unit in selected_units:
                 pygame.draw.rect(screen, (255, 255, 0), rect.inflate(4, 4), 3)
 
-            # Tło koloru gracza
-            owner_color = (80, 120, 200)
-            if hasattr(unit, 'owner') and unit.owner:
-                owner_color = getattr(unit.owner, 'color', (80, 120, 200))
-            pygame.draw.rect(screen, owner_color, rect.inflate(-4, -4))
-
-            # Nazwa jednostki
-            label = unit.type[:4].upper()
-            txt   = font.render(label, True, (255, 255, 255))
-            screen.blit(txt, txt.get_rect(centerx=rect.centerx, top=rect.top + 4))
-
-            # Liczba jednostek
+            # USUNIĘTO: Rysowanie koloru gracza i NAPISÓW (np. HEAL, recruit)
+            # Zostawiamy tylko liczbę jednostek, jeśli jest większa niż 1
             count = getattr(unit, 'count', 1)
             if count > 1:
                 c_txt = font_cnt.render(str(count), True, (255, 255, 0))
                 screen.blit(c_txt, (rect.right - c_txt.get_width() - 2,
                                     rect.bottom - c_txt.get_height() - 2))
 
-            # Overlay szkolenia
-            if hasattr(castle, 'training') and unit in castle.training:
-                ov = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
-                ov.fill((0, 0, 0, 140))
-                screen.blit(ov, rect.topleft)
-                turns = castle.training[unit]
-                t_txt = font.render(str(turns), True, (255, 255, 0))
-                screen.blit(t_txt, t_txt.get_rect(center=rect.center))
+        # --- PRZYCISKI DOLNE (SZPITAL, SZKOŁA, KOSZARY) ---
+        built = [b.lower() for b in getattr(castle, 'buildings', [])]
+        now = pygame.time.get_ticks()
 
-        # 4. Tabelka statystyk (prawy klik)
-        if inspected_unit is not None:
-            self._draw_unit_table(screen, inspected_unit)
+        # 6. Przycisk PRODUKCJA (Koszary) - PRZ_3 / PRZ_4
+        if "koszary" in built:
+            elapsed_p = now - self.btn_prod_anim_timer
+            # Jeśli kliknięto w ciągu ostatnich 200ms, pokaż mniejszą/wciśniętą grafikę
+            is_pressed = self.btn_prod_anim_timer > 0 and elapsed_p < 200
+            img = self.btn_prod_pressed if is_pressed else self.btn_prod_normal
+            if img:
+                screen.blit(img, self.btn_prod_rect.topleft)
 
-        # 5. Przycisk WYPUŚĆ (zawsze widoczny)
-        elapsed    = pygame.time.get_ticks() - self.btn_release_anim_timer
-        is_pressed = self.btn_release_anim_timer > 0 and elapsed < 400
-        btn_img    = self.btn_release_pressed if is_pressed else self.btn_release_normal
+        # 7. Przycisk LECZENIA (Szpital) - PRZ_5 / PRZ_6
+        if "szpital" in built:
+            elapsed_h = now - self.btn_hosp_anim_timer
+            is_pressed = self.btn_hosp_anim_timer > 0 and elapsed_h < 200
+            img = self.btn_hosp_pressed if is_pressed else self.btn_hosp_normal
+            if img:
+                screen.blit(img, self.btn_hosp_rect.topleft)
+
+        # 8. Przycisk SZKOLENIA (Szkoła) - PRZ_7 / PRZ_8
+        if "szkoła" in built or "szkola" in built:
+            elapsed_s = now - self.btn_school_anim_timer
+            is_pressed = self.btn_school_anim_timer > 0 and elapsed_s < 200
+            img = self.btn_school_pressed if is_pressed else self.btn_school_normal
+            if img:
+                screen.blit(img, self.btn_school_rect.topleft)
+                
+        # Przycisk WYPUŚĆ (zawsze widoczny)
+        elapsed_r = now - self.btn_release_anim_timer
+        is_pressed_r = self.btn_release_anim_timer > 0 and elapsed_r < 200
+        btn_img = self.btn_release_pressed if is_pressed_r else self.btn_release_normal
         if btn_img:
             screen.blit(btn_img, self.btn_release_rect.topleft)
 
-        # 6. Przycisk PRODUKCJA (tylko gdy koszary zbudowane)
-        has_koszary = "koszary" in [b.lower() for b in getattr(castle, 'buildings', [])]
-        if has_koszary:
-            elapsed_p    = pygame.time.get_ticks() - self.btn_prod_anim_timer
-            is_pressed_p = self.btn_prod_anim_timer > 0 and elapsed_p < 400
-            prod_img     = self.btn_prod_pressed if is_pressed_p else self.btn_prod_normal
-            if prod_img:
-                screen.blit(prod_img, self.btn_prod_rect.topleft)
-
         return self.slot_rects
-    # --------------------------------------------------
-    # TABELKA JEDNOSTKI
-    # --------------------------------------------------
-
+        
     def _draw_unit_table(self, screen: pygame.Surface, unit) -> None:
         r = self.table_rect
 
@@ -325,6 +325,26 @@ class GarrisonGraphics:
         self.btn_prod_anim_timer = pygame.time.get_ticks()
         return True
     
+    def handle_hosp_click(self, mx, my, castle) -> bool:
+        """Zwraca True jeśli kliknięto LECZENIE i szpital jest zbudowany."""
+        has_szpital = "szpital" in [b.lower() for b in getattr(castle, 'buildings', [])]
+        if not has_szpital:
+            return False
+        if not self.btn_hosp_rect.collidepoint(mx, my):
+            return False
+        self.btn_hosp_anim_timer = pygame.time.get_ticks()
+        return True
+
+    def handle_school_click(self, mx, my, castle) -> bool:
+        """Zwraca True jeśli kliknięto SZKOLENIE i szkoła jest zbudowana."""
+        built = [b.lower() for b in getattr(castle, 'buildings', [])]
+        has_szkola = "szkoła" in built or "szkola" in built
+        if not has_szkola:
+            return False
+        if not self.btn_school_rect.collidepoint(mx, my):
+            return False
+        self.btn_school_anim_timer = pygame.time.get_ticks()
+        return True
     
     if __name__ == "__main__":
         import subprocess, sys, os
