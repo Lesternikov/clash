@@ -72,7 +72,7 @@ class Renderer:
             w.court.draw_court(screen)
 
         elif w.screen == "peasants":
-            self.draw_peasants(screen)
+            w.peasant_menu.draw(screen, w)
 
         elif w.screen in ["forge", "workshop", "hospital", "school"]:
             draw_func = getattr(w, f"draw_{w.screen}", None)
@@ -625,6 +625,12 @@ class Renderer:
      
     def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
         w = self.world
+        
+        # --- BLOKADA: Rysuj globalne okienko TYLKO na mapie ---
+        # Jeśli jesteśmy w koszarach, garnizonie lub menu, przerywamy funkcję!
+        if getattr(w, 'screen', "map") != "map":
+            return
+
         if not stats_source:
             return
 
@@ -637,80 +643,6 @@ class Renderer:
             mode = "SIMPLE"
 
         w.unit_info_window.draw(screen, x, y, stats_source, mode)
-                
-    def draw_peasants(self, screen):
-        w = self.world
-        font = pygame.font.SysFont(None, 24)
-
-        castle = w.selected_castle
-        if not castle:
-            return
-
-        screen_w = screen.get_width()
-        screen_h = screen.get_height()
-
-        happiness_factor = 0.5 + (castle.happiness / 100) * 0.5
-        tax_income = int(castle.peasants * 0.1 * castle.tax_rate * happiness_factor)
-
-        screen.blit(font.render(f"Peasants: {castle.peasants}", True, (255,255,255)), (screen_w//2 - 60, 20))
-        screen.blit(font.render(f"Happiness: {castle.happiness}%", True, (200,255,200)), (screen_w//2 - 70, 45))
-        screen.blit(font.render(f"Gold: {castle.gold}", True, (255,215,0)), (screen_w - 120, 20))
-
-        screen.blit(font.render("TAX", True, (255,255,255)), (60, screen_h//2 - 80))
-        screen.blit(font.render(f"{castle.tax_rate:.1f}", True, (255,255,255)), (70, screen_h//2 - 20))
-        screen.blit(font.render(f"+{tax_income}/turn", True, (255,255,0)), (40, screen_h//2 + 10))
-
-        w.tax_minus_button.topleft = (20, screen_h//2 - 40)
-        w.tax_plus_button.topleft = (140, screen_h//2 - 40)
-
-        pygame.draw.rect(screen, (120,120,120), w.tax_minus_button)
-        pygame.draw.rect(screen, (120,120,120), w.tax_plus_button)
-
-        screen.blit(font.render("-", True, (0,0,0)), w.tax_minus_button.move(12,5))
-        screen.blit(font.render("+", True, (0,0,0)), w.tax_plus_button.move(12,5))
-
-        panel_rect = pygame.Rect(screen_w//2 - 150, screen_h//2 - 60, 300, 120)
-        pygame.draw.rect(screen, (70,50,40), panel_rect)
-
-        owned = [c for c in w.castles if c.owner == w.players[w.current_player] and not getattr(c, 'destroyed', False)]
-        visible = owned[w.castle_list_offset : w.castle_list_offset+3]
-
-        for i, c in enumerate(visible):
-            txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
-            screen.blit(font.render(txt, True, (255,255,255)), (screen_w//2 - 130, screen_h//2 - 40 + i*30))
-
-        w.castle_up_button.topleft = (screen_w//2 + 160, screen_h//2 - 60)
-        w.castle_down_button.topleft = (screen_w//2 + 160, screen_h//2)
-
-        pygame.draw.rect(screen,(120,120,120),w.castle_up_button)
-        pygame.draw.rect(screen,(120,120,120),w.castle_down_button)
-
-        screen.blit(font.render("^",True,(255,255,255)), w.castle_up_button.move(12,5))
-        screen.blit(font.render("v",True,(255,255,255)), w.castle_down_button.move(12,5))
-
-        w.peasants_minus_button.topleft = (screen_w - 180, screen_h//2 - 40)
-        w.peasants_plus_button.topleft = (screen_w - 140, screen_h//2 - 40)
-
-        w.gold_minus_button.topleft = (screen_w - 180, screen_h//2 + 10)
-        w.gold_plus_button.topleft = (screen_w - 140, screen_h//2 + 10)
-
-        w.send_button.center = (screen_w - 120, screen_h//2 + 80)
-
-        pygame.draw.rect(screen, (120,120,120), w.peasants_minus_button)
-        pygame.draw.rect(screen, (120,120,120), w.peasants_plus_button)
-        pygame.draw.rect(screen, (120,120,120), w.gold_minus_button)
-        pygame.draw.rect(screen, (120,120,120), w.gold_plus_button)
-        pygame.draw.rect(screen, (80,140,80), w.send_button)
-
-        screen.blit(font.render("-", True, (0,0,0)), w.peasants_minus_button.move(12,5))
-        screen.blit(font.render("+", True, (0,0,0)), w.peasants_plus_button.move(12,5))
-        screen.blit(font.render("-", True, (0,0,0)), w.gold_minus_button.move(12,5))
-        screen.blit(font.render("+", True, (0,0,0)), w.gold_plus_button.move(12,5))
-        screen.blit(font.render("SEND", True, (255,255,255)), w.send_button.move(30,10))
-        screen.blit(font.render(f"P: {w.send_peasants_amount}", True, (255,255,255)), (screen_w-120, screen_h//2 - 60))
-        screen.blit(font.render(f"G: {w.send_gold_amount}", True, (255,255,0)), (screen_w-120, screen_h//2 - 15))
-
-        self.draw_building_footer(screen)
 
     def draw_demolish_confirm(self, screen):
         w = self.world

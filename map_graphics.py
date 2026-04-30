@@ -97,7 +97,15 @@ class MapGraphics:
         self.grass_variants = [
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_0.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_1.png")),
-            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_3.png"))
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_3.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_751.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_753.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_74.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_75.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_95.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_96.png")),
+
         ]
 
         self.river_anim = self.load_river_animation() 

@@ -1,12 +1,13 @@
 import os
 import pygame
+from UI_components import UnitInfoWindow  # <--- IMPORTUJEMY TWOJE NOWE OKIENKO!
 
 # =====================================================
 #   GARRISON_GRAPHICS.PY
 # =====================================================
 
 GARRISON_BG    = os.path.join("assets", "garninon.png")
-GARRISON_TABLE = os.path.join("assets", "DW_12_GFX.png")
+# Stara tabelka (DW_12_GFX) usunięta!
 
 ORIG_W, ORIG_H = 640, 480
 
@@ -16,11 +17,9 @@ ORIG_SLOT_Y2 = 205
 ORIG_SLOT_W  = 31
 ORIG_SLOT_H  = 65
 
+# Zostawiamy tylko koordynaty, żeby wiedzieć, gdzie narysować nowe okienko
 ORIG_TABLE_X = 124
 ORIG_TABLE_Y = 300
-ORIG_TABLE_W = 390
-ORIG_TABLE_H = 140
-
 
 class GarrisonGraphics:
 
@@ -33,26 +32,12 @@ class GarrisonGraphics:
         self.sx = self.bg_w / ORIG_W
         self.sy = self.bg_h / ORIG_H
 
-        self.bg    = self._load(GARRISON_BG,    self.bg_w, self.bg_h)
-        self.table = self._load(GARRISON_TABLE,
-                                int(ORIG_TABLE_W * self.sx),
-                                int(ORIG_TABLE_H * self.sy))
-
-# --- TESTOWE ŁADOWANIE 5 GRAFIK PASKA (BEZ PIKSELOZY) ---
-        self.top_bar_parts = []
-        for i in range(5):
-            path = os.path.join("assets", f"DZ_INFO_S32_{i}.png")
-            if os.path.exists(path):
-                img = pygame.image.load(path).convert_alpha()
-                # Używamy SMOOTHSCALE dla efektu "ładnego wygładzenia"
-                # Skalujemy o 2.5x żeby były dobrze widoczne na górze
-                w, h = img.get_size()
-                smooth_img = pygame.transform.smoothscale(img, (int(w * 2.5), int(h * 2.5)))
-                self.top_bar_parts.append(smooth_img)
+        self.bg = self._load(GARRISON_BG, self.bg_w, self.bg_h)
+        
+        # Inicjalizacja nowego, uniwersalnego okienka statystyk
+        self.info_window = UnitInfoWindow()
 
         # --- ANIMACJA DRZWI ---
-        # Kolejność od zamkniętych do otwartych:
-        # KEEP7=zamknięte, KEEP6..KEEP1=pośrednie, KEEP=otwarte
         door_files = [
             "assets/KEEP.png",
             "assets/KEEP1.png",
@@ -78,18 +63,10 @@ class GarrisonGraphics:
        # --- INDYWIDUALNA ANIMACJA DRZWI ---
         self.door_anim_timers = [0] * 12
         self.door_anim_opening = [False] * 12
-        self.door_frame_indices = [0] * 12 # 0 to stan domyślny (np. zamknięte)   
+        self.door_frame_indices = [0] * 12 
 
         # --- SLOTY ---
         self.slot_rects = self._build_slot_rects()
-
-        # --- TABELKA ---
-        self.table_rect = pygame.Rect(
-            int(ORIG_TABLE_X * self.sx),
-            int(ORIG_TABLE_Y * self.sy),
-            int(ORIG_TABLE_W * self.sx),
-            int(ORIG_TABLE_H * self.sy)
-        )
 
         # --- PRZYCISK WYPUŚĆ ---
         BTN_W, BTN_H = 155, 82
@@ -127,9 +104,8 @@ class GarrisonGraphics:
             print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
             return None
         img = pygame.image.load(path).convert_alpha()
-            # smoothscale tutaj też zapewni lepszą jakość tła
-        return pygame.transform.smoothscale(img, (w, h))
-    
+        return pygame.transform.scale(img, (w, h))
+
     def _load_raw(self, path: str):
         if not os.path.exists(path):
             print(f"[GarrisonGraphics] BRAK PLIKU: {path}")
@@ -156,14 +132,12 @@ class GarrisonGraphics:
     # --------------------------------------------------
 
     def trigger_door_open(self, slot_idx):
-        """Uruchamia animację tylko dla konkretnego slotu."""
         if 0 <= slot_idx < 12:
             self.door_anim_timers[slot_idx] = pygame.time.get_ticks()
             self.door_anim_opening[slot_idx] = True
             self.door_frame_indices[slot_idx] = 0
 
     def _update_doors(self):
-        """Aktualizuje stan animacji dla każdego slotu z osobna."""
         now = pygame.time.get_ticks()
         frame_duration = 80 
 
@@ -184,11 +158,6 @@ class GarrisonGraphics:
                     self.door_frame_indices[i] = 0
 
     def draw(self, screen, castle, selected_units, inspected_unit=None) -> list:
-        """
-        Rysuje ekran garnizonu.
-        Zwraca slot_rects do obsługi kliknięć w world.py.
-        """
-
         # 1. Tło
         if self.bg:
             screen.blit(self.bg, (0, 0))
@@ -230,6 +199,13 @@ class GarrisonGraphics:
                 c_txt = font_cnt.render(str(count), True, (255, 255, 0))
                 screen.blit(c_txt, (rect.right - c_txt.get_width() - 2,
                                     rect.bottom - c_txt.get_height() - 2))
+
+# 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
+        if inspected_unit is not None:
+            info_x = int(ORIG_TABLE_X * self.sx)
+            info_y = int(ORIG_TABLE_Y * self.sy)
+            # Rysujemy nasze piękne, uniwersalne okno w starych koordynatach
+            self.info_window.draw_combat_info(screen, info_x, info_y, inspected_unit)
 
         # --- PRZYCISKI DOLNE (SZPITAL, SZKOŁA, KOSZARY) ---
         built = [b.lower() for b in getattr(castle, 'buildings', [])]
@@ -301,13 +277,12 @@ class GarrisonGraphics:
             y   = r.y + 35 + row * 22
             txt = font2.render(f"{label}: {val}", True, (255, 255, 255))
             screen.blit(txt, (x, y))
-
+        
     # --------------------------------------------------
     # OBSŁUGA KLIKNIĘĆ
     # --------------------------------------------------
 
     def handle_release_click(self, mx, my, selected_units: list) -> bool:
-        """Zwraca True jeśli kliknięto WYPUŚĆ i są zaznaczone jednostki."""
         if not self.btn_release_rect.collidepoint(mx, my):
             return False
         if not selected_units:
@@ -316,7 +291,6 @@ class GarrisonGraphics:
         return True
 
     def handle_prod_click(self, mx, my, castle) -> bool:
-        """Zwraca True jeśli kliknięto PRODUKCJA i koszary są zbudowane."""
         has_koszary = "koszary" in [b.lower() for b in getattr(castle, 'buildings', [])]
         if not has_koszary:
             return False

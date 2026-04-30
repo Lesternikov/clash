@@ -18,6 +18,21 @@ class ControlsHandler:
             
             # --- 1. KLAWIATURA ---
             elif event.type == pygame.KEYDOWN:
+                # --- DEBUG: MAGIGCZNY KLAWISZ F1 ---
+                if event.key == pygame.K_F1:
+                    print("DEBUG: Teleportacja do koszar!")
+                    for c in self.world.castles:
+                        if c.owner == self.world.players[self.world.current_player]:
+                            self.world.selected_castle = c
+                            self.world.screen = "recruitment"
+                            break
+                if event.key == pygame.K_F2:
+                    print("DEBUG: Teleportacja do koszar!")
+                    for c in self.world.castles:
+                        if c.owner == self.world.players[self.world.current_player]:
+                            self.world.selected_castle = c
+                            self.world.screen = "peasants"
+                            break
                 # Zamiast self.screen używamy self.world.screen
                 if event.key == pygame.K_ESCAPE:
                     self.world.road_build_mode = False
@@ -113,7 +128,7 @@ class ControlsHandler:
 
         # NOWE: obsługa ekranów które nie wymagają selected_castle
         if w.screen == "peasants":
-            w.handle_peasants_click(mx, my)
+            w.peasant_menu.handle_click(mx, my, w)
             return
 
         if not w.selected_castle: return   # teraz blokuje tylko resztę
@@ -182,7 +197,7 @@ class ControlsHandler:
         # Skoro mają tylko tekst i powrót (który obsłużyliśmy wyżej), 
         # po prostu blokujemy kliknięcia, żeby nie "przebijały" na mapę.
         if w.screen == "peasants":
-            w.handle_peasants_click(mx, my)
+            w.peasant_menu.handle_click(mx, my, w)
             return
 
         info_screens = ["forge", "hospital", "school", "workshop", "court"]
@@ -596,7 +611,7 @@ class ControlsHandler:
 
         # 2. Jeśli nie garnizon, sprawdź mapę
         if not self.world.inspected_unit:
-            self.world.inspected_unit = self.world.find_unit_at(mx, my)
+            self.world.inspected_unit = self.world.get_unit_at(mx, my)
 
         # 3. Jeśli coś znalazłeś, ustal tryb
         if self.world.inspected_unit:

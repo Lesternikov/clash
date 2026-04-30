@@ -12,6 +12,7 @@ from UI_components import UnitInfoWindow
 from castle_graphics import CastleGraphics
 from garrison_graphics import GarrisonGraphics
 from recruitment import RecruitmentManager
+from peasant_menu import PeasantMenu
 
 @property
 def back_button(self):
@@ -21,47 +22,77 @@ def back_button(self):
 
 class World(BuildingsMixin):
     def __init__(self):
-
-        # --- DODAJ TO W __init__ ---
-        self.recruitment_scroll = 0
-        # Zabezpieczenie - przyciski muszą istnieć przed wszystkim innym
-        # Na samym początku __init__, przed wszystkim innym:
-        self.back_button_castle = pygame.Rect(45, 690, 130, 74)  # złota ramka
-        self.back_button_bldg   = pygame.Rect(46, 685, 190, 91)  # szara ramka
-        self.back_button        = self.back_button_bldg           # domyślny alias
-        self.destroy_button = pygame.Rect(0, 0, 1, 1)  # placeholder
-        self.button_send_army = pygame.Rect(860, 600, 150, 40)
+        # ====================================================
+        # 1. GŁÓWNE ZMIENNE STANU GRY
+        # ====================================================
         self.screen = "map"
+        self.turn = 1
+        self.current_player = 0
+        
         self.selected_castle = None
+        self.selected_unit = None
+        self.inspected_unit = None
         self.selected_units = []
 
-        self.selected_unit_type = 0
-        self.selected_patent_index = None
-        self.recruitment_open = False
+        self.map = []
+        self.units = []
+        self.castles = []
+        self.castle_locations = []
+        self.peasant_groups = []
+        self.gold_transports = []
+        self.players = []
 
-        # Pobieramy wymiary ekranu dla dynamicznego pozycjonowania
+        self.camera_x = 0
+        self.camera_y = 0
+
+        # Tryby budowy dróg i pułapek
+        self.trap_build_mode = False
+        self.road_build_mode = False
+        self.build_menu_open = False
+        self.menu_open = False
+        self.active_dropdown = None
+
+        self.traps = []
+        self.trap_backgrounds = {}    
+        self.constructions = []
+        self.build_clicked = {}  
+
+        self.show_grid = False
+        self.show_top_ui = False
+
+        # ====================================================
+        # 2. INICJALIZACJA MENEDŻERÓW I KLAS POMOCNICZYCH
+        # ====================================================
         w = pygame.display.get_surface().get_width()
         h = pygame.display.get_surface().get_height()
+        
         self.castle_gfx = CastleGraphics(w, h)
         self.garrison_gfx = GarrisonGraphics(w, h)
         self.unit_info_window = UnitInfoWindow()
         self.court = CourtHandler(self)
         self.recruitment_manager = RecruitmentManager(self)
+        self.peasant_menu = PeasantMenu(w, h)
         pygame.font.init()
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)
         self.modal_font = pygame.font.SysFont(None, 32)
         self.btn_font = pygame.font.SysFont(None, 28, bold=True)
+
+        # ====================================================
+        # 3. INTERFEJS I PRZYCISKI
+        # ====================================================
+        # Uniwersalny przycisk powrotu i jego animacja
+        self.back_button_castle = pygame.Rect(45, 690, 130, 74)
+        self.back_button_bldg   = pygame.Rect(68, 680, 150, 80)
+        self.back_button        = self.back_button_bldg
+        self.back_anim_timer    = 0
+        self.back_destination   = "map"
         
         try:
-            self.back_img_castle_normal  = pygame.transform.scale(
-                pygame.image.load("assets/back_castlen.png").convert_alpha(), (130, 74))
-            self.back_img_castle_pressed = pygame.transform.scale(
-                pygame.image.load("assets/back_castlec.png").convert_alpha(), (130, 74))
-            self.back_img_bldg_normal    = pygame.transform.scale(
-                pygame.image.load("assets/back_normal.png").convert_alpha(),  (190, 91))
-            self.back_img_bldg_pressed   = pygame.transform.scale(
-                pygame.image.load("assets/back_clicked.png").convert_alpha(), (190, 91))
+            self.back_img_castle_normal  = pygame.transform.scale(pygame.image.load("assets/back_castlen.png").convert_alpha(), (130, 74))
+            self.back_img_castle_pressed = pygame.transform.scale(pygame.image.load("assets/back_castlec.png").convert_alpha(), (130, 74))
+            self.back_img_bldg_normal    = pygame.transform.scale(pygame.image.load("assets/back_normal.png").convert_alpha(),  (150, 80))
+            self.back_img_bldg_pressed   = pygame.transform.scale(pygame.image.load("assets/back_clicked.png").convert_alpha(), (150, 80))
             print("Grafiki przycisku powrotu załadowane!")
         except Exception as e:
             print(f"Błąd grafik przycisku: {e}")
@@ -72,197 +103,84 @@ class World(BuildingsMixin):
             self.back_img_bldg_normal    = dummy
             self.back_img_bldg_pressed   = dummy
 
-        self.back_anim_timer = 0
-        self.back_destination = "map"
-        self.back_anim_timer = 0
-        self.back_destination = "map"
-
-        self.back_anim_timer = 0  # 0 oznacza, że animacja nie trwa
-        # --- LOGIKA I DANE ---
-        # ====================================================
-        #                     ŁADOWANIE GRAFIKI MAPY
-        # ====================================================
-        self.load_castle_and_tower()
-        
-        # Inicjalizacja pozostałych list
-        self.map = []
-        self.units = []
-        self.castles = []
-        self.castle_locations = []
-        self.peasant_groups = []
-        self.gold_transports = []
-        self.players = []
-        self.selected_units = []
-        self.screen = "map"
-        self.selected_castle = None
-        self.selected_unit = None
-        self.turn = 1
-        self.current_player = 0
-        self.camera_x = 0
-        self.camera_y = 0
-        self.inspected_unit = None  # Dodaj to w sekcji zmiennych logicznych
-        # Ładowanie danych
-        # =====================================================
-        #              SYSTEMOWE PRZYCISKI (STAŁE)
-        # =====================================================
-        # UNIWERSALNY PRZYCISK POWRÓT (Ten większy i niżej, o który prosiłeś)
-        # Przycisk POWRÓT w głównym menu zamku (złota ramka - back_castlen/back_castlec)
-        self.back_button_castle = pygame.Rect(45, 690, 130, 74)
-
-        # Przycisk POWRÓT w budynkach (szara ramka - back_normal/back_clicked)
-        self.back_button_bldg = pygame.Rect(46, 685, 190, 91)
-
-
         # MENU GÓRNE (Mapa)
         self.btn_system = pygame.Rect(10, 0, 100, 40)
         self.btn_mapa = pygame.Rect(115, 0, 100, 40)
         self.next_turn_button = pygame.Rect(w - 220, 0, 200, 45)
         self.top_ui_trigger_area = pygame.Rect(0, 0, w, 10)
         self.top_ui_full_area = pygame.Rect(0, 0, w, 55)
-        self.show_top_ui = False
-        
-        # =====================================================
-        #              EKRAN GŁÓWNY ZAMKU
-        # =====================================================
+
+        # MENU ROZWIJANE (Kontekstowe)
+        self.menu_rects = {}
+        self.build_rects = {}
+        self.menu_options = {
+            "System": ["Misja", "Poddanie się", "Zapisz grę", "Wczytaj grę", "Opcje", "Koniec"],
+            "Mapa": ["Wszystko", "Budynki", "Jednostki", "Nic"]
+        }
+
+        # EKRAN GŁÓWNY ZAMKU
         self.garrison_button = pygame.Rect(80, 630, 160, 40)
         self.court_button = pygame.Rect(420, 100, 160, 40)
         self.peasant_button = pygame.Rect(w - 200, h - 110, 160, 40)
         self.menu_button = pygame.Rect(w - 180, 40, 140, 40)
 
-        self.debug_show_masks = False
-        # =====================================================
-        #              EKRAN GARNIZONU / KOSZAR
-        # =====================================================
+        # EKRAN GARNIZONU / KOSZAR
         self.recruit_button = pygame.Rect(260, 600, 120, 40)
         self.heal_button = pygame.Rect(460, 600, 120, 40)
         self.train_button = pygame.Rect(660, 600, 120, 40)
-        self.button_send_army = pygame.Rect(860, 600, 150, 40) # "OPUŚĆ KOSZARY"
+        self.button_send_army = pygame.Rect(860, 600, 150, 40)
+        self.destroy_button = pygame.Rect(0, 0, 1, 1)  # Dla Strażnicy
 
-        # =====================================================
-        #              EKRAN STRAŻNICY -GARNIZONU 
-        # =====================================================
-        self.release_tower = pygame.Rect
-        # =====================================================
-        #              EKRAN REKRUTACJI (PATENTY)
-        # =====================================================
-        self.buy_patent_button = pygame.Rect(160, 630, 140, 35)
-        self.remove_patent_button = pygame.Rect(w - 230, 580, 100, 35)        
-        self.start_prod_button = pygame.Rect(w - 300, 630, 120, 35)
-        self.stop_prod_button = pygame.Rect(w - 160, 630, 120, 35)
-        self.info_button = pygame.Rect(120, 590, 100, 30)
-        self.scroll_up_button = pygame.Rect(260, 80, 40, 40)
-        self.scroll_down_button = pygame.Rect(260, 200, 40, 40)
-        self.recruitment_unit_types = list(UNIT_STATS.keys())
-        self.patent_rects = []
-
-        # =====================================================
-        #              EKRAN CHŁOPÓW (PODATKI / WYSYŁKA)
-        # =====================================================
-        # +/- dla Wieśniaków, Złota i Podatków
-        self.peasants_plus_button = pygame.Rect(300, 200, 40, 40)
-        self.peasants_minus_button = pygame.Rect(100, 200, 40, 40)
-        self.gold_plus_button = pygame.Rect(300, 300, 40, 40)
-        self.gold_minus_button = pygame.Rect(100, 300, 40, 40)
-        self.tax_plus_button = pygame.Rect(300, 400, 40, 40)
-        self.tax_minus_button = pygame.Rect(100, 400, 40, 40)
-        self.send_button = pygame.Rect(100, 500, 160, 45)
-        # Przewijanie listy zamków docelowych
-        self.castle_up_button = pygame.Rect(800, 150, 40, 40)
-        self.castle_down_button = pygame.Rect(800, 450, 40, 40)
-        self.castle_list_offset = 0
-        self.send_peasants_amount = 10  # Domyślna liczba chłopów do wysłania
-        self.send_gold_amount = 100     # Przy okazji dodaj to dla złota, pewnie zaraz wyskoczy
-        
-        # =====================================================
-        #              LOGIKA MENU KONTEKSTOWEGO
-        # =====================================================
-        self.menu_open = False
-        self.build_open = False
-        self.build_menu_open = False  # <--- TEJ LINII BRAKOWAŁO
-        self.menu_rects = {}
-        self.build_rects = {}
-        self.active_dropdown = None
-        self.menu_options = {
-            "System": ["Misja", "Poddanie się", "Zapisz grę", "Wczytaj grę", "Opcje", "Koniec"],
-            "Mapa": ["Wszystko", "Budynki", "Jednostki", "Nic"]
-        }
-        
-        # =====================================================
-        #              INNE / MAPA
-        # =====================================================
-        self.ui_panel_rect = pygame.Rect(720, 610, 304, 158)
-        # =====================================================
-        # --- DOLNY PANEL AKCJI (MAPA) ---
-        # =====================================================
+        # DOLNY PANEL AKCJI (MAPA)
         self.action_buttons = []
         button_width = 120
         button_height = 60
-        
-        # Cały panel to 3 kolumny przycisków i 2 rzędy
-        panel_total_width = 3 * button_width   # 360 pikseli
-        panel_total_height = 2 * button_height # 120 pikseli
-        
-        # Ustawiamy margines od krawędzi ekranu (żeby nie dotykały samej ramki)
+        panel_total_width = 3 * button_width
+        panel_total_height = 2 * button_height
         margin_right = 0
         margin_bottom = 0
         
-        # DYNAMICZNE WYLICZANIE POZYCJI
-        # Zamiast sztywnych liczb (np. 664), odejmujemy szerokość panelu od szerokości ekranu (w)
         panel_x = w - panel_total_width - margin_right
         panel_y = h - panel_total_height - margin_bottom
 
-        # Tworzenie przycisków bazując na dynamicznym x i y
         for row in range(2):
             for col in range(3):
                 rect = pygame.Rect(panel_x + col * button_width, panel_y + row * button_height, button_width, button_height)
                 self.action_buttons.append(rect)
                 
-        # Zaktualizowanie ewentualnego tła dla tych przycisków, jeśli go używasz
         self.ui_panel_rect = pygame.Rect(panel_x - 10, panel_y - 10, panel_total_width + 20, panel_total_height + 20)
-        
-        self.show_grid = False
-        self.traps = []
-        self.trap_backgrounds = {}    # Słownik: (x, y) -> "oryginalny_znak_terenu"
-        self.constructions = []
-        self.trap_build_mode = False
-        self.build_clicked = {}  # Słownik do śledzenia kliknięć w budynki
-# DO SPRAWDZENIA !!!
-        # ===============================================================
-        #                       ŁADOWANIE IKON 
-        # ===============================================================
+
+        # ====================================================
+        # 4. ŁADOWANIE MAPY, IKON I GRACZY
+        # ====================================================
+        self.load_castle_and_tower()
+
         try:
             self.icon_training = pygame.image.load("assets/swords.png").convert_alpha()
-            # Przeskaluj ją, żeby pasowała do slotu (np. 32x32 piksele)
             self.icon_training = pygame.transform.scale(self.icon_training, (32, 32))
         except:
-            # Zabezpieczenie: jeśli pliku nie ma, stwórz pustą powierzchnię, żeby gra się nie wywaliła
             self.icon_training = pygame.Surface((32, 32))
-            self.icon_training.fill((255, 0, 255)) # Różowy kolor "błędu"
-        # --- NOWE KAFFELKI TERENU ---
+            self.icon_training.fill((255, 0, 255))
+
         base_bg_path = r"assets\BACKGR3_S32_"
         self.terrain_images = {}
-        
         try:
             self.terrain_images["$"] = pygame.image.load(f"{base_bg_path}752.png").convert_alpha()
             self.terrain_images["S"] = pygame.image.load(f"{base_bg_path}733.png").convert_alpha()
             self.terrain_images["&"] = pygame.image.load(f"{base_bg_path}736.png").convert_alpha()
-            
-            # Opcjonalnie skalujemy, by mieć pewność, że pasują do TILE_SIZE
             for key in self.terrain_images:
                 self.terrain_images[key] = pygame.transform.scale(self.terrain_images[key], (TILE_SIZE, TILE_SIZE))
         except Exception as e:
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
-        
-     
-# Wewnątrz world.py, w sekcji inicjalizacji graczy:
-        num_players = 2  # Na razie wymuszamy 2 graczy
-        self.players = []
+
+        # Inicjalizacja Graczy
+        num_players = 2 
         player_data = [
-            ("Don Marek", (200, 0, 0), "red"),     # ID 0
-            ("Lech VI", (0, 0, 200), "blue"),      # ID 1
-            ("Mściwój", (0, 150, 0), "green"),     # ID 2
-            ("Biały Kieł", (220, 220, 220), "white"),# ID 3
-            ("Złoty Pan", (200, 200, 0), "yellow")  # ID 4
+            ("Don Marek", (200, 0, 0), "red"),
+            ("Lech VI", (0, 0, 200), "blue"),
+            ("Mściwój", (0, 150, 0), "green"),
+            ("Biały Kieł", (220, 220, 220), "white"),
+            ("Złoty Pan", (200, 200, 0), "yellow")
         ]
 
         from player import Player
@@ -270,8 +188,7 @@ class World(BuildingsMixin):
             name, color_rgb, color_name = player_data[i]
             new_player = Player(i, name, color_rgb, color_name)
             self.players.append(new_player)
-            
-            self.back_destination = "map" # Cel powrotu
+
    
     def setup_starting_units(self):
         """Rozdaje graczom początkowe wojsko pod ich zamkami."""
@@ -781,3 +698,34 @@ if __name__ == "__main__":
     import subprocess, sys, os
     main_path = os.path.join(os.path.dirname(__file__), "main.py")
     subprocess.run([sys.executable, main_path])
+
+
+    # 4. TEREN (POPRAWKA 2: Delegujemy sprawdzanie do profesjonalnego Pathfindera)
+       # if hasattr(self, 'pathfinder'):
+         #   if not self.pathfinder.is_walkable(nx, ny, unit):
+        #        print(f"DEBUG: Blokada! Teren na ({nx}, {ny}) jest nieprzejezdny.")
+       #         return False
+
+        # ==========================================
+        # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
+        # ==========================================
+      #  if self.map[ny][nx] == "X":
+     #       print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
+            
+            # 1. Usuwamy jednostkę z gry (ginie)
+    #        if unit in self.units: 
+   #             self.units.remove(unit)
+  #          if unit in unit.owner.units: 
+ #               unit.owner.units.remove(unit)
+#            if self.selected_unit == unit: 
+            #    self.selected_unit = None
+                
+            # 2. Usuwamy pułapkę z mapy i przywracamy oryginalne tło
+           # original_bg = getattr(self, 'trap_backgrounds', {}).get((nx, ny), ".")
+          #  self.map[ny][nx] = original_bg
+            
+            # 3. Zwracamy True, bo ruch się wykonał (choć jednostka go nie przeżyła)
+         #   return True
+
+        # 5. WALKA 
+        #for other in self.units[:]:

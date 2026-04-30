@@ -7,7 +7,7 @@ MAP_WIDTH = 100
 MAP_HEIGHT = 100
 
 UNIT_NAMES = {
-    "PEON": "Pospolite ruszenie",
+    "PEON": "Posp. ruszenie",
     "INFL": "Lekka piechota",
     "INFH": "Ciężka piechota",
     "SPRL": "Pikinier",
@@ -43,6 +43,7 @@ UNIT_NAMES = {
     "SPECM": "Generał Mężczyzna",
     "GOLD": "Złoto"
 }
+NAME_TO_CODE = {name: code for code, name in UNIT_NAMES.items()}
 COLOR_TO_ID = {
     "red": 1,
     "blue": 2,
@@ -148,7 +149,7 @@ UNIT_STATS = {
         zwycięstwa. Panie, nie 
         zlekceważ tej potęgi.""" },
 
-    "Dragon":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":5 ,"production_time":4, "description":"""Dragoni\n
+    "Dragon":{"hp":80,"moves":6,"attack":60,"melee_attack": 5,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":5 ,"production_time":4, "description":"""Dragoni\n
         Dragoni - kawaleria uzbrojona
         w pistolety, które jednak mają
         dość ograniczony zasięg rażenia.
@@ -161,7 +162,7 @@ UNIT_STATS = {
         niejsze bardzo, ale to bardzo
         waleczni."""},
 
-    "Łucznik": {"hp": 8, "moves": 8, "attack": 20, "defense": 0, "range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":60,"production_cost":10 ,"production_time":2, "description":"""Łucznicy\n
+    "Łucznik": {"hp": 8, "moves": 8, "attack": 20,"melee_attack": 5, "defense": 0, "range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":60,"production_cost":10 ,"production_time":2, "description":"""Łucznicy\n
         Oddziały łuczników
         przybyły prosto z 
         Galaghelu, by służyć 
@@ -174,7 +175,7 @@ UNIT_STATS = {
         rozbiją nawet 
         najsilniejsze oddziały."""},
 
-    "Kusznik": {"hp": 20, "moves": 6, "attack": 40, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":240 ,"production_cost":12 ,"production_time":4, "description":"""Kusznicy\n
+    "Kusznik": {"hp": 20, "moves": 6, "attack": 40, "melee_attack": 5, "defense": 30, "range": 4, "tags": ["ranged"],"exp": 0, "morale": 10, "fatigue": 0, "patent_cost": 240, "production_cost": 12, "production_time": 4, "description": """Kusznicy\n"
         Kusznicy - ich bełty
         przebijają nawet naj-
         grubszy pancerz, zada-
@@ -185,7 +186,7 @@ UNIT_STATS = {
         w walce na odległość, jak
         i w bezpośrednim starciu."""},
 
-    "Muszkieter": {"hp": 25, "moves": 5, "attack": 50, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost":14 ,"production_time":4, "description":"""Muszkieterzy\n
+    "Muszkieter": {"hp": 25, "moves": 5, "attack": 50,"melee_attack": 5, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost":14 ,"production_time":4, "description":"""Muszkieterzy\n
         Muszkieterzy - oddziały
         sprowadzone z dalekiej
         Baarii, kraju leżącego
@@ -197,7 +198,7 @@ UNIT_STATS = {
         skuteczniejszy zarówno
         od łuku jak i od kuszy."""},
 
-    "Katapulta":{"hp":30,"moves":3,"attack":100,"defense":80,"range": 5, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":300 ,"production_cost":18 ,"production_time":4, "description":"""Katapulta\n 
+    "Katapulta":{"hp": 30, "moves": 3, "attack": 100, "defense": 80, "range": 5, "tags": ["ranged"],    "exp": 0, "morale": 10, "fatigue": 0,"patent_cost": 300, "production_cost": 18, "production_time": 4, "description":"""Katapulta\n 
         Katapulta - machina potrafią-
         ca miotać na dalekie dystanse
         kamienne głazy. Niestety
@@ -228,7 +229,7 @@ UNIT_STATS = {
         przeciwnika, toteż podczas
         bitwy łatwo ją utracić."""},
 
-    "Leśnik":{"hp":100,"moves":7,"attack":90,"defense":60,"range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":100 ,"production_cost":10 ,"production_time":3, "description":"""Leśnicy\n
+    "Leśnik":{"hp":100,"moves":7,"attack":90,"melee_attack": 5,"defense":60,"range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":100 ,"production_cost":10 ,"production_time":3, "description":"""Leśnicy\n
         Leśnicy - specjalne
         jednostki złożone z 
         dzikich ludzi wycho- 
@@ -286,7 +287,7 @@ UNIT_STATS = {
         słoń jest trudny do zatrzymania - czyni to z niego jedno z
         najgroźniejszych stworzeń na polu walki."""},
 
-    "Cyklop":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost": 10,"production_time":3, "description":"""Cyklop\n
+    "Cyklop":{"hp":80,"moves":6,"attack":60,"melee_attack": 5,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost": 10,"production_time":3, "description":"""Cyklop\n
         Cyklop zamieszkuje
         małe wysepki Morza
         Kalwadyjskiego. Jest
@@ -342,7 +343,7 @@ UNIT_STATS = {
         za życia czynią go niesamo-
         wicie odporną istotą.""" },
 
-    "Mag":{"hp":140,"moves":10,"attack":100,"defense":100, "range": 6, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":20 ,"production_time":5,"description":"""Mag\n
+    "Mag":{"hp":140,"moves":10,"attack":100,"melee_attack": 5,"defense":100, "range": 6, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":20 ,"production_time":5,"description":"""Mag\n
         Mag - jego znajo-
         mość magii będzie
         bardzo przydatna
@@ -385,7 +386,7 @@ UNIT_STATS = {
         przypomina cechami sko-
         rpiona, jest jednak szybszy."""},
 
-    "Skszydlak":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":16 ,"production_time":5,"description":"""Skrzydlak\n
+    "Skszydlak":{"hp":80,"moves":6,"attack":60,"melee_attack": 5,"defense":70,"range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":16 ,"production_time":5,"description":"""Skrzydlak\n
         Skrzydlak to przedziwny stwór. Spłaszczone ciało, ogromna,
         ziejąca ogniem paszcza, wielkie skrzydła i długi, ostro
         zakończony ogon sprawiają, że widok lecącego skrzydlaka
@@ -408,7 +409,7 @@ UNIT_STATS = {
         pary skrzydeł, co sprawia, że jest ono na polu 
         walki bardzo ruchliwe."""},
 
-    "Smok":{"hp":150,"moves":14,"attack":100,"defense":100,"exp":0,"morale":6,"fatigue":0,"patent_cost":550 ,"production_cost":20 ,"production_time":5, "description":"""Smok\n
+    "Smok":{"hp":150,"moves":14,"attack":100, "melee_attack": 5,"defense":100,"exp":0,"morale":6,"fatigue":0,"patent_cost":550 ,"production_cost":20 ,"production_time":5, "description":"""Smok\n
         Smok - pradawny gad
         zaopatrzony w parę błoniastych
         skrzydeł to pozostałość starych
