@@ -248,7 +248,7 @@ class GarrisonGraphics:
                     POWIEKSZENIE = 1.6  # Teraz 1.8 wystarczy by ładnie wypełnić slot!
                     
                     img_w, img_h = gray_img.get_size()
-                    new_w = int(img_w * POWIEKSZENIE - 5)
+                    new_w = int(img_w * POWIEKSZENIE)
                     new_h = int(img_h * POWIEKSZENIE)
                     
                     gray_img = pygame.transform.smoothscale(gray_img, (new_w, new_h))

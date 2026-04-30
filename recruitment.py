@@ -31,9 +31,12 @@ class RecruitmentManager:
 
         # Teraz funkcja jest gotowa przyjąć wszystkie 7 parametrów:
         # 1:nazwa, 2:plik, 3:plik_p, 4:X, 5:Y, 6:Szerokość, 7:Wysokość
-        add_btn("19", "assets/przyciski/19.png", "assets/przyciski/20.png", 400, 200, 800, 80)
-        add_btn("17", "assets/przyciski/17.png", "assets/przyciski/18.png", 220, 200, 100, 40)
-        
+        add_btn("19", "assets/przyciski/19.png", "assets/przyciski/20.png", 816, 678, 152, 83)
+        add_btn("17", "assets/przyciski/17.png", "assets/przyciski/18.png", 722, 593, 152, 83)
+        add_btn("15", "assets/przyciski/15.png", "assets/przyciski/16.png", 626, 678, 152, 83)
+        add_btn("13", "assets/przyciski/13.png", "assets/przyciski/14.png", 250, 678, 152, 83)
+        add_btn("11", "assets/przyciski/11.png", "assets/przyciski/12.png", 156, 593, 152, 83)
+
         # 1. Ładowanie tła
         try:
             self.bg = pygame.image.load(r"assets\DW_13_GFX.png").convert_alpha()
@@ -57,15 +60,15 @@ class RecruitmentManager:
             "stats_box": (160, 310),        
             "cost_box": (60, 510),          
             
-            "gold_chest": (512, 650),       
+            "gold_chest": (512, 676),       
             
-            "btn_1": pygame.Rect(80, 640, 140, 60),  # KUP PATENT
-            "btn_2": pygame.Rect(260, 640, 140, 60), # INFO
-            "btn_3": pygame.Rect(620, 640, 140, 60), # START PRODUKCJI
+            "btn_1": pygame.Rect(60, 600, 140, 60),  # KUP PATENT
+            "btn_2": pygame.Rect(280, 600, 140, 60), # INFO
+            "btn_3": pygame.Rect(600, 600, 140, 60), # START PRODUKCJI
             
             # --- PRZYWRÓCONY PRZYCISK POWRÓT (Grafika z world.py) ---
             # 190x91 to oryginalny rozmiar z world.py, pozycja: (46, 685)
-            "btn_back": pygame.Rect(46, 685, 190, 91), 
+            "btn_back": pygame.Rect(66, 678, 194, 118), 
 
             "patents_start": (650, 80),     
             "patents_gap": (76, 131)        
@@ -84,36 +87,6 @@ class RecruitmentManager:
         self.font_small = pygame.font.SysFont("Arial", 16, bold=True)
         self.font_main = pygame.font.SysFont("Arial", 22, bold=True)
         self.font_title = pygame.font.SysFont("Arial", 26, bold=True)
-
-        # --- PRZYCISK: kup patent ---
-        self.img_13 = pygame.image.load("assets/przyciski/13.png").convert_alpha()
-        self.img_14 = pygame.image.load("assets/przyciski/14.png").convert_alpha()
-        self.rect_13 = pygame.Rect(10, 10, self.img_13.get_width(), self.img_13.get_height())
-        self.a13_anim_timer = 0
-
-        # --- PRZYCISK: nazwa ---
-        self.img_11 = pygame.image.load("assets/przyciski/11.png").convert_alpha()
-        self.img_12 = pygame.image.load("assets/przyciski/12.png").convert_alpha()
-        self.rect_11 = pygame.Rect(50, 50, self.img_11.get_width(), self.img_11.get_height())
-        self.a11_anim_timer = 0
-
-        # --- PRZYCISK: nazwa ---
-        self.img_15 = pygame.image.load("assets/przyciski/15.png").convert_alpha()
-        self.img_16 = pygame.image.load("assets/przyciski/16.png").convert_alpha()
-        self.rect_15 = pygame.Rect(100, 100, self.img_15.get_width(), self.img_15.get_height())
-        self.a15_anim_timer = 0
-
-        # --- PRZYCISK: nazwa ---
-        self.img_17 = pygame.image.load("assets/przyciski/17.png").convert_alpha()
-        self.img_18 = pygame.image.load("assets/przyciski/18.png").convert_alpha()
-        self.rect_17 = pygame.Rect(150, 150, self.img_17.get_width(), self.img_17.get_height())
-        self.a17_anim_timer = 0
-
-        # --- PRZYCISK: nazwa ---
-        self.img_19 = pygame.image.load("assets/przyciski/19.png").convert_alpha()
-        self.img_20 = pygame.image.load("assets/przyciski/20.png").convert_alpha()
-        self.rect_19 = pygame.Rect(815, 677, self.img_19.get_width(), self.img_19.get_height())
-        self.a19_anim_timer = 0
 
     def draw(self, screen):
         castle = self.world.selected_castle
@@ -136,35 +109,43 @@ class RecruitmentManager:
         gx, gy = self.layout["patents_gap"]
         
         for i in range(12):
-            col = i % 4  
-            row = i // 4 
-            # Twój oryginalny obszar klikania (60x80)
-            rect = pygame.Rect(px + col * gx, py + row * gy, 60, 80)
+            col = i % 4 
+            row = i // 4
+
+            # 1. Definicja ramki klikania (Złota ramka)
+            rect = pygame.Rect(px + col * gx + 30, py + row * gy - 40, 60, 120)
             self.patent_rects.append(rect) 
             
-            # --- DEBUG: RYSOWANIE STREFY KLIKANIA ---
-            # Rysuje cienką, złotą ramkę. Jak już dopasujesz współrzędne, 
-            # możesz tę linijkę usunąć lub zakomentować (dać # na początku)
+            # DEBUG: Rysowanie ramki
             pygame.draw.rect(screen, (255, 215, 0), rect, 1)
 
             if i < len(castle.patents) and castle.patents[i] is not None:
                 p = castle.patents[i]
                 name = p["unit_type"] if isinstance(p, dict) else p
                 
-                # --- NOWOŚĆ: Szary Sprite Patentu ---
                 u_code = NAME_TO_CODE.get(name, name)
                 frame_idx = (pygame.time.get_ticks() // 150) % 8
                 path = f"assets/minimum/{u_code}1_I_S32/{u_code}1_I_S32_{frame_idx}.png"
-                
+
                 drawn = False
-                img_x, img_y = rect.x + 33, rect.y - 31 # Twoje wyliczone pozycje
-                img_w, img_h = 52, 104                  # Twoje wyliczone wymiary
                 
+                # --- TUTAJ JEST JEDYNE RYSOWANIE LUDZIKA ---
                 if os.path.exists(path):
                     try:
                         raw_img = pygame.image.load(path).convert_alpha()
-                        gray_img = pygame.transform.grayscale(raw_img) # Zmieniamy na szary!
+                        
+                        # Tworzymy wersję SZARĄ
+                        gray_img = pygame.transform.grayscale(raw_img) 
+                        
+                        # SKALOWANIE: Dopasuj do złotej ramki (np. 60x100)
+                        # Na Twoim screenie ramka jest wysoka, więc (55, 90) będzie OK
+                        img_w, img_h = 52, 104
                         scaled_img = pygame.transform.scale(gray_img, (img_w, img_h))
+                        
+                        # POZYCJA: rect.x i rect.y to lewy górny róg ZŁOTEJ RAMKI.
+                        # Centrujemy ludzika w ramce 60x120
+                        img_x = rect.x + (rect.width - img_w) // 2
+                        img_y = rect.y + 10 # 10 pikseli od góry ramki
                         
                         screen.blit(scaled_img, (img_x, img_y))
                         drawn = True
@@ -242,14 +223,13 @@ class RecruitmentManager:
 
         # --- INFO O PRODUKCJI ---
         if castle.production_enabled and castle.production_unit_type:
-            p_text = f"Produkcja: {castle.production_unit_type} ({castle.production_turns_left} tur)"
+            p_text = f"{castle.production_unit_type} ({castle.production_turns_left} tur)"
             p_color = (0, 255, 0)
         else:
             p_text = "Brak produkcji"
             p_color = (150, 150, 150)
         screen.blit(self.font_main.render(p_text, True, p_color), (self.layout["patents_start"][0], self.layout["patents_start"][1] + 450))
 
-# --- RYSOWANIE PRZYCISKÓW (DYNAMICZNE) ---
         # Sprawdzamy, czy gracz ma zaznaczony jakiś konkretny, KUPIONY patent w prawej siatce
         has_valid_patent = (self.selected_patent_index is not None and 
                             self.selected_patent_index < len(castle.patents) and 
