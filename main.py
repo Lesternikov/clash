@@ -30,10 +30,7 @@ world.pathfinder = pathfinding
 # 3. Tworzysz kontroler
 controls = ControlsHandler(world)
 world.map_gfx= gfx
-p1 = Player(1, "Gracz 1", (255, 50, 50))
-p2 = Player(2, "Gracz 2", (50, 150, 255))
-world.add_player(p1)
-world.add_player(p2)
+
 
 # --- KLUCZOWA ZMIANA TUTAJ ---
 # Podajemy samą nazwę bazową ("final_map1") i plik FAC ("0.FAC")

@@ -68,7 +68,7 @@ class RecruitmentManager:
             
             # --- PRZYWRÓCONY PRZYCISK POWRÓT (Grafika z world.py) ---
             # 190x91 to oryginalny rozmiar z world.py, pozycja: (46, 685)
-            "btn_back": pygame.Rect(66, 678, 194, 118), 
+            "btn_back": pygame.Rect(63, 678, 154, 83), 
 
             "patents_start": (650, 80),     
             "patents_gap": (76, 131)        
@@ -259,15 +259,19 @@ class RecruitmentManager:
             self._draw_btn_text(screen, "START", self.layout["btn_3"], text_color=(100, 100, 100))
         
         # ==============================================================
-        # PRZYCISK POWRÓT
+        # PRZYCISK POWRÓT (Aktywny - styl garnizonu)
         # ==============================================================
         back_rect = self.layout["btn_back"]
-        if getattr(self.world, 'back_anim_timer', 0) > 0 and pygame.time.get_ticks() - self.world.back_anim_timer < 500:
-            if hasattr(self.world, 'back_img_bldg_pressed'):
-                screen.blit(self.world.back_img_bldg_pressed, back_rect.topleft)
-        else:
-            if hasattr(self.world, 'back_img_bldg_normal'):
-                screen.blit(self.world.back_img_bldg_normal, back_rect.topleft)
+        
+        # Pobieramy grafikę garnizonu z obiektu świata
+        img = self.world.back_img_garrison_pressed if getattr(self.world, 'back_anim_timer', 0) > 0 and \
+            pygame.time.get_ticks() - self.world.back_anim_timer < 500 \
+            else self.world.back_img_garrison_normal
+            
+        # Zabezpieczenie przed brakiem obrazka i płynne skalowanie
+        if img:
+            scaled_img = pygame.transform.smoothscale(img, (back_rect.width, back_rect.height))
+            screen.blit(scaled_img, back_rect.topleft)
 
 # --- RYSOWANIE WSZYSTKICH GRAFICZNYCH PRZYCISKÓW ---
         now = pygame.time.get_ticks()

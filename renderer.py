@@ -22,6 +22,12 @@ class Renderer:
         self.top_ui_full_area = pygame.Rect(0, 0, 1024, 55)
         self.img_army_slots = pygame.image.load("assets//minimum/MARKS_S32/MARKS_S32_35.png").convert_alpha()
         # To jest pasek 12 slotów (384x32 px)
+        # --- TŁO BUDYNKÓW INFO ---
+        try:
+            self.bldg_bg = pygame.image.load("assets/budynki_tlo.png").convert()
+        except Exception as e:
+            print(f"Błąd ładowania tła budynków: {e}")
+            self.bldg_bg = None
 
     def draw(self, screen):
         w = self.world
@@ -357,16 +363,50 @@ class Renderer:
             img = self.world.back_img_castle_pressed if getattr(self.world, 'back_anim_timer', 0) > 0 and \
                 pygame.time.get_ticks() - self.world.back_anim_timer < 500 \
                 else self.world.back_img_castle_normal
-            screen.blit(img, rect.topleft)
+            
+            # --- ROZCIĄGANIE GRAFIKI DO ROZMIARU RECT ---
+            scaled_img = pygame.transform.smoothscale(img, (rect.width, rect.height))
+            screen.blit(scaled_img, rect.topleft)
             return
 
         if style == "bldg":
             img = self.world.back_img_bldg_pressed if getattr(self.world, 'back_anim_timer', 0) > 0 and \
                 pygame.time.get_ticks() - self.world.back_anim_timer < 500 \
                 else self.world.back_img_bldg_normal
-            screen.blit(img, rect.topleft)
+                
+            # ==========================================
+            # --- RĘCZNE USTAWIENIA GRAFIKI PRZYCISKU ---
+            # ==========================================
+            # Zmień na True, żeby "odpiąć" grafikę od obszaru klikania 
+            # i samodzielnie zdecydować o jej wyglądzie i miejscu:
+            WLASNE_USTAWIENIA = True 
+            
+            if WLASNE_USTAWIENIA:
+                # Tu wpisz sztywne wymiary, jakie ma mieć sam obrazek:
+                GRAFIKA_SZEROKOSC = 155 
+                GRAFIKA_WYSOKOSC = 84
+                
+                # Tu wpisz, gdzie dokładnie na ekranie ma zostać narysowany:
+                GRAFIKA_X = 62 
+                GRAFIKA_Y = 679 
+                
+                scaled_img = pygame.transform.smoothscale(img, (GRAFIKA_SZEROKOSC, GRAFIKA_WYSOKOSC))
+                screen.blit(scaled_img, (GRAFIKA_X, GRAFIKA_Y))
+            else:
+                # Domyślne zachowanie: grafika idealnie dopasowuje się do strefy klikania (rect)
+                scaled_img = pygame.transform.smoothscale(img, (rect.width, rect.height))
+                screen.blit(scaled_img, rect.topleft)
             return
-
+            
+        elif style == "garrison_back":
+            img = self.world.back_img_garrison_pressed if getattr(self.world, 'back_anim_timer', 0) > 0 and \
+                pygame.time.get_ticks() - self.world.back_anim_timer < 500 \
+                else self.world.back_img_garrison_normal
+                
+            # UPROSZCZENIE: Grafika sama dopasowuje się do rozmiaru i pozycji Recta z world.py!
+            scaled_img = pygame.transform.smoothscale(img, (rect.width, rect.height))
+            screen.blit(scaled_img, rect.topleft)
+            return
         # Zwykły przycisk
         mx, my = pygame.mouse.get_pos()
         is_hovered = rect.collidepoint(mx, my)
@@ -829,17 +869,22 @@ class Renderer:
 
     def draw_building_footer(self, screen):
         w = self.world
+        
         if w.screen == "castle":
             self.draw_button(screen, "", w.back_button_castle, style="castle")
+            
+        elif w.screen in ["garrison", "Strażnica", "peasants"]:
+            # ZMIANA: używamy stylu "garrison_back"
+            btn_rect = getattr(w, 'back_button_garrison', w.back_button_bldg)
+            self.draw_button(screen, "", btn_rect, style="garrison_back")
+            
         else:
+            # Reszta budynków używa standardowego stylu "bldg"
             self.draw_button(screen, "", w.back_button_bldg, style="bldg")
 
         if w.selected_castle and getattr(w.selected_castle, 'building_type', "") == "Strażnica":
             self.draw_button(screen, "ZBURZ", w.destroy_button, (100, 40, 40))
-
-        if w.screen == "garrison":                         
-            pass  
-
+            
     def draw_build_system(self, screen):
         w = self.world
         if w.selected_unit and w.selected_unit.type == "Budowniczy":
@@ -1019,25 +1064,43 @@ class Renderer:
     def draw_building_template(self, screen, title, lines,
                                 theme_color=(100, 100, 130),
                                 border_color=(180, 180, 220)):
-        screen.fill((60, 60, 80))
-        font_title = pygame.font.SysFont(None, 48)
-        font_text  = pygame.font.SysFont(None, 24)
+        
+        # 1. RYSOWANIE TŁA
+        if hasattr(self, 'bldg_bg') and self.bldg_bg:
+            # Rozciągamy tło na pełny ekran, żeby idealnie pasowało
+            bg_scaled = pygame.transform.scale(self.bldg_bg, screen.get_size())
+            screen.blit(bg_scaled, (0, 0))
+        else:
+            # Zabezpieczenie: jeśli nie znajdzie obrazka, narysuje stary prostokąt
+            screen.fill((60, 60, 80))
+            panel = pygame.Rect(120, 80, 760, 420)
+            pygame.draw.rect(screen, theme_color, panel)
+            pygame.draw.rect(screen, border_color, panel, 6)
 
-        panel = pygame.Rect(120, 80, 760, 420)
-        pygame.draw.rect(screen, theme_color, panel)
-        pygame.draw.rect(screen, border_color, panel, 6)
+        # 2. CZCIONKI
+        font_title = pygame.font.SysFont("Arial", 40, bold=True)
+        font_text  = pygame.font.SysFont("Arial", 24)
 
-        title_surface = font_title.render(title.upper(), True, border_color)
-        screen.blit(title_surface,
-                    (panel.centerx - title_surface.get_width() // 2, panel.y - 40))
+        # 3. TYTUŁ NA DREWNIANYM ZWOJU
+        # Kolor (40, 20, 10) to ciemny brąz, będzie dobrze wyglądał na drewnie
+        title_surface = font_title.render(title.upper(), True, (40, 20, 10))
+        
+        # Przesunięcie tytułu: wyśrodkowanie w poziomie (X) i dopasowanie do zwoju (Y)
+        tytul_x = screen.get_width() // 2 - title_surface.get_width() // 2
+        tytul_y = 120  # <--- ZMIEŃ TĘ LICZBĘ, żeby podnieść/opuścić tytuł na zwoju
+        screen.blit(title_surface, (tytul_x, tytul_y))
 
-        y = panel.y + 30
+        # 4. TEKST W GŁÓWNEJ RAMCE
+        tekst_x = 180  # Odległość od lewej krawędzi ekranu
+        tekst_y = 230  # Odległość od góry (start pierwszej linijki)
+        
         for line in lines:
-            txt = font_text.render(line, True, (255, 255, 255))
-            screen.blit(txt, (panel.x + 30, y))
-            y += 28
+            txt = font_text.render(line, True, (220, 220, 220)) # Jasnoszary tekst
+            screen.blit(txt, (tekst_x, tekst_y))
+            tekst_y += 35 # Odstęp między linijkami
 
-        self.draw_building_footer(screen)        
+        # 5. PRZYCISK POWROTU
+        self.draw_building_footer(screen)
 
     if __name__ == "__main__":
         import subprocess, sys, os

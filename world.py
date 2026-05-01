@@ -84,6 +84,11 @@ class World(BuildingsMixin):
         # Uniwersalny przycisk powrotu i jego animacja
         self.back_button_castle = pygame.Rect(45, 690, 130, 74)
         self.back_button_bldg   = pygame.Rect(68, 680, 150, 80)
+
+        # >>> NOWY PRZYCISK TYLKO DLA GARNIZONU <<<
+        # Tu możesz swobodnie edytować X (np. 68) i Y (np. 680), żeby załatać czarną dziurę!
+        self.back_button_garrison = pygame.Rect(62, 679, 154, 83) 
+        
         self.back_button        = self.back_button_bldg
         self.back_anim_timer    = 0
         self.back_destination   = "map"
@@ -93,6 +98,10 @@ class World(BuildingsMixin):
             self.back_img_castle_pressed = pygame.transform.scale(pygame.image.load("assets/back_castlec.png").convert_alpha(), (130, 74))
             self.back_img_bldg_normal    = pygame.transform.scale(pygame.image.load("assets/back_normal.png").convert_alpha(),  (150, 80))
             self.back_img_bldg_pressed   = pygame.transform.scale(pygame.image.load("assets/back_clicked.png").convert_alpha(), (150, 80))
+            # >>> NOWE: GRAFIKI TYLKO DLA GARNIZONU <<<
+            # (Podmień nazwy plików na te, których chcesz użyć)
+            self.back_img_garrison_normal  = pygame.image.load("assets/przyciski/PRZ_1.png").convert_alpha()
+            self.back_img_garrison_pressed = pygame.image.load("assets/przyciski/PRZ_2.png").convert_alpha()
             print("Grafiki przycisku powrotu załadowane!")
         except Exception as e:
             print(f"Błąd grafik przycisku: {e}")
@@ -325,7 +334,7 @@ class World(BuildingsMixin):
                 print("Wdepnięto w pułapkę!")
                 return True # Zwracamy True, żeby jednostka "stanęła" na polu
 
-        # 6. WALKA 
+        # 6. WALKA I ŁĄCZENIE
         for other in self.units[:]:
             if other.x == nx and other.y == ny:
                 if other.owner != unit.owner:
@@ -333,8 +342,16 @@ class World(BuildingsMixin):
                     self.units.remove(other)
                     # ...
                 else:
-                    return False # Nie można wejść na sojusznika
-            
+                    # TO JEST SOJUSZNIK! Sprawdzamy czy chcieliśmy się łączyć
+                    if getattr(self, 'merge_mode', False):
+                        # Odpalamy łączenie (funkcja merge_units sama usunie wędrowca z mapy)
+                        self.merge_units(unit, other, cost)
+                        # Zwracamy False, żeby zablokować dalsze kroczenie (bo jednostka jest już w środku innej)
+                        return False 
+                    else:
+                        # Zwykłe pchanie się na sojusznika bez trybu łączenia = blokada
+                        return False
+                        
         # 7. ZBIERANIE ZASOBÓW (Chłopi / Złoto)
         for group in self.peasant_groups[:]:
             if group.x == nx and group.y == ny and group.owner != unit.owner:
@@ -456,7 +473,8 @@ class World(BuildingsMixin):
             return
 
         # ================= BACK =================
-        if hasattr(self, 'back_button_castle') and self.back_button_castle.collidepoint(mx, my):
+        # Zmieniliśmy 'back_button_castle' na nasz nowy 'back_button_garrison'
+        if hasattr(self, 'back_button_garrison') and self.back_button_garrison.collidepoint(mx, my):
             self.selected_units.clear()
             self.screen = "castle"
             return
@@ -481,7 +499,42 @@ class World(BuildingsMixin):
             else:
                 print("Brak zaznaczonych jednostek do szkolenia")
             return
-        
+        # ================= SELEKCJA JEDNOSTEK W SLOTACH =================
+        # >>> TO JEST FRAGMENT, KTÓREGO BRAKOWAŁO <<<
+        rects = getattr(self, 'garrison_slot_rects', self.garrison_gfx.slot_rects)
+        index = None
+        for i, rect in enumerate(rects):
+            if rect.collidepoint(mx, my):
+                index = i
+                break
+                
+        if index is None or index >= len(self.selected_castle.garrison):
+            return
+
+        unit = self.selected_castle.garrison[index]
+
+        # --- PRAWY PRZYCISK: Statystyki ---
+        if button == 3: 
+            if unit is not None:
+                self.inspected_unit = unit  
+            else:
+                self.inspected_unit = None
+            return
+
+        # --- LEWY PRZYCISK: Zaznaczanie ---
+        if button == 1:
+            self.inspected_unit = None
+            if unit is None:
+                return
+
+            if unit in self.selected_units:
+                self.selected_units.remove(unit)
+            else:
+                if len(self.selected_units) < getattr(self.selected_castle, 'garrison_limit', 12):
+                    self.selected_units.append(unit)
+                else:
+                    print("DEBUG: Garnizon jest pełen!")
+
     def get_unit_at(self, x, y):
         for unit in self.units:
             # Ignoruj jednostki, które są w trakcie budowy!

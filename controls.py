@@ -256,42 +256,45 @@ class ControlsHandler:
 
        # --- LEWY PRZYCISK ---
         if button == 1:
-            # POBIERAMY JEDNOSTKĘ NA SAMYM POCZĄTKU
+            # 1. Sprawdzamy, czy kliknęliśmy w jakąś naszą jednostkę
             target_unit = self.world.get_unit_at(tile_x, tile_y)
             
-            # 1. LOGIKA ŁĄCZENIA ARMII (Jeśli klikamy własną jednostkę inną niż wybrana)
-            if self.world.selected_unit and target_unit and target_unit.owner == self.world.players[self.world.current_player] and target_unit != self.world.selected_unit:
-                u = self.world.selected_unit
-                
-                # Drugi klik w sojusznika -> Wykonanie marszu do połączenia
-                if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
-                    print("Wyruszam do połączenia armii!")
-                    u.move_along_path(self.world)
-                    return 
-                    
-                # Pierwszy klik w sojusznika -> Wyznaczenie trasy
-                u.target_x, u.target_y = tile_x, tile_y
-                u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
-                
-                if not u.planned_path:
-                    u.target_x = u.target_y = None
-                    print("BŁĄD: Nie można dojść do sojusznika!")
-                else:
-                    print("Trasa do sojusznika wyznaczona. Kliknij jeszcze raz, aby połączyć.")
-                return
-
-            # 2. ZAZNACZANIE NOWEJ JEDNOSTKI (Gdy nie ma łączenia)
             if target_unit and target_unit.owner == self.world.players[self.world.current_player]:
+                
+                # A. SCENARIUSZ: Przycisk POŁĄCZ JEST WŁĄCZONY i klikamy w inną naszą jednostkę
+                if self.world.selected_unit and target_unit != self.world.selected_unit and getattr(self.world, 'merge_mode', False):
+                    u = self.world.selected_unit
+                    
+                    # Drugi klik -> Wyruszamy na połączenie
+                    if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
+                        print("Wyruszam do połączenia armii!")
+                        u.move_along_path(self.world)
+                        return 
+                        
+                    # Pierwszy klik -> Wyznaczenie trasy do kolegi
+                    u.target_x, u.target_y = tile_x, tile_y
+                    u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
+                    
+                    if not u.planned_path:
+                        u.target_x = u.target_y = None
+                        print("BŁĄD: Nie można dojść do sojusznika!")
+                    else:
+                        print("Trasa wyznaczona. Kliknij jeszcze raz, aby połączyć.")
+                    return
+
+                # B. SCENARIUSZ: Przycisk POŁĄCZ JEST WYŁĄCZONY (albo klikamy tę samą jednostkę) -> ZAZNACZAMY JĄ
                 self.world.selected_unit = target_unit
                 target_unit.target_x = target_unit.target_y = None
                 target_unit.planned_path = []
+                self.world.merge_mode = False # Na wszelki wypadek resetujemy tryb
                 print(f"Wybrano jednostkę: {target_unit.type}")
                 return
-            
-            # Jeśli mamy kogoś wybranego i kliknęliśmy w puste pole (lub wroga)
+
+            # ========================================================
+            # 2. STANDARDOWA LOGIKA RUCHU (Kliknięcie w ziemię/wroga)
+            # ========================================================
             if self.world.selected_unit:
-                u = self.world.selected_unit
-                
+                u = self.world.selected_unit                
                 # Potwierdzenie zwykłego ruchu (Drugi klik)
                 if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
                     u.move_along_path(self.world) 

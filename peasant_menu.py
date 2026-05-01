@@ -61,8 +61,8 @@ class PeasantMenu:
         # ========================================================
         # Małe złote tarcze mają stały wymiar 40x40
         
-        self.tax_minus_button = pygame.Rect(279, screen_h//2 - 52, 44, 50)
-        self.tax_plus_button = pygame.Rect(279, screen_h//2 - 105, 44, 50)
+        self.tax_minus_button = pygame.Rect(279, screen_h//2 - 55, 44, 54)
+        self.tax_plus_button = pygame.Rect(279, screen_h//2 - 110, 44, 54)
         
         self.castle_up_button = pygame.Rect(screen_w//2 + 223, screen_h//2 + 43, 48, 85)
         self.castle_down_button = pygame.Rect(screen_w//2 + 223, screen_h//2 + 128, 48, 85)

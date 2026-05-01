@@ -69,31 +69,31 @@ class GarrisonGraphics:
         self.slot_rects = self._build_slot_rects()
 
         # --- PRZYCISK WYPUŚĆ ---
-        BTN_W, BTN_H = 155, 82
+        BTN_W, BTN_H = 155, 83
         self.btn_release_normal     = self._load("assets/przyciski/PRZ_9.png",  BTN_W, BTN_H)
         self.btn_release_pressed    = self._load("assets/przyciski/PRZ_10.png", BTN_W, BTN_H)
-        self.btn_release_rect       = pygame.Rect(806, 680, BTN_W, BTN_H)
+        self.btn_release_rect       = pygame.Rect(806, 679, BTN_W, BTN_H)
         self.btn_release_anim_timer = 0
 
         # --- PRZYCISK PRODUKCJA (tylko gdy koszary zbudowane) ---
         BTN_P_W, BTN_P_H = 140, 80
         self.btn_prod_normal     = self._load("assets/przyciski/PRZ_3.png",  BTN_P_W, BTN_P_H)
         self.btn_prod_pressed    = self._load("assets/przyciski/PRZ_4.png", BTN_P_W, BTN_P_H)
-        self.btn_prod_rect       = pygame.Rect(255, 677, BTN_P_W, BTN_P_H)
+        self.btn_prod_rect       = pygame.Rect(255, 679, BTN_P_W, BTN_P_H)
         self.btn_prod_anim_timer = 0
 
         # ---PRZYCISK LECZENIA (tylko gdy zbudowany szpital)
         BTN_H_W, BTN_H_H = 140, 80
         self.btn_hosp_normal     = self._load("assets/przyciski/PRZ_5.png",  BTN_H_W, BTN_H_H)
         self.btn_hosp_pressed    = self._load("assets/przyciski/PRZ_6.png", BTN_H_W, BTN_H_H)
-        self.btn_hosp_rect       = pygame.Rect(440, 677, BTN_H_W, BTN_H_H)
+        self.btn_hosp_rect       = pygame.Rect(440, 679, BTN_H_W, BTN_H_H)
         self.btn_hosp_anim_timer = 0
 
         # ----PRZYCISK SZKOLENIA (tylko gdy zbuowana szkoła)
         BTN_S_W, BTN_S_H = 140, 80
         self.btn_school_normal     = self._load("assets/przyciski/PRZ_7.png",  BTN_S_W, BTN_S_H)
         self.btn_school_pressed    = self._load("assets/przyciski/PRZ_8.png", BTN_S_W, BTN_S_H)
-        self.btn_school_rect       = pygame.Rect(622, 677, BTN_S_W, BTN_S_H)
+        self.btn_school_rect       = pygame.Rect(622, 679, BTN_S_W, BTN_S_H)
         self.btn_school_anim_timer = 0
     # --------------------------------------------------
     # ŁADOWANIE
@@ -186,11 +186,6 @@ class GarrisonGraphics:
             if unit in selected_units:
                 pygame.draw.rect(screen, (255, 255, 0), rect.inflate(4, 4), 3)
 
-            owner_color = (80, 120, 200)
-            if hasattr(unit, 'owner') and unit.owner:
-                owner_color = getattr(unit.owner, 'color', (80, 120, 200))
-            pygame.draw.rect(screen, owner_color, rect.inflate(-4, -4))
-
             # --- RYSOWANIE SYLWETKI ---
             drawn = False
             raw_img = None
@@ -244,20 +239,28 @@ class GarrisonGraphics:
                     else:
                         gray_img = alpha_img.copy()
                         
-                    # --- POWIĘKSZENIE BEZ BLOKAD ---
-                    POWIEKSZENIE = 1.6  # Teraz 1.8 wystarczy by ładnie wypełnić slot!
+                    # ===================================================
+                    # --- USTAWIENIA ROZMIARU I POZYCJI JEDNOSTEK ---
+                    # ===================================================
+                    POWIEKSZENIE = 1.65   # Skala powiększenia
+                    PRZESUNIECIE_X = 5   # Przesunięcie w poziomie (np. -10 to w lewo, 10 to w prawo)
+                    PRZESUNIECIE_Y = 2 # Przesunięcie w pionie (np. -15 to w górę, 15 to w dół)
                     
                     img_w, img_h = gray_img.get_size()
                     new_w = int(img_w * POWIEKSZENIE)
                     new_h = int(img_h * POWIEKSZENIE)
                     
                     gray_img = pygame.transform.smoothscale(gray_img, (new_w, new_h))
-                    screen.blit(gray_img, (rect.centerx - gray_img.get_width()//2, 
-                                           rect.centery - gray_img.get_height()//2))
+                    
+                    # Rysowanie na środku slota + nasze przesunięcie
+                    rys_x = rect.centerx - gray_img.get_width() // 2 + PRZESUNIECIE_X
+                    rys_y = rect.centery - gray_img.get_height() // 2 + PRZESUNIECIE_Y
+                    
+                    screen.blit(gray_img, (rys_x, rys_y))
                     drawn = True
                 except Exception as e:
                     print(f"Błąd grafiki jednostki: {e}")
-                    
+
             # Fallback tekstowy (teraz zadziała, jeśli usunęliśmy fałszywą grafikę)
             if not drawn:
                 label = str(u_name)[:4].upper()
