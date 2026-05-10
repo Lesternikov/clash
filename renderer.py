@@ -172,72 +172,110 @@ class Renderer:
                              (0, y + offset_y), (SCREEN_WIDTH, y + offset_y))
     
     def draw_castle_interface(self, screen, world):
-        """Rysuje interfejs zamku. Wywoływane z Renderera, dane pobiera z world."""
+        """Rysuje interfejs zamku."""
         castle = world.selected_castle
         if not castle: 
             return
         
-        # Pobieramy aktualną pozycję myszy
         mx, my = pygame.mouse.get_pos()
+        mouse_over_ui = False # Do śledzenia, czy trzymać otwarte menu
 
-        # --- WARSTWA 1: DYNAMICZNA GRAFIKA ZAMKU ---
-        # Zmieniamy self na world, bo tam siedzi castle_gfx
+        # --- WARSTWA 1: DYNAMICZNA GRAFIKA ZAMKU (Budynki) ---
         if hasattr(world, 'castle_gfx'):
             world.castle_gfx.draw(screen, castle)
         else:
             screen.fill((60, 50, 40))
 
-        # --- WARSTWA 3: STAŁY INTERFEJS ---
-        font = pygame.font.SysFont(None, 28)
-        title = font.render(f"{castle.building_type.upper()}", True, (255, 255, 255))
+        # --- WARSTWA 2: TYTUŁ ZAMKU ---
+        font_main = pygame.font.SysFont("Arial", 28, bold=True)
+        title = font_main.render(f"{castle.building_type.upper()}", True, (255, 255, 255))
         screen.blit(title, (40, 40))
 
-        # Przyciski funkcyjne
-        if castle.building_type == "Zamek":
-            # Definiujemy rect (możesz go trzymać w world lub rendererze, tutaj zakładam world)
-            world.peasant_button = pygame.Rect(screen.get_width() - 200, screen.get_height() - 110, 160, 40)
-            # Używamy self.draw_button, bo jesteśmy w Rendererze!
-            self.draw_button(screen, "CHŁOPI", world.peasant_button, (160, 140, 60))
-
-        # Debugowanie masek (world.castle_gfx i flaga z world)
+        # --- WARSTWA 3: NAPISY INFORMACYJNE (NA WYPALONYM PASKU) ---
+        bldg_code = None
         if hasattr(world, 'castle_gfx'):
-            world.castle_gfx.draw(screen, castle, debug_mode=getattr(world, 'debug_show_masks', False))
-
-        # --- WARSTWA 4: SYSTEM MENU ---
-        mouse_over_ui = False
+            bldg_code = world.castle_gfx.get_building_at_pos(mx, my, castle)
         
-        # Sprawdzamy kolizję z przyciskiem (wszystkie recty są w world)
-        if world.menu_button.collidepoint(mx, my):
+        slownik_nazw = {
+            "court": "DWÓR", "koszary": "BARAKI", "hospital": "SZPITAL",
+            "workshop": "WARSZTAT", "school": "SZKOŁA", "forge": "KUŹNIA",
+            "peasants": "CHŁOPI"
+        }
+        
+        hovered_text = slownik_nazw.get(bldg_code, "")
+        if hovered_text:
+            font_info = pygame.font.SysFont("Arial", 22, bold=True)
+            txt_surf = font_info.render(hovered_text, True, (230, 210, 170))
+            txt_shadow = font_info.render(hovered_text, True, (0, 0, 0))
+            txt_x = screen.get_width() // 2 - txt_surf.get_width() // 2
+            txt_y = screen.get_height() - 40  
+            screen.blit(txt_shadow, (txt_x + 2, txt_y + 2))
+            screen.blit(txt_surf, (txt_x, txt_y))
+
+        # ==========================================================
+        # WARSTWA 4: ANIMOWANE ZIELONE MENU NA ŁAŃCUCHACH
+        # ==========================================================
+        if not hasattr(world, 'menu_anim_frame'):
+            world.menu_anim_frame = 0.0
+
+        # Ustalamy obszar MENU (Prawy Górny Róg)
+        ban_w, ban_h = 130 * 1.3, 72 * 1.3 # Powiększamy (ok. 169x93 px)
+        ban_x = screen.get_width() - ban_w - 20
+        ban_y = 20
+        banner_rect = pygame.Rect(ban_x, ban_y, ban_w, ban_h)
+
+        # Sprawdzamy najechanie myszką na baner
+        if banner_rect.collidepoint(mx, my):
             world.menu_open = True
             mouse_over_ui = True
 
+        # Płynna animacja zwijania/rozwijania (zmienia klatki od 0.0 do 5.0)
         if getattr(world, 'menu_open', False):
-            # Wywołujemy rysowanie menu (zakładam, że draw_castle_menu też jest w Rendererze)
+            world.menu_anim_frame = min(5.0, world.menu_anim_frame + 0.4)
+        else:
+            world.menu_anim_frame = max(0.0, world.menu_anim_frame - 0.4)
+
+        current_frame = int(world.menu_anim_frame)
+
+        # Rysowanie Banera
+        if hasattr(world, 'menu_frames') and len(world.menu_frames) == 6:
+            banner_scaled = pygame.transform.scale(world.menu_frames[current_frame], (int(ban_w), int(ban_h)))
+            screen.blit(banner_scaled, (ban_x, ban_y))
+            
+            # Zapisujemy pozycję dla rozwijanych opcji (aby zaczynały się dokładnie POD banerem)
+            world.menu_options_start_y = ban_y + int(ban_h) - 15 
+            world.menu_options_start_x = ban_x
+        else:
+            # Fallback - stary przycisk, gdyby grafiki się nie załadowały
+            world.menu_button = pygame.Rect(ban_x, ban_y, 100, 40)
+            self.draw_button(screen, "MENU", world.menu_button)
+            if world.menu_button.collidepoint(mx, my): mouse_over_ui = True
+            world.menu_options_start_y = ban_y + 40
+            world.menu_options_start_x = ban_x
+
+        # --- WARSTWA 5: OPCJE MENU (Dropdown) ---
+        if getattr(world, 'menu_open', False):
+            # Przekazujemy mx, my i rysujemy rozwijane opcje
             self.draw_castle_menu(screen, mx, my)
             
-            # Sprawdzamy czy mysz jest nad opcjami menu
+            # Podtrzymujemy otwarte menu, jeśli myszka zjedzie na rozwinięte przyciski
             for rect in world.menu_rects.values():
                 if rect.collidepoint(mx, my): mouse_over_ui = True
-            
             if getattr(world, 'build_open', False):
                 for rect in world.build_rects.values():
                     if rect.collidepoint(mx, my): mouse_over_ui = True
             
-            # Mostek bezpieczeństwa
-            bridge_rect = pygame.Rect(world.menu_button.x - 20, world.menu_button.y, 30, 200)
+            # "Mostek bezpieczeństwa" - by menu nie znikało przy szybkim przesunięciu myszki w dół
+            bridge_rect = pygame.Rect(world.menu_options_start_x, ban_y, ban_w, 300)
             if bridge_rect.collidepoint(mx, my): mouse_over_ui = True
 
-        # Logika zamykania menu (zmienia stan w world)
+        # Automatyczne zamykanie menu
         if not mouse_over_ui:
             world.menu_open = False
             world.build_open = False
 
-        # Rysujemy sam przycisk MENU
-        self.draw_button(screen, "MENU", world.menu_button)
-
-        # 6. STOPKA (zakładam, że ta funkcja też jest w Rendererze)
+        # --- WARSTWA 6: STOPKA (Kamienny przycisk Powrotu) ---
         self.draw_building_footer(screen)
-
     def draw_castle(self, screen, castle):
         """Ta funkcja rysuje tylko OBIEKT na mapie świata."""
         # Obliczamy pozycję na ekranie względem kamery
@@ -509,63 +547,6 @@ class Renderer:
                     img_y = slot_y + (32 - unit_img.get_height()) // 2
                     screen.blit(unit_img, (img_x, img_y))
 
-    def draw_unit_info(self, screen):
-        # Historyczne informacje o jednostce w koszarach.
-        screen.fill((20,20,20))
-        0
-        # Jeśli tekst jest pusty, zainicjuj go bezpiecznym komunikatem
-        if not hasattr(self, 'unit_info_text') or not self.unit_info_text:
-            self.unit_info_text = "Brak informacji\nNie wybrano jednostki."
-
-        font_title = pygame.font.SysFont(None, 48)
-        font_text = pygame.font.SysFont(None, 28)
-
-        lines = self.unit_info_text.split("\n")
-        y = 120
-
-        # Nagłówek (pierwsza linia)
-        if lines:
-            screen.blit(font_title.render(lines[0], True, (255,255,0)), (120, y)) # Zmieniłem na żółty, żeby się wyróżniał
-            y += 80
-
-        # Opis (reszta linii)
-        for line in lines[1:]:
-            # Proste zawijanie tekstu: jeśli linia jest za długa, można by ją dzielić, 
-            # ale na razie renderujemy linia po linii.
-            txt_surf = font_text.render(line, True, (200,200,200))
-            screen.blit(txt_surf, (120, y))
-            y += 35
-
-        info = font_text.render("Kliknij dowolny klawisz lub przycisk myszy, aby wrócić", True, (120,120,120))
-        screen.blit(info, (120, screen.get_height()-80))
-    def draw_building_template(self, screen, title, lines, theme_color=(100, 100, 130), border_color=(180, 180, 220)):
-        # Ogólny zarys każdego budynku w zamku
-        # 1. Tło ogólne
-        screen.fill((60, 60, 80))
-
-        # 2. Czcionki (najlepiej zdefiniuj je raz w __init__ jako self.font_title itd.)
-        font_title = pygame.font.SysFont(None, 48)
-        font_text = pygame.font.SysFont(None, 24)
-
-        # 3. Panel środkowy
-        panel = pygame.Rect(120, 80, 760, 420)
-        pygame.draw.rect(screen, theme_color, panel)
-        pygame.draw.rect(screen, border_color, panel, 6)
-
-        # 4. Tytuł (zawsze wycentrowany)
-        title_surface = font_title.render(title.upper(), True, border_color)
-        screen.blit(title_surface, (panel.centerx - title_surface.get_width() // 2, panel.y - 40))
-
-        # 5. Tekst (automatyczne linie)
-        y = panel.y + 30
-        for line in lines:
-            txt = font_text.render(line, True, (255, 255, 255))
-            screen.blit(txt, (panel.x + 30, y))
-            y += 28
-
-        # 6. Stopka (Twoje przyciski)
-        self.draw_building_footer(screen)
-
     def draw_ui(self, screen):
 
         # 2. DOLNY PANEL ARMII (Tylko dla 2+ jednostek)
@@ -576,25 +557,69 @@ class Renderer:
 
             # Rysujemy sloty armii TYLKO jeśli jest grupa
             if len(display_units) >= 2:
-                panel_rect = pygame.Rect(0, 610, 1024, 158)
-                pygame.draw.rect(screen, (30, 20, 10), panel_rect) 
-                pygame.draw.rect(screen, (100, 80, 60), panel_rect, 2)
+                # 1. RYSOWANIE PIĘKNEGO DREWNIANEGO PANELU
+                if hasattr(self, 'img_army_slots') and self.img_army_slots:
+                    # Skalujemy grafikę na szerokość 10 slotów (ok. 760px na 150px)
+                    scaled_panel = pygame.transform.scale(self.img_army_slots, (665, 120))
+                    screen.blit(scaled_panel, (0, 645))
+                else:
+                    # Awaryjne tło
+                    pygame.draw.rect(screen, (30, 20, 10), pygame.Rect(5, 615, 760, 150))
 
-                if not hasattr(self, 'army_slot_rects'):
-                    self.army_slot_rects = [pygame.Rect(10 + i * 75, 620, 70, 140) for i in range(10)]
+                # 2. Inicjalizacja stref klikania (zapisujemy w świecie, by myszka to widziała)
+                if not hasattr(self.world, 'army_slot_rects'):
+                    self.world.army_slot_rects = [pygame.Rect(2 + i * 66, 645, 70, 120) for i in range(10)]
 
+                # 3. Wypełnianie slotów
                 for i in range(10):
-                    rect = self.army_slot_rects[i]
-                    pygame.draw.rect(screen, (60, 40, 30), rect)
-                    pygame.draw.rect(screen, (150, 130, 100), rect, 1)
+                    rect = self.world.army_slot_rects[i]
 
                     if i < len(display_units):
                         unit = display_units[i]
-                        name_txt = self.font_small.render(str(unit.type), True, (255, 255, 255))
-                        count = getattr(unit, 'count', 1)
-                        count_txt = self.font_small.render(str(count), True, (255, 255, 0))
-                        screen.blit(name_txt, (rect.x + 5, rect.y + 120))
-                        screen.blit(count_txt, (rect.x + 5, rect.y + 100))
+                        
+                        # --- GRAFIKA WOJOWNIKA ---
+                        frame = (pygame.time.get_ticks() // 150) % 8
+                        if hasattr(unit, 'sprites') and unit.sprites:
+                            img = unit.sprites[frame % len(unit.sprites)]
+                            img = pygame.transform.scale(img, (img.get_width() * 1.7, img.get_height() * 1.6))
+                            
+                            # ===================================================
+                            # KOREKTA POZYCJI LUDZIKA (Zmień te liczby!)
+                            # ===================================================
+                            przesuniecie_x = 0   # Zwiększ na plus (w prawo) / minus (w lewo)
+                            przesuniecie_y = 2  # ZWIĘKSZ, żeby opuścić w dół (wcześniej było 15)
+                            
+                            rys_x = rect.centerx - img.get_width() // 2 + przesuniecie_x
+                            rys_y = rect.y + przesuniecie_y
+                            
+                            screen.blit(img, (rys_x, rys_y))
+                        
+                        # ===================================================
+                        # TEKST: TYLKO PUNKTY ŻYCIA (HP) ZAMIAST NAZWY
+                        # ===================================================
+                        hp_val = int(getattr(unit, 'hp', 100)) # Pobieramy HP (domyślnie 100)
+                        
+                        # Zmienia kolor w zależności od ran (zielony -> żółty -> czerwony)
+                        if hp_val > 50:
+                            kolor_hp = (100, 255, 100)
+                        elif hp_val > 25:
+                            kolor_hp = (255, 255, 0)
+                        else:
+                            kolor_hp = (255, 100, 100)
+                            
+                        # Formatujemy np. "100 HP"
+                        hp_txt = self.font_main.render(f"{hp_val} HP", True, kolor_hp)
+                        hp_shadow = self.font_main.render(f"{hp_val} HP", True, (0, 0, 0)) 
+                        
+                        wysokosc_liczby = 24 
+                        
+                        # Rysowanie
+                        txt_x = rect.centerx - hp_txt.get_width() // 2
+                        txt_y = rect.bottom - wysokosc_liczby
+                        
+                        screen.blit(hp_shadow, (txt_x + 1, txt_y + 1)) # Cień
+                        screen.blit(hp_txt, (txt_x, txt_y))            # Właściwy tekst
+                        
 
         # 3. PRZYCISKI AKCJI (Zawsze widoczne na ekranie)
         # Wyciągnięte poza "if u:", więc będą widoczne od startu gry
@@ -728,29 +753,44 @@ class Renderer:
         options = ["Buduj", "ZBURZ ZAMEK", "ROZBUDUJ MURY"]
         w.menu_rects.clear()
 
-        menu_w, menu_h = 180, 35
-        menu_x = w.menu_button.x
-        menu_y = w.menu_button.y + 40
+        # Pobieramy X i Y z animowanego banera (żeby opcje przykleiły się idealnie)
+        menu_w, menu_h = 168, 35 # Szerokość idealnie pod baner
+        menu_x = getattr(w, 'menu_options_start_x', 800)
+        menu_y = getattr(w, 'menu_options_start_y', 100)
 
-        for i, opt in enumerate(options):
-            rect = pygame.Rect(menu_x, menu_y + i * menu_h, menu_w, menu_h)
-            self.draw_button(screen, opt, rect)
-            w.menu_rects[opt] = rect
+        # Pokazujemy opcje dopiero, gdy baner opuści się wystarczająco nisko (klatka 3+)
+        if getattr(w, 'menu_anim_frame', 0) >= 3.0:
+            for i, opt in enumerate(options):
+                rect = pygame.Rect(menu_x, menu_y + i * menu_h, menu_w, menu_h)
+                
+                # Zamiast szarych przycisków robimy customowe (ciemnozielone, komponujące się z banerem)
+                is_hovered = rect.collidepoint(mx, my)
+                color = (60, 100, 60) if is_hovered else (40, 50, 40)
+                pygame.draw.rect(screen, color, rect)
+                pygame.draw.rect(screen, (20, 30, 20), rect, 2) # Obramowanie
+                
+                # Tekst w kolorze pożółkłego pergaminu
+                font = pygame.font.SysFont("Arial", 16, bold=True)
+                txt = font.render(opt.upper(), True, (200, 220, 200) if is_hovered else (150, 170, 150))
+                screen.blit(txt, (rect.centerx - txt.get_width()//2, rect.centery - txt.get_height()//2))
+                
+                w.menu_rects[opt] = rect
 
-        w.demolish_button = w.menu_rects.get("ZBURZ ZAMEK")
-        w.wall_button = w.menu_rects.get("ROZBUDUJ MURY")
+            w.demolish_button = w.menu_rects.get("ZBURZ ZAMEK")
+            w.wall_button = w.menu_rects.get("ROZBUDUJ MURY")
 
-        buduj_rect = w.menu_rects.get("Buduj")
-        if not buduj_rect: return
-        
-        safe_zone_to_submenu = pygame.Rect(menu_x - 165, menu_y, 170, 200)
+            buduj_rect = w.menu_rects.get("Buduj")
+            if not buduj_rect: return
+            
+            # Bezpieczna strefa do przejścia na lewo do sub-menu (np. do listy budynków)
+            safe_zone_to_submenu = pygame.Rect(menu_x - 165, menu_y, 170, 200)
 
-        if buduj_rect.collidepoint(mx, my) or (getattr(w, "build_open", False) and safe_zone_to_submenu.collidepoint(mx, my)):
-            w.build_open = True
-            self.draw_build_submenu(screen, menu_x, menu_y)
-        else:
-            if mx > menu_x: 
-                w.build_open = False
+            if buduj_rect.collidepoint(mx, my) or (getattr(w, "build_open", False) and safe_zone_to_submenu.collidepoint(mx, my)):
+                w.build_open = True
+                self.draw_build_submenu(screen, menu_x, menu_y)
+            else:
+                if mx > menu_x: 
+                    w.build_open = False
         
     def draw_build_submenu(self, screen, menu_x, menu_y):
         w = self.world
@@ -871,8 +911,9 @@ class Renderer:
         w = self.world
         
         if w.screen == "castle":
+            # Tylko zamek ma graficzny przycisk z arkusza Z_IKO
             self.draw_button(screen, "", w.back_button_castle, style="castle")
-            
+
         elif w.screen in ["garrison", "Strażnica", "peasants"]:
             # ZMIANA: używamy stylu "garrison_back"
             btn_rect = getattr(w, 'back_button_garrison', w.back_button_bldg)

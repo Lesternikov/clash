@@ -28,15 +28,14 @@ class RecruitmentManager:
                 "rect": pygame.Rect(x, y, w, h),
                 "timer": 0
             }
-
-        # Teraz funkcja jest gotowa przyjąć wszystkie 7 parametrów:
-        # 1:nazwa, 2:plik, 3:plik_p, 4:X, 5:Y, 6:Szerokość, 7:Wysokość
-        add_btn("19", "assets/przyciski/19.png", "assets/przyciski/20.png", 816, 678, 152, 83)
-        add_btn("17", "assets/przyciski/17.png", "assets/przyciski/18.png", 722, 593, 152, 83)
-        add_btn("15", "assets/przyciski/15.png", "assets/przyciski/16.png", 626, 678, 152, 83)
-        add_btn("13", "assets/przyciski/13.png", "assets/przyciski/14.png", 250, 678, 152, 83)
-        add_btn("11", "assets/przyciski/11.png", "assets/przyciski/12.png", 156, 593, 152, 83)
-
+        
+        add_btn("STOP",  "assets/przyciski/19.png", "assets/przyciski/20.png", 816, 678, 152, 83)
+        add_btn("USUN",  "assets/przyciski/17.png", "assets/przyciski/18.png", 722, 593, 152, 83)
+        add_btn("START", "assets/przyciski/15.png", "assets/przyciski/16.png", 626, 678, 152, 83)
+        add_btn("KUP",   "assets/przyciski/13.png", "assets/przyciski/14.png", 250, 678, 152, 83)
+        add_btn("INFO",  "assets/przyciski/11.png", "assets/przyciski/12.png", 156, 593, 152, 83)
+        add_btn("UP",   "assets/przyciski/23.png",   "assets/przyciski/24.png", 499, 39, 50, 83)
+        add_btn("DOWN", "assets/przyciski/21.png", "assets/przyciski/22.png", 499, 125, 50, 83)
         # 1. Ładowanie tła
         try:
             self.bg = pygame.image.load(r"assets\DW_13_GFX.png").convert_alpha()
@@ -45,6 +44,7 @@ class RecruitmentManager:
             print(f"Nie udało się załadować tła rekrutacji: {e}")
             self.bg = pygame.Surface(self.screen_res)
             self.bg.fill((50, 20, 20))
+            
         self.icon_cross = load_scaled("assets/minimum/INFO_S32/INFO_S32_30.png")  # Krzyżyk (X)
         self.icon_hammer = load_scaled("assets/minimum/INFO_S32/INFO_S32_29.png") # Młotek
         self.icon_cross.set_colorkey((255, 255, 255))
@@ -52,20 +52,22 @@ class RecruitmentManager:
 
         # --- KONFIGURACJA POZYCJI ---
         self.layout = {
-            "list_start": (45, 80),         
-            "list_step": 32,                
+            "list_start": (75, 56),         
+            "list_step": 27,                
             "scroll_up": pygame.Rect(320, 80, 50, 50),   
             "scroll_down": pygame.Rect(320, 160, 50, 50),
             
-            "stats_box": (160, 310),        
-            "cost_box": (60, 510),          
+            "stats_box": (10, 310),        
+            "cost_box": (122, 554),          
             
             "gold_chest": (512, 676),       
             
             "btn_1": pygame.Rect(60, 600, 140, 60),  # KUP PATENT
             "btn_2": pygame.Rect(280, 600, 140, 60), # INFO
             "btn_3": pygame.Rect(600, 600, 140, 60), # START PRODUKCJI
-            
+            "btn_4": pygame.Rect(60, 60, 140, 60),
+            "btn_5": pygame.Rect(10, 60, 140, 60),
+            "btn_6": pygame.Rect(60, 10, 140, 60),
             # --- PRZYWRÓCONY PRZYCISK POWRÓT (Grafika z world.py) ---
             # 190x91 to oryginalny rozmiar z world.py, pozycja: (46, 685)
             "btn_back": pygame.Rect(63, 678, 154, 83), 
@@ -75,18 +77,39 @@ class RecruitmentManager:
         }
 
         # Zmienne stanu
-        self.scroll = 0
+        self.scroll = -2
         self.selected_unit_type = None
         self.selected_patent_index = None
-
+        # --- DODAJ TĘ JEDNĄ LINIJKĘ ---
+        self.door_animations = {}
         self.recruitment_unit_types = list(UNIT_STATS.keys())
         self.patent_rects = []
         self.unit_list_rects = []
 
         # Czcionki
-        self.font_small = pygame.font.SysFont("Arial", 16, bold=True)
-        self.font_main = pygame.font.SysFont("Arial", 22, bold=True)
-        self.font_title = pygame.font.SysFont("Arial", 26, bold=True)
+        self.font_small = pygame.font.SysFont("Arial", 16, bold=True) # nie wiem od czego to
+        self.font_main = pygame.font.SysFont("Arial", 20, bold=True) #lista jednostek
+        self.font_title = pygame.font.SysFont("Arial", 26, bold=True) #złoto
+
+        # --- DRZWICZKI DLA PUSTYCH PATENTÓW (Osobne pliki KEEP) ---
+        self.door_frames = []
+        try:
+            # Lista Twoich plików - od zamkniętych (KEEP) do całkowicie otwartych (KEEP7)
+            pliki_drzwi = ["KEEP.png", "KEEP1.png", "KEEP2.png", "KEEP3.png", 
+                           "KEEP4.png", "KEEP5.png", "KEEP6.png", "KEEP7.png"]
+            
+            for nazwa in pliki_drzwi:
+                # Zakładam, że są w folderze assets/
+                sciezka = f"assets/{nazwa}"
+                if os.path.exists(sciezka):
+                    klatka = pygame.image.load(sciezka).convert_alpha()
+                    # Zauważyłem, że zmieniłeś wymiary ramki na 56x106, więc skalujemy idealnie do nich!
+                    klatka = pygame.transform.smoothscale(klatka, (56, 106))
+                    self.door_frames.append(klatka)
+                else:
+                    print(f"Brakuje pliku drzwiczek: {sciezka}")
+        except Exception as e:
+            print(f"Błąd przy drzwiczkach: {e}")
 
     def draw(self, screen):
         castle = self.world.selected_castle
@@ -112,65 +135,89 @@ class RecruitmentManager:
             col = i % 4 
             row = i // 4
 
-            # 1. Definicja ramki klikania (Złota ramka)
-            rect = pygame.Rect(px + col * gx + 30, py + row * gy - 40, 60, 120)
+            rect = pygame.Rect(px + col * gx + 32, py + row * gy - 32, 56, 106)
             self.patent_rects.append(rect) 
             
-            # DEBUG: Rysowanie ramki
-            pygame.draw.rect(screen, (255, 215, 0), rect, 1)
+            # ==========================================================
+            # ETAP 1: OBLICZAMY STAN ANIMACJI I SZUKAMY "DUCHÓW"
+            # ==========================================================
+            anim = self.door_animations.get(i)
+            is_opening = anim and anim.get("type") == "open"
+            is_closing = anim and anim.get("type") == "close"
+            current_frame_idx = 0
+            
+            if anim:
+                elapsed = pygame.time.get_ticks() - anim.get("timer", 0)
+                frame_progress = min(7, int((elapsed / 1000.0) * 8))
+                
+                if is_opening: current_frame_idx = frame_progress 
+                elif is_closing: current_frame_idx = 7 - frame_progress
+                
+                if elapsed >= 1000:
+                    del self.door_animations[i]
+                    anim = None
+                    is_opening = False
+                    is_closing = False
 
-            if i < len(castle.patents) and castle.patents[i] is not None:
-                p = castle.patents[i]
-                name = p["unit_type"] if isinstance(p, dict) else p
+            has_patent = i < len(castle.patents) and castle.patents[i] is not None
+            ghost_unit_name = anim.get("ghost_name") if is_closing else None
+
+            # ==========================================================
+            # ETAP 2: RYSOWANIE LUDZIKA LUB JEGO DUCHA
+            # ==========================================================
+            # Jeśli w zamku jest ludzik, ALBO drzwiczki właśnie zamykają ducha:
+            if has_patent or ghost_unit_name:
+                
+                # Zabezpieczenie: skąd bierzemy nazwę do rysowania?
+                if has_patent:
+                    p = castle.patents[i]
+                    name = p["unit_type"] if isinstance(p, dict) else p
+                else:
+                    name = ghost_unit_name
                 
                 u_code = NAME_TO_CODE.get(name, name)
                 frame_idx = (pygame.time.get_ticks() // 150) % 8
                 path = f"assets/minimum/{u_code}1_I_S32/{u_code}1_I_S32_{frame_idx}.png"
-
                 drawn = False
-                
-                # --- TUTAJ JEST JEDYNE RYSOWANIE LUDZIKA ---
                 if os.path.exists(path):
                     try:
                         raw_img = pygame.image.load(path).convert_alpha()
-                        
-                        # Tworzymy wersję SZARĄ
                         gray_img = pygame.transform.grayscale(raw_img) 
-                        
-                        # SKALOWANIE: Dopasuj do złotej ramki (np. 60x100)
-                        # Na Twoim screenie ramka jest wysoka, więc (55, 90) będzie OK
-                        img_w, img_h = 52, 104
+                        img_w, img_h = 54, 106
                         scaled_img = pygame.transform.scale(gray_img, (img_w, img_h))
                         
-                        # POZYCJA: rect.x i rect.y to lewy górny róg ZŁOTEJ RAMKI.
-                        # Centrujemy ludzika w ramce 60x120
                         img_x = rect.x + (rect.width - img_w) // 2
-                        img_y = rect.y + 10 # 10 pikseli od góry ramki
+                        img_y = rect.y
                         
                         screen.blit(scaled_img, (img_x, img_y))
                         drawn = True
-                    except:
-                        pass
+                    except: pass
 
-                # Fallback: jeśli nie znajdzie obrazka
                 if not drawn:
                     txt = self.font_small.render(name[:6], True, (255, 255, 255))
                     screen.blit(txt, (rect.x + 5, rect.y + 30))
 
-                # --- NOWOŚĆ: KRZYŻYK (Zamiast ramki zaznaczenia) ---
                 if self.selected_patent_index == i:
-                    # Krzyżyk na obrazku jednostki
                     cross_x = img_x + img_w - self.icon_cross.get_width() - 2
                     cross_y = img_y + 2
                     screen.blit(self.icon_cross, (cross_x, cross_y))
 
-                # --- NAPRAWIONY MŁOTEK ---
-                # Używamy właściwej nazwy zmiennej: production_unit_type
                 if getattr(castle, 'production_enabled', False) and getattr(castle, 'production_unit_type', None) == name:
                     hammer_x = img_x + 2
                     hammer_y = img_y + 2
                     screen.blit(self.icon_hammer, (hammer_x, hammer_y))
-                    
+
+            # ==========================================================
+            # ETAP 3: RYSOWANIE DRZWICZEK (Nakładane na wierzch)
+            # ==========================================================
+            if hasattr(self, 'door_frames') and len(self.door_frames) > 0:
+                if is_opening or is_closing:
+                    # Trwa animacja - rysujemy odpowiednią klatkę w ruchu
+                    screen.blit(self.door_frames[current_frame_idx], (rect.x, rect.y))
+                elif not has_patent:
+                    # Nie ma patentu, nie ma animacji - drzwi są twardo zamknięte (klatka 0)
+                    screen.blit(self.door_frames[0], (rect.x, rect.y))
+
         # --- SEKCJA LISTY JEDNOSTEK (Lewa strona) ---
         self.unit_list_rects = [] 
         lx, ly = self.layout["list_start"]
@@ -179,26 +226,41 @@ class RecruitmentManager:
 
         for i in range(5):
             scroll_idx = self.scroll + i
-            rect = pygame.Rect(lx, ly + i * step, 240, step)
+            rect = pygame.Rect(lx, ly + i * step, 400, step)
             self.unit_list_rects.append(rect) 
             
             if 0 <= scroll_idx < len(unit_types):
                 unit_name = unit_types[scroll_idx]
                 has_p = self.world.castle_has_patent(castle, unit_name)
                 
+                # --- TUTAJ PRZYWRACAMY TWOJE KLASYCZNE KOLORY ---
                 if i == center_index:
-                    t_col = (255, 255, 0) 
+                    t_col = (255, 255, 255) # Zaznaczony na środku -> Śnieżnobiały
                 elif has_p:
-                    t_col = (150, 150, 150) 
+                    t_col = (100, 100, 100) # Wygaszony (już kupiony) -> Ciemnoszary
                 else:
-                    t_col = (255, 255, 255) 
+                    t_col = (180, 180, 180) # Dostępny do kupienia -> Zwykły szary
                 
                 screen.blit(self.font_main.render(unit_name, True, t_col), (rect.x, rect.y + 4))
 
         # --- OBSZAR 9 i 8 (Statystyki i Koszty) ---
-        idx_on_center = self.scroll + center_index
-        if 0 <= idx_on_center < len(unit_types):
-            unit_to_show = unit_types[idx_on_center]
+        unit_to_show = None
+        
+        # 1. Sprawdzamy, czy gracz ma zaznaczony jakiś wykupiony patent po prawej
+        if self.selected_patent_index is not None and self.selected_patent_index < len(castle.patents):
+            p = castle.patents[self.selected_patent_index]
+            if p is not None:
+                unit_to_show = p["unit_type"] if isinstance(p, dict) else p
+
+        # 2. Jeśli nie ma zaznaczonego patentu, bierzemy jednostkę ze środka lewej listy
+        if not unit_to_show:
+            center_index = 2
+            idx_on_center = self.scroll + center_index
+            if 0 <= idx_on_center < len(unit_types):
+                unit_to_show = unit_types[idx_on_center]
+
+        # 3. Wyświetlanie statystyk dla wybranej jednostki
+        if unit_to_show:
             stats = UNIT_STATS.get(unit_to_show, {}) 
             
             if stats:
@@ -218,45 +280,63 @@ class RecruitmentManager:
                 
                 cx, cy = self.layout["cost_box"]
                 screen.blit(self.font_main.render(f"{stats.get('patent_cost', 0)}", True, (255, 215, 0)), (cx + 50, cy))
-                screen.blit(self.font_main.render(f"{stats.get('production_cost', 0)}", True, (255, 215, 0)), (cx + 200, cy))
-                screen.blit(self.font_main.render(f"{stats.get('production_time', 0)}", True, (255, 255, 255)), (cx + 340, cy))
+                screen.blit(self.font_main.render(f"{stats.get('production_cost', 0)}", True, (255, 215, 0)), (cx + 215, cy))
+                screen.blit(self.font_main.render(f"{stats.get('production_time', 0)}", True, (255, 255, 255)), (cx + 370, cy))
 
         # --- INFO O PRODUKCJI ---
         if castle.production_enabled and castle.production_unit_type:
-            p_text = f"{castle.production_unit_type} ({castle.production_turns_left} tur)"
-            p_color = (0, 255, 0)
-        else:
-            p_text = "Brak produkcji"
-            p_color = (150, 150, 150)
-        screen.blit(self.font_main.render(p_text, True, p_color), (self.layout["patents_start"][0], self.layout["patents_start"][1] + 450))
-
-        # Sprawdzamy, czy gracz ma zaznaczony jakiś konkretny, KUPIONY patent w prawej siatce
-        has_valid_patent = (self.selected_patent_index is not None and 
-                            self.selected_patent_index < len(castle.patents) and 
-                            castle.patents[self.selected_patent_index] is not None)
-        
-        if has_valid_patent:
-            # --- ZAZNACZONO KUPIONY PATENT ---
-            p = castle.patents[self.selected_patent_index]
-            selected_unit_name = p["unit_type"] if isinstance(p, dict) else p
+            turns = getattr(castle, 'production_turns_left', 1)
             
-            # 1. Zamiast KUP jest USUŃ
-            self._draw_btn_text(screen, "USUŃ", self.layout["btn_1"], text_color=(255, 100, 100))
-            
-            # 2. INFO zostaje normalnie
-            self._draw_btn_text(screen, "INFO", self.layout["btn_2"])
-            
-            # 3. Jeśli ten patent jest akurat produkowany -> WSTRZYMAJ, w przeciwnym razie -> START
-            if getattr(castle, 'production_enabled', False) and getattr(castle, 'production_unit_type', None) == selected_unit_name:
-                self._draw_btn_text(screen, "WSTRZYMAJ", self.layout["btn_3"], text_color=(255, 255, 0))
+            if turns == 1: tekst_tury = "POZOSTAŁA 1 TURA"
             else:
-                self._draw_btn_text(screen, "START", self.layout["btn_3"], text_color=(0, 255, 0))
+                resztka = turns % 10
+                if 2 <= resztka <= 4 and not (12 <= turns % 100 <= 14): tekst_tury = f"POZOSTAŁY {turns} TURY"
+                else: tekst_tury = f"POZOSTAŁO {turns} TUR"
+                    
+            linie_tekstu = ["DO UKOŃCZENIA", "PRODUKCJI", tekst_tury]
+            
+            # =======================================================
+            # ZADANIA 1, 2, 3: REGULACJA POZYCJI I WYGLĄDU
+            # =======================================================
+            # 1. Pozycja TŁA (brązowego prostokąta)
+            ramka_x = self.layout["patents_start"][0] + 141 # Zwiększ, żeby przesunąć w PRAWO
+            ramka_y = self.layout["patents_start"][1] + 380 # Zwiększ, żeby przesunąć w DÓŁ
+            
+            # 2. Pozycja TEKSTU względem tła
+            tekst_offset_x = 1 # Ujemne wartości przesuwają tekst w LEWO
+            tekst_offset_y = 18  # Dodatnie wartości przesuwają tekst w DÓŁ
+            
+            # 3. Wygląd napisu
+            kolor_tekstu = (210, 220, 230) # Delikatny, srebrzysty kolor
+            kolor_cienia = (10, 10, 10)    # Ciemny cień
+            # =======================================================
+            
+            # Rysowanie tła (jeśli istnieje)
+            try:
+                bg_path = "assets/ramka_produkcji.png"
+                if os.path.exists(bg_path):
+                    bg_panel = pygame.image.load(bg_path).convert_alpha()
+                    screen.blit(bg_panel, (ramka_x - bg_panel.get_width()//2, ramka_y))
+            except Exception:
+                pass 
+            
+            font_info = pygame.font.SysFont("Times New Roman", 18, bold=True)
+            odstep_y = 22 # Odstęp między linijkami tekstu
+            
+            # Środek tekstu po dodaniu Twojego offsetu
+            srodek_tekstu_x = ramka_x + tekst_offset_x
+            start_y_tekstu = ramka_y + tekst_offset_y
+            
+            for i, linia in enumerate(linie_tekstu):
+                txt_shadow = font_info.render(linia, True, kolor_cienia)
+                txt_main = font_info.render(linia, True, kolor_tekstu)
                 
-        else:
-            # --- NIC NIE ZAZNACZONO LUB ZAZNACZONO PUSTY SLOT/LISTĘ PO LEWEJ ---
-            self._draw_btn_text(screen, "KUP PATENT", self.layout["btn_1"])
-            self._draw_btn_text(screen, "INFO", self.layout["btn_2"])
-            self._draw_btn_text(screen, "START", self.layout["btn_3"], text_color=(100, 100, 100))
+                txt_x = srodek_tekstu_x - txt_main.get_width() // 2
+                txt_y = start_y_tekstu + i * odstep_y
+                
+                # Zależnie od tego, jak gruby ma być cień, możesz regulować to (txt_x + 2, txt_y + 2)
+                screen.blit(txt_shadow, (txt_x + 2, txt_y + 2))
+                screen.blit(txt_main, (txt_x, txt_y))
         
         # ==============================================================
         # PRZYCISK POWRÓT (Aktywny - styl garnizonu)
@@ -279,9 +359,6 @@ class RecruitmentManager:
         # Upewniamy się, że słownik z guzikami został stworzony w __init__
         if hasattr(self, 'custom_buttons'):
             for btn_name, btn_data in self.custom_buttons.items():
-                
-                # >>> TEST DETEKTYWISTYCZNY <<<
-                print(f"Rysuję guzik: {btn_name}, rozmiar: {btn_data['img'].get_size()}")
                 
                 elapsed = now - btn_data["timer"]
                 # Jeśli kliknięto go niedawno, rysuje wciśnięty (img_p)
@@ -306,83 +383,144 @@ class RecruitmentManager:
                             self.selected_patent_index < len(castle.patents) and 
                             castle.patents[self.selected_patent_index] is not None)
 
-        # 1. Przycisk Powrót (Z GRAFIKĄ)
+       # 1. Przycisk Powrót (Z GRAFIKĄ)
         if self.layout["btn_back"].collidepoint(mx, my):
-            # Uruchamiamy animację z controls.py! (Zamiast po prostu zamykać ekran)
+            self.selected_patent_index = None # Resetuje krzyżyk na obecnym ekranie
             self.world.back_destination = "garrison"
             self.world.back_anim_timer = pygame.time.get_ticks()
             return
-
-        # 2. Przycisk 1: (KUP PATENT lub USUŃ PATENT)
-        if self.layout["btn_1"].collidepoint(mx, my):
-            if has_valid_patent:
-                # --- AKCJA: USUŃ PATENT ---
-                # Uwaga: Musisz upewnić się, że masz metodę np. castle.remove_patent(index)
-                # Jeśli jej nie masz, to poniższy kod to ręczne usuwanie (podmień na list.pop lub przypisz None w zależności od mechaniki w Twoim pliku castle.py)
-                try:
-                    p_to_remove = castle.patents[self.selected_patent_index]
-                    unit_name = p_to_remove["unit_type"] if isinstance(p_to_remove, dict) else p_to_remove
-                    
-                    # Prosta opcja usuwania: ucinamy element lub zmieniamy na None
-                    if isinstance(castle.patents, list):
-                        castle.patents[self.selected_patent_index] = None
-                        # Opcjonalnie: castle.patents.remove(p_to_remove) 
-                    
-                    # Jeśli usuwamy patent, który właśnie jest produkowany - warto wstrzymać produkcję!
-                    if getattr(castle, 'production_unit_type', None) == unit_name:
-                        castle.production_enabled = False
-                        castle.production_unit_type = None
-                        
-                    print(f"Usunięto patent: {unit_name}")
-                    self.selected_patent_index = None # Odznaczamy po usunięciu
-                except Exception as e:
-                    print(f"Błąd przy usuwaniu patentu: {e}")
-            else:
-                # --- AKCJA: KUP PATENT ---
+        # ==========================================
+        # 1. KUP PATENT
+        # ==========================================
+        if "KUP" in self.custom_buttons and self.custom_buttons["KUP"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["KUP"]["timer"] = pygame.time.get_ticks()
+            
+            if not has_valid_patent: 
                 center_idx = self.scroll + 2
                 if 0 <= center_idx < len(unit_types):
                     u_name = unit_types[center_idx]
                     if not self.world.castle_has_patent(castle, u_name):
+                        
+                        # --- TO JEST TA MAGIA: Szukamy miejsca PRZED kupnem! ---
+                        target_idx = -1
+                        for idx in range(12):
+                            if idx >= len(castle.patents) or castle.patents[idx] is None:
+                                target_idx = idx
+                                break
+                        
+                        if target_idx != -1:
+                            self.door_animations[target_idx] = {"type": "open", "timer": pygame.time.get_ticks()}
+                        # -------------------------------------------------------
+                            
                         castle.buy_patent(u_name)
+                        print(f"Kupiono patent: {u_name}")
             return
 
-        # 3. Przycisk 3: (START PRODUKCJI lub WSTRZYMAJ)
-        if self.layout["btn_3"].collidepoint(mx, my):
+       # ==========================================
+        # 2. USUŃ PATENT
+        # ==========================================
+        if "USUN" in self.custom_buttons and self.custom_buttons["USUN"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["USUN"]["timer"] = pygame.time.get_ticks()
+            
+            if has_valid_patent:
+                # 1. Zapisujemy nazwę wojownika ZANIM go skasujemy z listy
+                p_to_remove = castle.patents[self.selected_patent_index]
+                unit_name = p_to_remove["unit_type"] if isinstance(p_to_remove, dict) else p_to_remove
+                
+                # 2. Wrzucamy go do pamięci drzwi jako "ducha"
+                self.door_animations[self.selected_patent_index] = {
+                    "type": "close", 
+                    "timer": pygame.time.get_ticks(),
+                    "ghost_name": unit_name  # <--- MAGIA
+                }
+                
+                # 3. DOPIERO TERAZ fizycznie usuwamy go z koszar
+                if isinstance(castle.patents, list):
+                    castle.patents[self.selected_patent_index] = None
+                
+                if getattr(castle, 'production_unit_type', None) == unit_name:
+                    castle.production_enabled = False
+                    castle.production_unit_type = None
+                    
+                self.selected_patent_index = None # Odznaczamy, żeby zamknąć menu
+            return
+        # ==========================================
+        # 3. START PRODUKCJI
+        # ==========================================
+        if "START" in self.custom_buttons and self.custom_buttons["START"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["START"]["timer"] = pygame.time.get_ticks()
+            
+            if has_valid_patent:
+                p = castle.patents[self.selected_patent_index]
+                u_name = p["unit_type"] if isinstance(p, dict) else p
+                if u_name:
+                    castle.start_production(u_name)
+                    print(f"Uruchomiono produkcję: {u_name}")
+            return
+
+        # ==========================================
+        # 4. WSTRZYMAJ PRODUKCJĘ
+        # ==========================================
+        if "STOP" in self.custom_buttons and self.custom_buttons["STOP"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["STOP"]["timer"] = pygame.time.get_ticks()
+            
             if has_valid_patent:
                 p = castle.patents[self.selected_patent_index]
                 u_name = p["unit_type"] if isinstance(p, dict) else p
                 
                 if u_name:
-                    # Sprawdzamy czy ta konkretna jednostka jest teraz w produkcji
                     is_currently_producing = getattr(castle, 'production_enabled', False) and getattr(castle, 'production_unit_type', None) == u_name
-                    
                     if is_currently_producing:
-                        # --- AKCJA: WSTRZYMAJ ---
                         castle.production_enabled = False
                         print(f"Wstrzymano produkcję: {u_name}")
-                    else:
-                        # --- AKCJA: START ---
-                        castle.start_production(u_name)
-                        print(f"Uruchomiono produkcję: {u_name}")
             return
 
-        # Kliknięcie w slot Patentu na siatce po prawej
-        for i, rect in enumerate(self.patent_rects):
-            if rect.collidepoint(mx, my):
-                if i < len(castle.patents) and castle.patents[i]:
-                    # Kliknięto w ZAJĘTY slot - zaznaczamy
-                    self.selected_patent_index = i
-                    self.selected_unit_type = None 
-                    
-                    u_name = castle.patents[i]["unit_type"] if isinstance(castle.patents[i], dict) else castle.patents[i]
-                    if u_name in unit_types:
-                        target_idx = unit_types.index(u_name)
-                        self.scroll = target_idx - 2 
-                else:
-                    # Kliknięto w PUSTY slot - ODWZNAKOWUJEMY (dzięki temu zniknie przycisk "Usuń" i wróci "Kup Patent")
-                    self.selected_patent_index = None
-                return
+        # ==========================================
+        # 5. INFO
+        # ==========================================
+        if "INFO" in self.custom_buttons and self.custom_buttons["INFO"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["INFO"]["timer"] = pygame.time.get_ticks()
+            
+            u_name = None
+            if has_valid_patent:
+                p = castle.patents[self.selected_patent_index]
+                u_name = p["unit_type"] if isinstance(p, dict) else p
+            else:
+                center_idx = self.scroll + 2
+                if 0 <= center_idx < len(unit_types):
+                    u_name = unit_types[center_idx]
 
+            if u_name:
+                from settings import UNIT_STATS # Upewniamy się, że mamy dostęp do statystyk
+                stats = UNIT_STATS.get(u_name, {})
+                
+                # 1. Wyciągamy historyczny opis z pliku settings
+                # Jeśli jakaś jednostka nie ma jeszcze opisu, dajemy tekst zastępczy
+                surowy_opis = stats.get("description", f"{u_name}\n\nBrak opisu historycznego.")
+                
+                # 2. Czyścimy tekst ze spacji (żeby ładnie i równo wyglądał w grze)
+                czysty_opis = "\n".join([linia.strip() for linia in surowy_opis.split("\n") if linia.strip() != ""])
+                
+                # 3. Wrzucamy gotowy opis do świata gry!
+                self.world.unit_info_text = czysty_opis
+                
+                # Hologram (zabezpieczenie)
+                class DummyUnit:
+                    def __init__(self, name):
+                        self.type = name
+                        self.type_code = name
+                        self.owner = castle.owner 
+                
+                self.world.inspected_unit = DummyUnit(u_name)
+                
+                # 4. Przełączamy ekran
+                # Zapisujemy poprzedni ekran!
+                self.world.previous_screen = self.world.screen 
+                # Przełączamy ekran
+                self.world.screen = "unit_info"
+
+                
+            return
         # Scroll (Guziki)
         if self.layout["scroll_up"].collidepoint(mx, my):
             self.scroll = max(-2, self.scroll - 1)
@@ -395,7 +533,18 @@ class RecruitmentManager:
             self.scroll = min(len(unit_types)-3, self.scroll + 1)
             self.selected_patent_index = None # J.w.
             return
-
+        # Przewijanie listy (Guziki)
+        if "UP" in self.custom_buttons and self.custom_buttons["UP"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["UP"]["timer"] = pygame.time.get_ticks()
+            self.scroll = max(-2, self.scroll - 1)
+            self.selected_patent_index = None
+            return
+            
+        if "DOWN" in self.custom_buttons and self.custom_buttons["DOWN"]["rect"].collidepoint(mx, my):
+            self.custom_buttons["DOWN"]["timer"] = pygame.time.get_ticks()
+            self.scroll = min(len(unit_types)-3, self.scroll + 1)
+            self.selected_patent_index = None
+            return
         # Kliknięcie w listę jednostek po lewej
         for i, rect in enumerate(self.unit_list_rects):
             if rect.collidepoint(mx, my):
@@ -405,6 +554,27 @@ class RecruitmentManager:
                     # Wybrano jednostkę z listy - musimy ODZNACZYĆ panel po prawej, 
                     # żeby przyciski pokazały "Kup Patent"
                     self.selected_patent_index = None
+                    return
+
+        # ... (tu masz kliknięcie w listę jednostek po lewej)
+        for i, rect in enumerate(self.unit_list_rects):
+            if rect.collidepoint(mx, my):
+                clicked_unit_idx = self.scroll + i
+                if 0 <= clicked_unit_idx < len(unit_types):
+                    self.scroll = clicked_unit_idx - 2 
+                    self.selected_patent_index = None
+                    return
+
+        # ==========================================
+        # KLIKNIĘCIE W SIATKĘ PATENTÓW PO PRAWEJ
+        # ==========================================
+        if hasattr(self, 'patent_rects'):
+            for i, rect in enumerate(self.patent_rects):
+                if rect.collidepoint(mx, my):
+                    # Sprawdzamy czy w tym slocie faktycznie jest jakiś wykupiony patent
+                    if i < len(castle.patents) and castle.patents[i] is not None:
+                        self.selected_patent_index = i
+                        print(f"Zaznaczono patent w slocie: {i}")
                     return
 
     def handle_scroll_wheel(self, event):
@@ -424,7 +594,7 @@ class RecruitmentManager:
             if self.scroll < max_scroll:
                 self.scroll += 1
 
-    if __name__ == "__main__":
+if __name__ == "__main__":
             import subprocess, sys, os
             main_path = os.path.join(os.path.dirname(__file__), "main.py")
             subprocess.run([sys.executable, main_path])

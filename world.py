@@ -5,6 +5,7 @@ from buildings import BuildingsMixin
 from castle import BUILDING_TYPES
 import random  # Do losowania drzew (żeby las nie był nudny)
 import pygame  # Silnik gry
+import os
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
 from court import CourtHandler
 from controls import ControlsHandler
@@ -198,6 +199,35 @@ class World(BuildingsMixin):
             new_player = Player(i, name, color_rgb, color_name)
             self.players.append(new_player)
 
+        # ==========================================
+        # WYCINANIE GRAFIK Z_IKO_PCX.png (Spritesheet)
+        # ==========================================
+        try:
+            z_iko_sheet = pygame.image.load(os.path.join("assets", "Z_IKO_PCX.png")).convert_alpha()
+            
+            # 1. PRZYCISK POWROTU (Rozdzielony na wciśnięty i odciśnięty)
+            self.back_img_bldg_normal = z_iko_sheet.subsurface(pygame.Rect(7, 430, 80, 48))
+            self.back_img_bldg_pressed = z_iko_sheet.subsurface(pygame.Rect(89, 430, 80, 48))
+            
+            # 2. PASEK NAZWY BUDYNKU
+            self.title_bar_img = z_iko_sheet.subsurface(pygame.Rect(180, 446, 285, 32))
+            
+            # 3. ANIMACJA ZIELONEGO MENU (Na razie wycinamy i szykujemy do użycia)
+            self.menu_frames = [
+                z_iko_sheet.subsurface(pygame.Rect(508, 1, 130, 69)),
+                z_iko_sheet.subsurface(pygame.Rect(508, 72, 130, 69)),
+                z_iko_sheet.subsurface(pygame.Rect(508, 143, 130, 69)),
+                z_iko_sheet.subsurface(pygame.Rect(508, 215, 130, 69)),
+                z_iko_sheet.subsurface(pygame.Rect(508, 287, 130, 69)),
+                z_iko_sheet.subsurface(pygame.Rect(508, 359, 130, 69))
+            ]
+            print("Wycinki z arkusza Z_IKO załadowane pomyślnie!")
+            
+        except Exception as e:
+            print(f"Błąd wycinania z Z_IKO_PCX: {e}")
+            self.title_bar_img = None
+            self.menu_frames = []
+
    
     def setup_starting_units(self):
         """Rozdaje graczom początkowe wojsko pod ich zamkami."""
@@ -250,17 +280,37 @@ class World(BuildingsMixin):
         self.selected_castle = None
         self.selected_unit = None
         self.screen = "map"
+        
+        # ---> KLUCZOWA POPRAWKA 3: Twardy reset krzyżyków w koszarach! <---
+        self.selected_units.clear()
 
         # --- KLUCZ: Logika zamków i budowania odpala się TYLKO raz na rundę ---
-        # (Np. gdy kolejka wraca do gracza 0)
         if self.current_player == 0:
             self.turn += 1
             self.process_construction() 
 
             for castle in self.castles:
                 if not getattr(castle, 'destroyed', False):
-                    castle.next_turn() # Tu jest process_production()
-                    # castle.collect_taxes() # To już masz w castle.next_turn()
+                    if hasattr(castle, 'next_turn'):
+                        castle.next_turn() 
+                    
+                    # ---> KLUCZOWA POPRAWKA 2: Przetwarzanie leczenia i szkolenia <---
+                    for u in getattr(castle, 'garrison', []):
+                        if u:
+                            # Przetwarzanie Leczenia (Szpital - Serduszka)
+                            if getattr(u, 'healing_turns', 0) > 0:
+                                u.healing_turns -= 1
+                                if u.healing_turns <= 0:
+                                    u.hp = getattr(u, 'max_hp', 100) # Leczmy na 100%
+                                    print(f"[{castle.x},{castle.y}] Wyleczono jednostkę: {u.type}")
+                            
+                            # Przetwarzanie Szkolenia (Szkoła - Miecze)
+                            if getattr(u, 'training_turns', 0) > 0:
+                                u.training_turns -= 1
+                                if u.training_turns <= 0:
+                                    # Złoty posąg to max 12 pkt doświadczenia
+                                    u.experience = min(12, getattr(u, 'experience', 0) + 3) 
+                                    print(f"[{castle.x},{castle.y}] Wyszkolono jednostkę: {u.type}")
 
     def move_unit(self, unit, dx, dy, cost=1):
         """
@@ -296,25 +346,22 @@ class World(BuildingsMixin):
                     print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color}!")
                     castle.owner = unit.owner
                     # Czyścimy garnizon wroga
-                    castle.garrison = [None] * castle.garrison_limit 
+                    castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
                     # Przerywamy wrogą produkcję
                     castle.production_enabled = False
                     castle.production_unit_type = None
 
-                # Próba wejścia do garnizonu (automatyczna, jeśli jest miejsce)
-                for i in range(len(castle.garrison)):
-                    if castle.garrison[i] is None:
-                        castle.garrison[i] = unit
-                        if unit in self.units: self.units.remove(unit)
-                        if unit in unit.owner.units: unit.owner.units.remove(unit)
-                        
-                        unit.move_points -= cost
-                        if self.selected_unit == unit:
-                            self.selected_unit = None
-                        return True
+                # =========================================================
+                # Próba wejścia do garnizonu (ROZPAKOWANIE ARMII)
+                # =========================================================
+                unit.move_points -= cost # Odejmujemy koszt za wejście
                 
-                print("Garnizon pełny! Nie możesz wejść.")
-                return False
+                if self.enter_castle(unit, castle):
+                    return True # Sukces, armia rozpakowana w zamku!
+                else:
+                    unit.move_points += cost # Brak miejsca, oddajemy punkty
+                    print("Brak miejsca w garnizonie! Armia zostaje przed zamkiem.")
+                    return False
 
         # 4. TEREN
         walkable_chars = [".", "l", "g", "p", "_", "#", "$","x", " "] 
@@ -338,19 +385,26 @@ class World(BuildingsMixin):
         for other in self.units[:]:
             if other.x == nx and other.y == ny:
                 if other.owner != unit.owner:
-                    # To jest wróg -> Walka (zostawiasz jak masz)
-                    self.units.remove(other)
-                    # ...
+                    # ==========================================
+                    # TO JEST WRÓG -> WYWOŁANIE AUTOMATYCZNEJ WALKI
+                    # ==========================================
+                    from walka_auto import resolve_auto_combat
+                    attacker_survived = resolve_auto_combat(unit, other, self)
+                    
+                    if not attacker_survived:
+                        # Atakujący zginął w walce, więc kończymy jego ruch i odznaczamy
+                        if self.selected_unit == unit:
+                            self.selected_unit = None
+                        return False 
+                    # Jeśli przeżył, skrypt pójdzie dalej i poprawnie postawi go na nowym polu!
+                    
                 else:
                     # TO JEST SOJUSZNIK! Sprawdzamy czy chcieliśmy się łączyć
                     if getattr(self, 'merge_mode', False):
-                        # Odpalamy łączenie (funkcja merge_units sama usunie wędrowca z mapy)
                         self.merge_units(unit, other, cost)
-                        # Zwracamy False, żeby zablokować dalsze kroczenie (bo jednostka jest już w środku innej)
                         return False 
                     else:
-                        # Zwykłe pchanie się na sojusznika bez trybu łączenia = blokada
-                        return False
+                        return False # Blokada - nie można wejść na sojusznika bez łączenia
                         
         # 7. ZBIERANIE ZASOBÓW (Chłopi / Złoto)
         for group in self.peasant_groups[:]:
@@ -372,7 +426,8 @@ class World(BuildingsMixin):
         for u in self.units:
             if u.x < 0:
                 continue
-            u.move_points = 5
+            # Pobieramy maksymalną wartość ruchu przypisaną do jednostki (awaryjnie 5)
+            u.move_points = getattr(u, 'moves', 5)
 
     def select_unit(self, x, y):
         for u in self.units:
@@ -473,34 +528,54 @@ class World(BuildingsMixin):
             return
 
         # ================= BACK =================
-        # Zmieniliśmy 'back_button_castle' na nasz nowy 'back_button_garrison'
         if hasattr(self, 'back_button_garrison') and self.back_button_garrison.collidepoint(mx, my):
-            self.selected_units.clear()
+            self.selected_units.clear() 
             self.screen = "castle"
+            
+            # --- POPRAWIONA NAZWA ---
+            if hasattr(self, 'recruitment_manager'):
+                self.recruitment_manager.selected_patent_index = None
             return
 
         # ================= RECRUITMENT =================
         if self.garrison_gfx.handle_prod_click(mx, my, castle):
-            self.prod_anim_timer = pygame.time.get_ticks() # Nowy stoper dla animacji
+            
+            # --- POPRAWIONA NAZWA ---
+            if hasattr(self, 'recruitment_manager'):
+                self.recruitment_manager.selected_patent_index = None
+                
+            self.prod_anim_timer = pygame.time.get_ticks() 
             return
 
         # ================= HEAL =================
         if self.garrison_gfx.handle_hosp_click(mx, my, castle):
-            for unit in self.selected_units:
-                castle.start_healing_unit(unit)
+            if self.selected_units:
+                for u in self.selected_units:
+                    if getattr(u, 'hp', 100) < getattr(u, 'max_hp', 100):
+                        u.healing_turns = 3 
+                        u.training_turns = 0  # <--- NOWOŚĆ: Leczenie wyłącza szkolenie
+                self.selected_units.clear() 
+                print("Rozpoczęto leczenie (Szkolenie przerwane)")
             return
 
         # ================= TRAIN ================= 
         if self.garrison_gfx.handle_school_click(mx, my, castle):
             if self.selected_units:
-                castle.start_training_group(self.selected_units) 
+                # ... (twoja logika szkolenia) ...
+                for u in self.selected_units:
+                    u.training_turns = 3  
+                    u.healing_turns = 0  # <--- NOWOŚĆ: Szkolenie wyłącza leczenie
                 self.selected_units.clear() 
-                print("Zakończono wydawanie rozkazów szkolenia")
-            else:
-                print("Brak zaznaczonych jednostek do szkolenia")
+                print("Rozpoczęto szkolenie (Leczenie przerwane)")
             return
+        
+        # ================= WYPUŚĆ WOJSKO =================
+        if self.garrison_gfx.handle_release_click(mx, my, self.selected_units):
+            print("Akcja: Wypuszczanie zaznaczonych jednostek z garnizonu")
+            self.release_selected_units(stay_in_menu=True) 
+            return
+        
         # ================= SELEKCJA JEDNOSTEK W SLOTACH =================
-        # >>> TO JEST FRAGMENT, KTÓREGO BRAKOWAŁO <<<
         rects = getattr(self, 'garrison_slot_rects', self.garrison_gfx.slot_rects)
         index = None
         for i, rect in enumerate(rects):
@@ -530,10 +605,11 @@ class World(BuildingsMixin):
             if unit in self.selected_units:
                 self.selected_units.remove(unit)
             else:
-                if len(self.selected_units) < getattr(self.selected_castle, 'garrison_limit', 12):
+                # ---> KLUCZOWA POPRAWKA 1: Sztywny limit 10 jednostek do armii! <---
+                if len(self.selected_units) < 10:
                     self.selected_units.append(unit)
                 else:
-                    print("DEBUG: Garnizon jest pełen!")
+                    print("Maksymalna wielkość armii (10) osiągnięta! Nie możesz zaznaczyć więcej.")
 
     def get_unit_at(self, x, y):
         for unit in self.units:
@@ -547,23 +623,18 @@ class World(BuildingsMixin):
 
     def check_unit_castle_entry(self, unit):
         """Sprawdza czy jednostka powinna zostać przeniesiona do garnizonu zamku."""
+        # Ignorujemy jednostki, których już nie ma fizycznie na mapie
+        if unit.x < 0 or unit.y < 0:
+            return False
+            
         for castle in self.castles:
-            # Sprawdzamy czy jednostka stoi na którymś z 4 pól zamku
-            if castle.x <= unit.x <= castle.x + 1 and castle.y <= unit.y <= castle.y + 1:
+            size = 2 if getattr(castle, 'building_type', 'Zamek') in ["Zamek", "Twierdza"] else 1
+            if castle.x <= unit.x < castle.x + size and castle.y <= unit.y < castle.y + size:
                 if castle.owner == unit.owner:
-                    print(f"{unit.type} wchodzi do garnizonu.")
-                    # Dodajemy do listy garnizonu (musisz mieć tę listę w klasie Castle)
-                    if not hasattr(castle, 'garrison'):
-                        castle.garrison = []
-                    
-                    castle.add_to_garrison(unit)
-                    # Usuwamy z mapy świata
-                    if unit in unit.owner.units:
-                        unit.owner.units.remove(unit)
-                    
-                    self.selected_unit = None # Odznaczamy po wejściu
-                    return True
-        return False  
+                    print(f"[{unit.type}] Osiągnięto cel - wchodzę do garnizonu!")
+                    # Używamy tej samej funkcji rozpakowującej!
+                    return self.enter_castle(unit, castle)
+        return False
                   
     def enter_castle(self, unit, castle):
         """Przenosi lidera i wszystkich jego pasażerów do osobnych slotów w zamku."""
@@ -667,14 +738,25 @@ class World(BuildingsMixin):
                 # ================= SCENARIUSZ A: SOLO (np. pojedynczy Budowniczy) =================
                 solo_unit = group[0]
                 
-                # Usuwanie ze slotu zamku
+                # Usuwanie ze slotu zamku (Szukamy, w którym slocie siedział)
                 for slot_idx in range(len(target.garrison)):
                     if target.garrison[slot_idx] is solo_unit:
+                        
+                        # 1. ŁAPIEMY DUCHA
+                        ghost_to_save = target.garrison[slot_idx]
+                        
+                        # 2. CZYŚCIMY SLOT ZAMKU
                         target.garrison[slot_idx] = None
+                        
+                        # 3. ZAMYKAMY DRZWI (Z naszym duchem!)
                         if hasattr(self, 'garrison_gfx'):
-                            self.garrison_gfx.trigger_door_open(slot_idx)
+                            self.garrison_gfx.trigger_door_close(slot_idx, ghost_to_save)
+                            
                         break
-
+                # ---> NOWOŚĆ: Reset statusów przy wyjściu <---
+                solo_unit.healing_turns = 0
+                solo_unit.training_turns = 0
+                
                 solo_unit.x, solo_unit.y = nx, ny
                 if hasattr(solo_unit, 'rect'):
                     solo_unit.rect.topleft = (nx * TILE_SIZE, ny * TILE_SIZE)
@@ -690,23 +772,29 @@ class World(BuildingsMixin):
 
             else:
                 # ================= SCENARIUSZ B: GRUPA (ARMIA) =================
-                # Bierzemy pierwszą jednostkę z grupy jako Lidera (ona będzie widoczna na mapie)
                 leader = group[0]
                 leader.x, leader.y = nx, ny
-                leader.garrison = [None] * 10 # Inicjujemy jej garnizon
+                leader.garrison = [None] * 10 
                 
-                # Wszystkie jednostki z grupy (wliczając lidera) muszą zniknąć ze slotów zamku
-                # Wszystkie jednostki z grupy (wliczając lidera) muszą zniknąć ze slotów zamku
                 for unit_to_clear in group:
+                    # ---> NOWOŚĆ: Reset statusów dla każdego członka armii <---
+                    unit_to_clear.healing_turns = 0
+                    unit_to_clear.training_turns = 0
                     for slot_idx in range(len(target.garrison)):
                         if target.garrison[slot_idx] is unit_to_clear:
+                            
+                            # 1. ŁAPIEMY DUCHA
+                            ghost_to_save = target.garrison[slot_idx]
+                            
+                            # 2. CZYŚCIMY SLOT ZAMKU
                             target.garrison[slot_idx] = None
                             
-                            # DODANE: Animacja drzwi działa teraz też dla całych armii!
+                            # 3. ZAMYKAMY DRZWI (Z naszym duchem!)
                             if hasattr(self, 'garrison_gfx'):
-                                self.garrison_gfx.trigger_door_open(slot_idx)
+                                self.garrison_gfx.trigger_door_close(slot_idx, ghost_to_save)
                                 
                             break
+                            
                 # Resztę jednostek (od indeksu 1) chowamy do garnizonu lidera
                 for i, unit_to_hide in enumerate(group[1:]):
                     if i < 10:
@@ -722,6 +810,7 @@ class World(BuildingsMixin):
                     target.owner.units.append(leader)
                 
                 print(f"Wypuszczono oddział: Lider {leader.type} prowadzi {len(group)-1} jednostek.")
+                
         # --- Finał ---
         self.selected_units.clear()
         

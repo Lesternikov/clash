@@ -103,15 +103,8 @@ class CastleGraphics:
             if rgb == (0, 0, 0): return None
             
             result = self.COLOR_MAP.get(rgb)
-            
-            # DEBUG: Pomoże nam sprawdzić dlaczego Dwór to Garnizon
-            if result:
-                print(f"KLIK! Plik: {file_name} | Kolor RGB: {rgb} | Budynek: {result}")
-            else:
-                # Jeśli trafiliśmy w kolor, którego nie ma w COLOR_MAP
-                print(f"NIEZNANY KOLOR! Plik: {file_name} | RGB: {rgb}")
-                
             return result
+            
         except IndexError:
             return None
         

@@ -244,7 +244,7 @@ class Pathfinder:
     def check_collision(self, x, y):
         return self.world.map[y][x] in ("W", "V")
  
-    def is_walkable(self, x, y, unit=None, target_castle=None):
+    def is_walkable(self, x, y, unit=None, target_castle=None, dest_x=None, dest_y=None):
         w = self.world
         if not (0 <= x < len(w.map[0]) and 0 <= y < len(w.map)):
             return False
@@ -273,9 +273,22 @@ class Pathfinder:
         unwalkable = ["S", "&", "R", "W", "G", "B", "M"]
         if obj_tile != " " and obj_tile in unwalkable:
             return False
- 
+
+        # =======================================================
+        # Omijanie jednostek wroga
+        # =======================================================
+        if unit is not None:
+            for other in w.units:
+                if other.x == x and other.y == y and other != unit:
+                    if other.owner != unit.owner:
+                        # ZEZWALAMY NA WEJŚCIE TYLKO JEŚLI TO JEST CEL NASZEGO MARSZU (ATAK)
+                        if dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
+                            pass 
+                        else:
+                            return False # W każdym innym wypadku traktujemy wroga jak mur!
+                            
         return True
- 
+  
     # -------------------------------------------------------
     # ZNAJDOWANIE ŚCIEŻKI
     # -------------------------------------------------------
@@ -307,7 +320,8 @@ class Pathfinder:
  
             for dx, dy in [(0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1)]:
                 nx, ny = cx + dx, cy + dy
-                if not self.is_walkable(nx, ny, unit, target_castle):
+                # ---> TUTAJ DODAJEMY dest_x, dest_y DO ZAPYTANIA <---
+                if not self.is_walkable(nx, ny, unit, target_castle, dest_x, dest_y):
                     continue
  
                 bg_tile  = w.bg_map[ny][nx]

@@ -66,8 +66,11 @@ class Unit:
         p_color_name = getattr(self.owner, 'color_name', 'red')
         c_id = COLOR_TO_ID.get(p_color_name, 1)
 
+        from settings import NAME_TO_CODE
+        u_code = NAME_TO_CODE.get(self.type, self.type_code)
+
         # Folder to np. assets/minimum/INFL1_I_S32
-        base_name = f"{self.type_code}{c_id}_I_S32"
+        base_name = f"{u_code}{c_id}_I_S32"
         folder_path = f"assets/minimum/{base_name}"
 
         # Spróbujmy wczytać 8 klatek

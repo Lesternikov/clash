@@ -52,7 +52,7 @@ COLOR_TO_ID = {
     "green": 5
 }
 UNIT_STATS = {
-    "Posp. ruszenie":{"hp":50,"moves":5,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
+    "Posp. ruszenie":{"hp":100,"moves":24,"attack":1,"defense":1,"exp":0,"morale":10,"fatigue":0,"patent_cost":0,"production_cost": 2,"production_time":1, "description":"""Chłopi\n 
         Chłopi zajmują się
         zwykle uprawą roli.
         Używani do walki
@@ -63,7 +63,7 @@ UNIT_STATS = {
         są jednymi z najsłab-
         szych na polu bitwy."""},
 
-    "Lekka piechota": {"hp": 100, "moves": 6, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2,"description":"""Lekka piechota\n
+    "Lekka piechota": {"hp": 100, "moves":20, "attack": 70, "defense":50,"exp":0,"morale":10,"fatigue":0,"patent_cost":10,"production_cost":3 ,"production_time":2,"description":"""Lekka piechota\n
         Lekka piechota
         stanowi formację 
         stojącą dość nisko 
@@ -75,7 +75,7 @@ UNIT_STATS = {
         groźnym orężem w 
         Twoich rękach. """},
 
-    "Ciężka piechota": {"hp": 120, "moves": 8, "attack": 50, "defense": 70,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":10 ,"production_time":2, "description":"""Ciężka Piechota\n
+    "Ciężka piechota": {"hp": 100, "moves":20, "attack": 50, "defense": 70,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":10 ,"production_time":2, "description":"""Ciężka Piechota\n
         Ciężka piechota -
         najsilniej uzbrojona 
         jednostka piesza. Jest 
@@ -85,7 +85,7 @@ UNIT_STATS = {
         Na pewno przysłuży 
         Ci się w niejednej bitwie."""},
 
-    "Pikinier": {"hp": 60, "moves": 77, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2,"description":"""Pikinierzy\n
+    "Pikinier": {"hp": 100, "moves":24, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":30 ,"production_cost":5 ,"production_time":2,"description":"""Pikinierzy\n
         Pikinierzy - piesze oddziały
         uzbrojone w długie piki. 
         Większość z żołnierzy służą- 
@@ -98,7 +98,7 @@ UNIT_STATS = {
         się do ochrony wartościowych 
         jednostek podczas bitwy."""},
 
-    "Halbardnik": {"hp": 70, "moves": 5, "attack": 90, "defense": 100,"exp":0,"morale":10,"fatigue":0,"patent_cost":50 ,"production_cost":10 ,"production_time":3, "description":"""Halabardnicy\n
+    "Halbardnik": {"hp": 100, "moves":22, "attack": 90, "defense": 100,"exp":0,"morale":10,"fatigue":0,"patent_cost":50 ,"production_cost":10 ,"production_time":3, "description":"""Halabardnicy\n
         Halabardnicy - ciężka
         piechota uzbrojona w 
         halabardy-oręż bardzo 
@@ -111,7 +111,7 @@ UNIT_STATS = {
         szala zwycięstwa przechyli 
         się na Twoją stronę, panie."""},
 
-    "Lekka jazda": {"hp": 80, "moves": 10, "attack": 90, "defense": 40,"exp":0,"morale":10,"fatigue":0,"patent_cost":100,"production_cost": 3,"production_time":3, "description":"""Lekka jazda\n
+    "Lekka jazda": {"hp": 100, "moves":36, "attack": 90, "defense": 40,"exp":0,"morale":10,"fatigue":0,"patent_cost":100,"production_cost": 3,"production_time":3, "description":"""Lekka jazda\n
         Lekka jazda - konnica
         charakteryzująca się 
         dużą mobilnością. Jej 
@@ -124,7 +124,7 @@ UNIT_STATS = {
         plemion wędrujących po 
         stepach Tajmuru."""},
 
-    "Ciężka jazda": {"hp": 160, "moves": 3, "attack": 120, "defense": 90,"exp":0,"morale":6,"fatigue":0,"patent_cost":200 ,"production_cost":10 ,"production_time":4, "description":"""Ciężka Jazda\n
+    "Ciężka jazda": {"hp": 100, "moves":32, "attack": 120, "defense": 90,"exp":0,"morale":6,"fatigue":0,"patent_cost":200 ,"production_cost":10 ,"production_time":4, "description":"""Ciężka Jazda\n
         Ciężka jazda jest najsil- 
         niejszą z jednostek konnych. 
         Rycerze służący w tych od- 
@@ -136,7 +136,7 @@ UNIT_STATS = {
         rycerskich, a teraz służą 
         pod Twoimi rozkazami, panie. """},
 
-    "Rycerstwo":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":8 ,"production_time":4,"description":"""Rycerstwo\n
+    "Rycerstwo":{"hp":100,"moves":30,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":8 ,"production_time":4,"description":"""Rycerstwo\n
         Rycerstwo - zaciężne
         oddziały rycerzy polo- 
         peskich. Długie lance 
@@ -149,7 +149,7 @@ UNIT_STATS = {
         zwycięstwa. Panie, nie 
         zlekceważ tej potęgi.""" },
 
-    "Dragon":{"hp":80,"moves":6,"attack":60,"melee_attack": 5,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":5 ,"production_time":4, "description":"""Dragoni\n
+    "Dragon":{"hp":100,"moves":30,"attack":60,"melee_attack": 5,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":150 ,"production_cost":5 ,"production_time":4, "description":"""Dragoni\n
         Dragoni - kawaleria uzbrojona
         w pistolety, które jednak mają
         dość ograniczony zasięg rażenia.
@@ -162,7 +162,7 @@ UNIT_STATS = {
         niejsze bardzo, ale to bardzo
         waleczni."""},
 
-    "Łucznik": {"hp": 8, "moves": 8, "attack": 20,"melee_attack": 5, "defense": 0, "range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":60,"production_cost":10 ,"production_time":2, "description":"""Łucznicy\n
+    "Łucznik": {"hp": 100, "moves":24, "attack": 20,"melee_attack": 5, "defense": 0, "range": 3, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":60,"production_cost":10 ,"production_time":2, "description":"""Łucznicy\n
         Oddziały łuczników
         przybyły prosto z 
         Galaghelu, by służyć 
@@ -175,7 +175,7 @@ UNIT_STATS = {
         rozbiją nawet 
         najsilniejsze oddziały."""},
 
-    "Kusznik": {"hp": 20, "moves": 6, "attack": 40, "melee_attack": 5, "defense": 30, "range": 4, "tags": ["ranged"],"exp": 0, "morale": 10, "fatigue": 0, "patent_cost": 240, "production_cost": 12, "production_time": 4, "description": """Kusznicy\n"
+    "Kusznik": {"hp": 100, "moves":20, "attack": 40, "melee_attack": 5, "defense": 30, "range": 4, "tags": ["ranged"],"exp": 0, "morale": 10, "fatigue": 0, "patent_cost": 240, "production_cost": 12, "production_time": 4, "description": """Kusznicy\n"
         Kusznicy - ich bełty
         przebijają nawet naj-
         grubszy pancerz, zada-
@@ -186,7 +186,7 @@ UNIT_STATS = {
         w walce na odległość, jak
         i w bezpośrednim starciu."""},
 
-    "Muszkieter": {"hp": 25, "moves": 5, "attack": 50,"melee_attack": 5, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost":14 ,"production_time":4, "description":"""Muszkieterzy\n
+    "Muszkieter": {"hp": 100, "moves":24, "attack": 50,"melee_attack": 5, "defense": 30, "range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost":14 ,"production_time":4, "description":"""Muszkieterzy\n
         Muszkieterzy - oddziały
         sprowadzone z dalekiej
         Baarii, kraju leżącego
@@ -198,7 +198,7 @@ UNIT_STATS = {
         skuteczniejszy zarówno
         od łuku jak i od kuszy."""},
 
-    "Katapulta":{"hp": 30, "moves": 3, "attack": 100, "defense": 80, "range": 5, "tags": ["ranged"],    "exp": 0, "morale": 10, "fatigue": 0,"patent_cost": 300, "production_cost": 18, "production_time": 4, "description":"""Katapulta\n 
+    "Katapulta":{"hp": 100, "moves":20, "attack": 100, "defense": 80, "range": 5, "tags": ["ranged"],    "exp": 0, "morale": 10, "fatigue": 0,"patent_cost": 300, "production_cost": 18, "production_time": 4, "description":"""Katapulta\n 
         Katapulta - machina potrafią-
         ca miotać na dalekie dystanse
         kamienne głazy. Niestety
@@ -210,14 +210,14 @@ UNIT_STATS = {
         jdzie się w polu rażenia wrogich oddziałów, stanowi
         łatwy łup."""},
 
-    "Taran":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":50 ,"production_cost":10 ,"production_time":3, "description":"""Taran\n
+    "Taran":{"hp":100,"moves":20,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":50 ,"production_cost":10 ,"production_time":3, "description":"""Taran\n
         Taran jest rodzajem maszyny oblężniczej, służącej
         do zdobywania murów. W zwykłej walce jest 
         bezużyteczny, lecz podciągnięty pod zamek wroga 
         umożliwi przedarcie się na najbardziej ufortyfiko- 
         wane dziedzińce.""" },
 
-    "Armata":{"hp":80,"moves":6,"attack":60,"defense":70,"range": 5, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":400 ,"production_cost": 20,"production_time":5, "description":"""Armata\n
+    "Armata":{"hp":100,"moves":16,"attack":60,"defense":70,"range": 5, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":400 ,"production_cost": 20,"production_time":5, "description":"""Armata\n
         Armaty potrafią wys-
         trzeliwać żelazne kule
         na wielkie odległości,
@@ -229,7 +229,7 @@ UNIT_STATS = {
         przeciwnika, toteż podczas
         bitwy łatwo ją utracić."""},
 
-    "Leśnik":{"hp":100,"moves":7,"attack":90,"melee_attack": 5,"defense":60,"range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":100 ,"production_cost":10 ,"production_time":3, "description":"""Leśnicy\n
+    "Leśnik":{"hp":100,"moves":24,"attack":90,"melee_attack": 5,"defense":60,"range": 4, "tags": ["ranged"],"exp":0,"morale":10,"fatigue":0,"patent_cost":100 ,"production_cost":10 ,"production_time":3, "description":"""Leśnicy\n
         Leśnicy - specjalne
         jednostki złożone z 
         dzikich ludzi wycho- 
@@ -242,7 +242,7 @@ UNIT_STATS = {
         nność to atut godny 
         uwagi, panie."""},
         
-    "Góral": {"hp": 100, "moves": 6, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost": 8,"production_time":3, "description":"""Górale\n
+    "Góral": {"hp": 100, "moves":26, "attack": 80, "defense": 60,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost": 8,"production_time":3, "description":"""Górale\n
         Górale-synowie
         pasterzy owiec 
         zwerbowani 
@@ -253,7 +253,7 @@ UNIT_STATS = {
         tempie pokonują 
         każdy łańcuch górski."""},
 
-    "Budowniczy":{"hp":80,"moves":136,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
+    "Budowniczy":{"hp":100,"moves":26,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
         Budowniczy - formacje nie-
         zbędne przy konstruowaniu 
         zamków, dróg, mostów itd. 
@@ -265,7 +265,7 @@ UNIT_STATS = {
         w bezpośrednim starciu są 
         bezbronni."""},
         
-    "Czerw":{"hp":60,"moves":5,"attack":55,"defense":10,"exp":0,"morale":6,"fatigue":0,"patent_cost":250 ,"production_cost":10 ,"production_time":3, "description":"""Czerw\n
+    "Czerw":{"hp":100,"moves":18,"attack":55,"defense":10,"exp":0,"morale":6,"fatigue":0,"patent_cost":250 ,"production_cost":10 ,"production_time":3, "description":"""Czerw\n
         Czerw to ogromne stworzenie. Choć pozbawiony oczu
         i kończyn, potrafi odnaleźć wroga dzięki świetnemu
         węchowi i wyczuwaniu wibracji ziemi. Jego ojczyzną
@@ -273,7 +273,7 @@ UNIT_STATS = {
         drodze. Posiadając tego stwora dysponujesz siłą porów-
         nywalną do kawalerii."""},    
 
-    "Słoń": {"hp": 100, "moves": 3, "attack": 100, "defense":0,"exp":0,"morale":6,"fatigue":0,"patent_cost":300 ,"production_cost":10 ,"production_time":4, "description":"""Słoń\n
+    "Słoń": {"hp": 100, "moves":20, "attack": 100, "defense":0,"exp":0,"morale":6,"fatigue":0,"patent_cost":300 ,"production_cost":10 ,"production_time":4, "description":"""Słoń\n
         Słoń - już od
         starożytnych
         czasów używano
@@ -287,7 +287,7 @@ UNIT_STATS = {
         słoń jest trudny do zatrzymania - czyni to z niego jedno z
         najgroźniejszych stworzeń na polu walki."""},
 
-    "Cyklop":{"hp":80,"moves":6,"attack":60,"melee_attack": 5,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost": 10,"production_time":3, "description":"""Cyklop\n
+    "Cyklop":{"hp":100,"moves":26,"attack":60,"melee_attack": 5,"defense":70,"range": 3, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost": 10,"production_time":3, "description":"""Cyklop\n
         Cyklop zamieszkuje
         małe wysepki Morza
         Kalwadyjskiego. Jest
@@ -301,7 +301,7 @@ UNIT_STATS = {
         W czasie bitwy nie rozstaje się ze swoim koszem peł-
         nym kamieni, którymi nader celnie ciska."""},
 
-    "Troll":{"hp":90,"moves":4,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":270 ,"production_cost": 10,"production_time":4, "description":"""Troll\\n
+    "Troll":{"hp":100,"moves":22,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":270 ,"production_cost": 10,"production_time":4, "description":"""Troll\\n
         Troll określany zawsze dwoma
         słowami - ogromny i bezlitosny - 
         podobny jest nieco do człowieka, 
@@ -316,7 +316,7 @@ UNIT_STATS = {
         ny młot, skuteczny zwłaszcza 
         podczas natarcia."""},
 
-    "Skorpion":{"hp":100,"moves":8,"attack":80,"defense":80,"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost": 10,"production_time":3, "description":"""Skorpion\n
+    "Skorpion":{"hp":100,"moves":26,"attack":80,"defense":80,"exp":0,"morale":6,"fatigue":0,"patent_cost":290 ,"production_cost": 10,"production_time":3, "description":"""Skorpion\n
         Skorpion - olbrzymi (osiągający nawet
         trzy metry długości) pajęczak
         zamieszkuje
@@ -329,7 +329,7 @@ UNIT_STATS = {
         W walce dobrze spisuje się podczas manewrów i
         ataku, jego słabszą stroną jest obrona.""" },    
 
-    "Szkielet":{"hp":90,"moves":6,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost":15 ,"production_time":4, "description":"""Szkielet\n
+    "Szkielet":{"hp":100,"moves":22,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":280 ,"production_cost":15 ,"production_time":4, "description":"""Szkielet\n
         Szkielet - przywrócone do życia
         ciało dawno zmarłych wojowników.
         Szkielet walczy bardzo skutecznie,
@@ -343,7 +343,7 @@ UNIT_STATS = {
         za życia czynią go niesamo-
         wicie odporną istotą.""" },
 
-    "Mag":{"hp":140,"moves":10,"attack":100,"melee_attack": 5,"defense":100, "range": 6, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":20 ,"production_time":5,"description":"""Mag\n
+    "Mag":{"hp":100,"moves":40,"attack":100,"melee_attack": 5,"defense":100, "range": 6, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":20 ,"production_time":5,"description":"""Mag\n
         Mag - jego znajo-
         mość magii będzie
         bardzo przydatna
@@ -355,7 +355,7 @@ UNIT_STATS = {
         ataku i obronie. Mag
         jest bardzo szybkim wojownikiem.""" },
 
-    "Duch":{"hp":100,"moves":4,"attack":80,"defense":60,"exp":0,"morale":6,"fatigue":0,"patent_cost":380 ,"production_cost":8 ,"production_time":3,"descryption":"""Upiór\n
+    "Duch":{"hp":100,"moves":24,"attack":80,"defense":60,"exp":0,"morale":6,"fatigue":0,"patent_cost":380 ,"production_cost":8 ,"production_time":3,"descryption":"""Upiór\n
         Upiór - niewidoczny dla
         zwykłego śmiertelnika
         (można zobaczyć go tylko
@@ -367,13 +367,13 @@ UNIT_STATS = {
         jednak zbroja i ciężki topór
         czynią go dużo wolniejszym.""" },
 
-    "Orzeł":{"hp":100, "moves":11, "attack":90, "defense":30,"exp":0,"morale":6,"fatigue":0,"patent_cost":300 ,"production_cost":5 ,"production_time":3, "description":"""Orzeł\n
+    "Orzeł":{"hp":100, "moves":34, "attack":90, "defense":30,"exp":0,"morale":6,"fatigue":0,"patent_cost":300 ,"production_cost":5 ,"production_time":3, "description":"""Orzeł\n
         Orzeł to wielki ptak drapieżny, panie... Dzięki
         specjalnej hodowli przystosowany do walki z
         każdym innym rodzajem wojsk. Porusza się bardzo
         szybko, lecz jego słabą stroną jest obrona."""},
 
-    "Pegaz":{"hp":120, "moves":10, "attack":80, "defense":20,"exp":0,"morale":6,"fatigue":0,"patent_cost":350 ,"production_cost":8 ,"production_time":3, "description":"""Pegaz\n
+    "Pegaz":{"hp":100, "moves":30, "attack":80, "defense":20,"exp":0,"morale":6,"fatigue":0,"patent_cost":350 ,"production_cost":8 ,"production_time":3, "description":"""Pegaz\n
         Pegaz - uskrzydlony koń,
         bardzo rzadkie zwie-
         rzę uważane nawet przez
@@ -386,7 +386,7 @@ UNIT_STATS = {
         przypomina cechami sko-
         rpiona, jest jednak szybszy."""},
 
-    "Skszydlak":{"hp":80,"moves":6,"attack":60,"melee_attack": 5,"defense":70,"range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":16 ,"production_time":5,"description":"""Skrzydlak\n
+    "Skszydlak":{"hp":100,"moves":24,"attack":60,"melee_attack": 5,"defense":70,"range": 4, "tags": ["ranged"],"exp":0,"morale":6,"fatigue":0,"patent_cost":400 ,"production_cost":16 ,"production_time":5,"description":"""Skrzydlak\n
         Skrzydlak to przedziwny stwór. Spłaszczone ciało, ogromna,
         ziejąca ogniem paszcza, wielkie skrzydła i długi, ostro
         zakończony ogon sprawiają, że widok lecącego skrzydlaka
@@ -396,7 +396,7 @@ UNIT_STATS = {
         Mając skrzydlaka na swych usługach zyskujesz jedną z
         najsilniejszych i najwszechstronniejszych jednostek.""",},
 
-    "Ważka":{"hp":80,"moves":6,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":380 ,"production_cost":5 ,"production_time":2, "description":"""Ważka mamucia\n
+    "Ważka":{"hp":100,"moves":32,"attack":60,"defense":70,"exp":0,"morale":6,"fatigue":0,"patent_cost":380 ,"production_cost":5 ,"production_time":2, "description":"""Ważka mamucia\n
         Ważka mamucia,
         zamieszkuje rozle- 
         wiska rzeki Bhag. 
@@ -409,7 +409,7 @@ UNIT_STATS = {
         pary skrzydeł, co sprawia, że jest ono na polu 
         walki bardzo ruchliwe."""},
 
-    "Smok":{"hp":150,"moves":14,"attack":100, "melee_attack": 5,"defense":100,"exp":0,"morale":6,"fatigue":0,"patent_cost":550 ,"production_cost":20 ,"production_time":5, "description":"""Smok\n
+    "Smok":{"hp":100,"moves":36,"attack":100, "melee_attack": 5,"defense":100,"exp":0,"morale":6,"fatigue":0,"patent_cost":550 ,"production_cost":20 ,"production_time":5, "description":"""Smok\n
         Smok - pradawny gad
         zaopatrzony w parę błoniastych
         skrzydeł to pozostałość starych

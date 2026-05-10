@@ -9,9 +9,14 @@ class PeasantMenu:
         self.sy = screen_h / 480.0
         
         # Zmienne stanu
-        self.send_peasants_amount = 10
-        self.send_gold_amount = 100 
+        self.send_peasants_amount = 0
+        self.send_gold_amount = 0 
         self.castle_list_offset = 0
+        # --- NOWE ZMIENNE LISTY ZAMKÓW ---
+        self.scroll = -2 
+        self.castle_list_rects = []
+        self.last_click_time = 0
+        self.last_clicked_idx = -1
 
         # Ładowanie tła
         bg_path = os.path.join("assets", "DW_15_GFX.png")
@@ -23,7 +28,17 @@ class PeasantMenu:
             self.bg.fill((50, 40, 30))
 
         self.font = pygame.font.SysFont(None, 24)
-
+        
+        # --- NOWE CZCIONKI ---
+        try:
+            # Próba załadowania systemowej czcionki gotyckiej
+            self.font_gothic = pygame.font.SysFont("Old English Text MT", 75) 
+        except:
+            # Fallback (awaryjnie) w razie braku czcionki w systemie
+            self.font_gothic = pygame.font.SysFont("Times New Roman", 55, bold=True)
+            
+        self.font_morale = pygame.font.SysFont("Times New Roman", 30, bold=True)
+        self.font_bottom = pygame.font.SysFont("Times New Roman", 20, bold=True)
         # ========================================================
         # ŁADOWANIE WSZYSTKICH STRZAŁEK
         # ========================================================
@@ -117,16 +132,39 @@ class PeasantMenu:
         tax_income = int(castle.peasants * 0.1 * castle.tax_rate * happiness_factor)
 
         # 3. Informacje o wybranym zamku (Góra)
-        screen.blit(self.font.render(f"Peasants: {castle.peasants}", True, (255,255,255)), (self.screen_w//2 - 60, 20))
-        screen.blit(self.font.render(f"Happiness: {castle.happiness}%", True, (200,255,200)), (self.screen_w//2 - 70, 45))
-        screen.blit(self.font.render(f"Gold: {castle.gold}", True, (255,215,0)), (self.screen_w - 120, 20))
+        
+        # --- GOTYCKA LICZBA CHŁOPÓW Z CIENIEM ---
+        peasants_count = int(getattr(castle, 'peasants', 0))
+        shadow_txt = self.font_gothic.render(str(peasants_count), True, (0, 0, 0))
+        main_txt = self.font_gothic.render(str(peasants_count), True, (255, 255, 255))
+        
+        # Obliczenie środka, żeby tekst ładnie leżał niezależnie od liczby cyfr
+        txt_x = self.screen_w // 2  - main_txt.get_width() // 2
+        txt_y = 40
+        
+        screen.blit(shadow_txt, (txt_x + 3, txt_y + 3))  # Rysowanie cienia
+        screen.blit(main_txt, (txt_x, txt_y))            # Rysowanie właściwej liczby
+
+        # --- ZADOWOLENIE (MORALE) ---
+        happiness_val = int(getattr(castle, 'happiness', 50)) # Zamiana na liczbę całkowitą
+        hap_shadow = self.font_morale.render(f"{happiness_val}", True, (0, 0, 0))
+        hap_txt = self.font_morale.render(f"{happiness_val}", True, (255, 255, 255))
+        
+        hap_x = self.screen_w // 2 
+        hap_y = 138
+        
+        screen.blit(hap_shadow, (hap_x + 2, hap_y + 2))
+        screen.blit(hap_txt, (hap_x, hap_y))
+
+        # --- ZŁOTO --- (zostało bez zmian)
+        screen.blit(self.font.render(f"{castle.gold}", True, (255,215,0)), (self.screen_w - 125, 50))
 
         # WSKAŹNIK TRENDU (Strzałka przy poziomie zadowolenia)
         trend_img = self.trend_up if castle.happiness >= 50 else self.trend_down
         if trend_img:
-            tw, th = int(35 * sx), int(55 * sy)
+            tw, th = int(42 * sx), int(41 * sy)
             scaled_trend = pygame.transform.scale(trend_img, (tw, th))
-            screen.blit(scaled_trend, (self.screen_w//2 + 110, 15))
+            screen.blit(scaled_trend, (self.screen_w//2 + 101, 31))
 
         # 4. Podatki (Lewa strona)
         screen.blit(self.font.render(f"{castle.tax_rate:.1f}", True, (255,255,255)), (365, self.screen_h//2 - 62))
@@ -135,13 +173,67 @@ class PeasantMenu:
         self._draw_arrow(screen, self.tax_minus_button, "tax_down")
         self._draw_arrow(screen, self.tax_plus_button, "tax_up")
 
-        # 5. Lista zamków (Środek)
-        owned = [c for c in w.castles if c.owner == w.players[w.current_player] and not getattr(c, 'destroyed', False)]
-        visible = owned[self.castle_list_offset : self.castle_list_offset+3]
+        # =========================================================
+        # 5. Lista zamków (Środek - Dolny panel)
+        # =========================================================
+        base_x = self.screen_w // 2 - 220 
+        base_y = self.screen_h // 2 + 55 # Trochę wyżej, żeby zmieścić 5 linijek
+        step_y = 31 # Odstęp między linijkami
 
-        for i, c in enumerate(visible):
-            txt = f"Castle ({c.x},{c.y})  P:{c.peasants} G:{c.gold}"
-            screen.blit(self.font.render(txt, True, (255,255,255)), (self.screen_w//2 - 130, self.screen_h//2  + 100 + i*30))
+        # Pobieramy zamki i wymuszamy, aby NASZ OBECNY zamek był zawsze na pozycji 0
+        owned = [c for c in w.castles if c.owner == w.players[w.current_player] and not getattr(c, 'destroyed', False)]
+        if castle in owned:
+            owned.remove(castle)
+            owned.insert(0, castle)
+
+        self.castle_list_rects = []
+
+        # Rysujemy 5 slotów (od 0 do 4, gdzie 2 to środek)
+        for i in range(5):
+            scroll_idx = self.scroll + i
+            row_y = base_y + i * step_y
+            
+            # Tworzymy rect do klikania
+            rect = pygame.Rect(base_x, row_y, 420, step_y)
+            self.castle_list_rects.append(rect)
+
+            # Jeśli w tym slocie znajduje się jakiś zamek z naszej listy:
+            if 0 <= scroll_idx < len(owned):
+                c = owned[scroll_idx]
+                
+                # Nazwa (obecny zamek ma specjalną nazwę)
+                if c == castle:
+                    c_name = "PRZED MURY ZAMKU"
+                else:
+                    c_name = getattr(c, 'name', f"ZAMEK ({c.x},{c.y})").upper()
+                
+                # Kolor (Środek = Biały, Reszta = Szary)
+                if i == 2:
+                    t_col = (255, 255, 255)
+                else:
+                    t_col = (150, 150, 150)
+                    
+                # Rysujemy ZAWSZE nazwę zamku
+                txt_name = self.font_bottom.render(c_name, True, t_col)
+                sh_name = self.font_bottom.render(c_name, True, (0, 0, 0))
+                
+                row_y = base_y + i * step_y
+                screen.blit(sh_name, (base_x + 2, row_y + 2))
+                screen.blit(txt_name, (base_x, row_y))
+                
+                # MAGIA: Rysujemy Chłopów i Złoto TYLKO jeśli to nie jest nasz obecny zamek!
+                if c != castle:
+                    txt_p = self.font_bottom.render(f"P: {c.peasants}", True, t_col)
+                    txt_g = self.font_bottom.render(f"G: {c.gold}", True, t_col)
+                    
+                    sh_p = self.font_bottom.render(f"P: {c.peasants}", True, (0, 0, 0))
+                    sh_g = self.font_bottom.render(f"G: {c.gold}", True, (0, 0, 0))
+                    
+                    screen.blit(sh_p, (base_x + 160 + 2, row_y + 2))
+                    screen.blit(txt_p, (base_x + 160, row_y))
+                    
+                    screen.blit(sh_g, (base_x + 260 + 2, row_y + 2))
+                    screen.blit(txt_g, (base_x + 260, row_y))
 
         # --- STRZAŁKI LISTY ZAMKÓW ---
         self._draw_arrow(screen, self.castle_up_button, "castle_up")
@@ -158,8 +250,8 @@ class PeasantMenu:
         self._draw_arrow(screen, self.send_button, "send_gold")
         
         # Wartości do wysłania
-        screen.blit(self.font.render(f"P: {self.send_peasants_amount}", True, (255,255,255)), (self.screen_w-120, self.screen_h//2 - 60))
-        screen.blit(self.font.render(f"G: {self.send_gold_amount}", True, (255,255,0)), (self.screen_w-120, self.screen_h//2 - 15))
+        screen.blit(self.font.render(f"{self.send_peasants_amount}", True, (255,255,255)), (self.screen_w-120, self.screen_h//2 + 190))
+        screen.blit(self.font.render(f"{self.send_gold_amount}", True, (255,255,0)), (self.screen_w-120, self.screen_h//2 + 55))
 
         # 7. Przycisk Powrotu (obsługiwany przez funkcję z pliku world)
         w.renderer.draw_building_footer(screen)
@@ -170,6 +262,31 @@ class PeasantMenu:
             scaled_obj = pygame.transform.scale(self.TAX, (int(pw * sx), int(ph * sy)))
             screen.blit(scaled_obj, (int(px * sx), int(py * sy)))
 
+        # =======================================================
+        # TRYB DEBUG - CZERWONE RAMKI (DO USUNIĘCIA PÓŹNIEJ)
+        # =======================================================
+        debug_color = (255, 0, 0)
+        thickness = 2
+        
+        # 1. Pojedyncze przyciski (podatki, chłopi, złoto, wyślij)
+        buttons_to_draw = [
+            self.tax_minus_button, self.tax_plus_button,
+            self.peasants_minus_button, self.peasants_plus_button,
+            self.gold_minus_button, self.gold_plus_button,
+            self.send_button
+        ]
+        
+        for b in buttons_to_draw:
+            pygame.draw.rect(screen, debug_color, b, thickness)
+            
+        # 2. Strzałki od zamków (Pokazujemy je POWIĘKSZONE, tak jak faktycznie czyta je myszka!)
+        pygame.draw.rect(screen, debug_color, self.castle_up_button.inflate(20, 20), thickness)
+        pygame.draw.rect(screen, debug_color, self.castle_down_button.inflate(20, 20), thickness)
+        
+        # 3. Pola do klikania w nazwy zamków (Lista na środku)
+        if hasattr(self, 'castle_list_rects'):
+            for r in self.castle_list_rects:
+                pygame.draw.rect(screen, (255, 100, 100), r, thickness) # Lekko jaśniejszy czerwony
 
     def handle_click(self, mx, my, w):
         """Obsługuje kliknięcia w menu."""
@@ -205,17 +322,61 @@ class PeasantMenu:
             castle.tax_rate = max(0.0, castle.tax_rate - 0.1)
             return
             
-        # Lista zamków
-        owned = [c for c in w.castles if c.owner == w.players[w.current_player]]
-        max_offset = max(0, len(owned) - 3)
+        # ==========================================
+        # Lista zamków (Przewijanie i Klikanie)
+        # ==========================================
+        owned = [c for c in w.castles if c.owner == w.players[w.current_player] and not getattr(c, 'destroyed', False)]
+        if castle in owned:
+            owned.remove(castle)
+            owned.insert(0, castle)
+            
+        max_scroll = max(-2, len(owned) - 3)
 
-        if self.castle_up_button.collidepoint(mx, my):
-            self.castle_list_offset = max(0, self.castle_list_offset - 1)
-            return
-        if self.castle_down_button.collidepoint(mx, my):
-            self.castle_list_offset = min(max_offset, self.castle_list_offset + 1)
+        # 1. STRZAŁKI (z inflate dla łatwiejszego trafienia)
+        up_rect = self.castle_up_button.inflate(20, 20)
+        down_rect = self.castle_down_button.inflate(20, 20)
+
+        if up_rect.collidepoint(mx, my):
+            self.scroll = max(-2, getattr(self, 'scroll', -2) - 1)
             return
             
+        if down_rect.collidepoint(mx, my):
+            self.scroll = min(max_scroll, getattr(self, 'scroll', -2) + 1)
+            return
+            
+        # --- DEFINICJA 'now' (Naprawia błąd NameError) ---
+        now = pygame.time.get_ticks() 
+
+        # 2. KLIKNIĘCIE W NAZWĘ ZAMKU (Teleportacja)
+        for i, rect in enumerate(getattr(self, 'castle_list_rects', [])):
+            if rect.collidepoint(mx, my):
+                clicked_idx = getattr(self, 'scroll', -2) + i
+                if 0 <= clicked_idx < len(owned):
+                    
+                    # SPRAWDZENIE PODWÓJNEGO KLIKNIĘCIA
+                    if now - getattr(self, 'last_click_time', 0) < 500 and getattr(self, 'last_clicked_idx', -1) == clicked_idx:
+                        new_castle = owned[clicked_idx]
+                        print(f"Teleportacja do: {getattr(new_castle, 'name', 'Zamek')}")
+                        
+                        # --- KROK A: ZMIANA ZAMKU ---
+                        w.selected_castle = new_castle
+                        
+                        # --- KROK B: CENTROWANIE KAMERY NA MAPIE ---
+                        from settings import TILE_SIZE
+                        # Ustawiamy kamerę tak, by zamek był na środku ekranu po wyjściu na mapę
+                        w.camera_x = new_castle.x * TILE_SIZE - (self.screen_w // 2)
+                        w.camera_y = new_castle.y * TILE_SIZE - (self.screen_h // 2)
+                        
+                        self.scroll = -2 
+                        self.last_click_time = 0 
+                    else:
+                        # Pierwsze kliknięcie - tylko wyśrodkowanie na liście
+                        self.scroll = clicked_idx - 2
+                        self.last_click_time = now
+                        self.last_clicked_idx = clicked_idx
+                        
+                    return
+                 
         # Guzik WYSYŁANIA (send_gold)
         if self.send_button.collidepoint(mx, my):
             if self.send_peasants_amount <= castle.peasants and self.send_gold_amount <= castle.gold:
@@ -224,6 +385,21 @@ class PeasantMenu:
                 print("Zasoby wysłane!")
                 self.send_peasants_amount = 0
                 self.send_gold_amount = 0
+            return
+
+    def handle_scroll_wheel(self, event, w):
+        castle = w.selected_castle
+        if not castle: return
+
+        owned = [c for c in w.castles if c.owner == w.players[w.current_player] and not getattr(c, 'destroyed', False)]
+        max_scroll = max(-2, len(owned) - 3)
+
+        if event.button == 4: # GÓRA
+            if self.scroll > -2:
+                self.scroll -= 1
+        elif event.button == 5: # DÓŁ
+            if self.scroll < max_scroll:
+                self.scroll += 1
 
     if __name__ == "__main__":
         import subprocess, sys, os

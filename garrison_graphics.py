@@ -11,10 +11,10 @@ GARRISON_BG    = os.path.join("assets", "garninon.png")
 
 ORIG_W, ORIG_H = 640, 480
 
-ORIG_SLOTS_X = [124, 195, 266, 337, 408, 479]
-ORIG_SLOT_Y1 = 74
-ORIG_SLOT_Y2 = 205
-ORIG_SLOT_W  = 31
+ORIG_SLOTS_X = [126, 197, 268, 339, 410, 481]
+ORIG_SLOT_Y1 = 75
+ORIG_SLOT_Y2 = 206
+ORIG_SLOT_W  = 34
 ORIG_SLOT_H  = 65
 
 # Zostawiamy tylko koordynaty, żeby wiedzieć, gdzie narysować nowe okienko
@@ -95,6 +95,26 @@ class GarrisonGraphics:
         self.btn_school_pressed    = self._load("assets/przyciski/PRZ_8.png", BTN_S_W, BTN_S_H)
         self.btn_school_rect       = pygame.Rect(622, 679, BTN_S_W, BTN_S_H)
         self.btn_school_anim_timer = 0
+
+        # --- IKONY STANU (Krzyżyk, Serce, Miecze) ---
+        cross_path = "assets/minimum/INFO_S32/INFO_S32_30.png"
+        if os.path.exists(cross_path):
+            img = pygame.image.load(cross_path).convert_alpha()
+            self.icon_cross = pygame.transform.scale(img, (18, 18))
+            self.icon_cross.set_colorkey((255, 255, 255)) # <--- TO USUWA BIAŁE TŁO!
+            
+        heart_path = "assets/minimum/INFO_S32/INFO_S32_31.png"
+        if os.path.exists(heart_path):
+            img = pygame.image.load(heart_path).convert_alpha()
+            self.icon_heart = pygame.transform.scale(img, (14, 14))
+            self.icon_heart.set_colorkey((255, 255, 255)) # Dla pewności usuwamy też tutaj
+
+        swords_path = "assets/minimum/INFO_S32/INFO_S32_15.png"
+        if os.path.exists(swords_path):
+            img = pygame.image.load(swords_path).convert_alpha()
+            self.icon_swords = pygame.transform.scale(img, (25, 22))
+            self.icon_swords.set_colorkey((255, 255, 255)) # I tutaj
+
     # --------------------------------------------------
     # ŁADOWANIE
     # --------------------------------------------------
@@ -131,12 +151,18 @@ class GarrisonGraphics:
     # ANIMACJA DRZWI
     # --------------------------------------------------
 
-    def trigger_door_open(self, slot_idx):
+  # --- ZAKTUALIZOWANA FUNKCJA ZAMYKANIA ---
+    def trigger_door_close(self, slot_idx, ghost_unit=None):
         if 0 <= slot_idx < 12:
             self.door_anim_timers[slot_idx] = pygame.time.get_ticks()
-            self.door_anim_opening[slot_idx] = True
-            self.door_frame_indices[slot_idx] = 0
+            self.door_anim_opening[slot_idx] = False
+            self.door_frame_indices[slot_idx] = 7
+            # ZAPISUJEMY DUCHA! Upewnij się, że masz w __init__: self.door_ghosts = [None] * 12
+            if not hasattr(self, 'door_ghosts'):
+                self.door_ghosts = [None] * 12
+            self.door_ghosts[slot_idx] = ghost_unit
 
+    # --- ZAKTUALIZOWANA PĘTLA ANIMACJI ---
     def _update_doors(self):
         now = pygame.time.get_ticks()
         frame_duration = 80 
@@ -149,13 +175,14 @@ class GarrisonGraphics:
             if self.door_anim_opening[i]:
                 self.door_frame_indices[i] = min(7, elapsed // frame_duration)
                 if self.door_frame_indices[i] >= 7:
-                    self.door_anim_opening[i] = False
-                    self.door_anim_timers[i] = now
+                    self.door_anim_timers[i] = 0 
             else:
                 self.door_frame_indices[i] = max(0, 7 - elapsed // frame_duration)
                 if self.door_frame_indices[i] <= 0:
-                    self.door_anim_timers[i] = 0
-                    self.door_frame_indices[i] = 0
+                    self.door_anim_timers[i] = 0 
+                    # ZAMKNIĘTO DRZWI -> USUŃ DUCHA
+                    if hasattr(self, 'door_ghosts'):
+                        self.door_ghosts[i] = None
 
     def draw(self, screen, castle, selected_units, inspected_unit=None) -> list:
         # 1. Tło
@@ -170,113 +197,156 @@ class GarrisonGraphics:
         # 3. Sloty jednostek
         font     = pygame.font.SysFont("Arial", 14, bold=True)
         font_cnt = pygame.font.SysFont("Arial", 12)
+        font_turns = pygame.font.SysFont("Arial", 18, bold=True) # <--- DODAJ TĘ LINIJKĘ
+        font_hp  = pygame.font.SysFont("Times New Roman", 24, bold=True) # <--- DODAJ TĘ LINIJKĘ DLA ŻYCIA
         garrison = getattr(castle, 'garrison', [])
 
         for i, rect in enumerate(self.slot_rects):
             unit = garrison[i] if i < len(garrison) else None
-
-            # 1. PUSTY SLOT = DRZWI
-            if unit is None or not hasattr(unit, 'type'):
-                idx = self.door_frame_indices[i] 
-                if self.door_frames:
-                    screen.blit(self.door_frames[idx], rect.topleft)
-                continue
-
-            # --- SLOT Z JEDNOSTKĄ ---
-            if unit in selected_units:
-                pygame.draw.rect(screen, (255, 255, 0), rect.inflate(4, 4), 3)
-
-            # --- RYSOWANIE SYLWETKI ---
-            drawn = False
-            raw_img = None
             
-            # Bezpieczne wyciąganie nazwy (nawet jeśli to słownik)
-            u_name = getattr(unit, 'type_code', getattr(unit, 'type', 'Unknown'))
-            if isinstance(u_name, dict):
-                u_name = u_name.get("unit_type", str(u_name))
-            
-            u_code = u_name 
-            try:
-                from settings import NAME_TO_CODE, UNIT_NAMES
-                if u_name in NAME_TO_CODE:
-                    u_code = NAME_TO_CODE[u_name]
-                else:
-                    for code, name in UNIT_NAMES.items():
-                        if name == u_name:
-                            u_code = code
-                            break
-            except Exception:
-                pass
+            # Pobieramy ewentualnego ducha
+            ghost = getattr(self, 'door_ghosts', [None]*12)[i]
+            display_unit = unit if unit is not None else ghost
 
-            # PRIORYTET: Szukamy bezpośrednio na dysku, żeby ominąć fałszywe grafiki w pamięci gry!
-            frame = (pygame.time.get_ticks() // 150) % 8
-            path = f"assets/minimum/{u_code}1_I_S32/{u_code}1_I_S32_{frame}.png"
-            
-            if os.path.exists(path):
-                raw_img = pygame.image.load(path).convert_alpha()
-            else:
-                # Ratunek z pamięci
-                frames_list = getattr(unit, 'walk_frames', getattr(unit, 'sprites', []))
-                if frames_list and len(frames_list) > 0:
-                    raw_img = frames_list[frame % len(frames_list)]
-
-            # Wykrywamy awaryjne "niewidzialne" kwadraty (zniszczy to pusty czerwony prostokąt)
-            if raw_img and raw_img.get_size() == (32, 32):
-                test_col = raw_img.get_at((16, 16))
-                if test_col[3] == 0 or test_col == (255, 0, 255, 255) or test_col == (0, 0, 0, 255):
-                    raw_img = None 
-
-            if raw_img:
-                try:
-                    # Gwarancja przezroczystości (usuwamy tło magenta)
-                    alpha_img = pygame.Surface(raw_img.get_size(), pygame.SRCALPHA)
-                    if raw_img.get_colorkey() is None:
-                        raw_img.set_colorkey((255, 0, 255))
-                    alpha_img.blit(raw_img, (0, 0))
-                    
-                    if hasattr(pygame.transform, 'grayscale'):
-                        gray_img = pygame.transform.grayscale(alpha_img)
-                    else:
-                        gray_img = alpha_img.copy()
-                        
-                    # ===================================================
-                    # --- USTAWIENIA ROZMIARU I POZYCJI JEDNOSTEK ---
-                    # ===================================================
-                    POWIEKSZENIE = 1.65   # Skala powiększenia
-                    PRZESUNIECIE_X = 5   # Przesunięcie w poziomie (np. -10 to w lewo, 10 to w prawo)
-                    PRZESUNIECIE_Y = 2 # Przesunięcie w pionie (np. -15 to w górę, 15 to w dół)
-                    
-                    img_w, img_h = gray_img.get_size()
-                    new_w = int(img_w * POWIEKSZENIE)
-                    new_h = int(img_h * POWIEKSZENIE)
-                    
-                    gray_img = pygame.transform.smoothscale(gray_img, (new_w, new_h))
-                    
-                    # Rysowanie na środku slota + nasze przesunięcie
-                    rys_x = rect.centerx - gray_img.get_width() // 2 + PRZESUNIECIE_X
-                    rys_y = rect.centery - gray_img.get_height() // 2 + PRZESUNIECIE_Y
-                    
-                    screen.blit(gray_img, (rys_x, rys_y))
-                    drawn = True
-                except Exception as e:
-                    print(f"Błąd grafiki jednostki: {e}")
-
-            # Fallback tekstowy (teraz zadziała, jeśli usunęliśmy fałszywą grafikę)
-            if not drawn:
-                label = str(u_name)[:4].upper()
-                txt   = font.render(label, True, (255, 255, 255))
-                screen.blit(txt, txt.get_rect(centerx=rect.centerx, centery=rect.centery))
+            if display_unit is not None:
+                # ===============================================
+                # 1. RYSOWANIE SYLWETKI JEDNOSTKI LUB DUCHA
+                # ===============================================
+                drawn = False
+                raw_img = None
                 
-            count = getattr(unit, 'count', 1)
-            if count > 1:
-                c_txt = font_cnt.render(str(count), True, (255, 255, 0))
-                screen.blit(c_txt, (rect.right - c_txt.get_width() - 2,
-                                    rect.bottom - c_txt.get_height() - 2))
+                u_name = getattr(display_unit, 'type_code', getattr(display_unit, 'type', 'Unknown'))
+                if isinstance(u_name, dict):
+                    u_name = u_name.get("unit_type", str(u_name))
+                
+                u_code = u_name 
+                try:
+                    from settings import NAME_TO_CODE, UNIT_NAMES
+                    if u_name in NAME_TO_CODE: u_code = NAME_TO_CODE[u_name]
+                    else:
+                        for code, name in UNIT_NAMES.items():
+                            if name == u_name:
+                                u_code = code; break
+                except: pass
+
+                frame = (pygame.time.get_ticks() // 150) % 8
+                path = f"assets/minimum/{u_code}1_I_S32/{u_code}1_I_S32_{frame}.png"
+                
+                if os.path.exists(path):
+                    raw_img = pygame.image.load(path).convert_alpha()
+                else:
+                    frames_list = getattr(display_unit, 'walk_frames', getattr(display_unit, 'sprites', []))
+                    if frames_list and len(frames_list) > 0:
+                        raw_img = frames_list[frame % len(frames_list)]
+
+                if raw_img and raw_img.get_size() == (32, 32):
+                    test_col = raw_img.get_at((16, 16))
+                    if test_col[3] == 0 or test_col == (255, 0, 255, 255) or test_col == (0, 0, 0, 255):
+                        raw_img = None 
+
+                if raw_img:
+                    try:
+                        alpha_img = pygame.Surface(raw_img.get_size(), pygame.SRCALPHA)
+                        if raw_img.get_colorkey() is None: raw_img.set_colorkey((255, 0, 255))
+                        alpha_img.blit(raw_img, (0, 0))
+                        if hasattr(pygame.transform, 'grayscale'): gray_img = pygame.transform.grayscale(alpha_img)
+                        else: gray_img = alpha_img.copy()
+                            
+                        POWIEKSZENIE = 1.67   
+                        PRZESUNIECIE_X = -1
+                        PRZESUNIECIE_Y = 2 
+                        img_w, img_h = gray_img.get_size()
+                        gray_img = pygame.transform.smoothscale(gray_img, (int(img_w * POWIEKSZENIE), int(img_h * POWIEKSZENIE)))
+                        
+                        rys_x = rect.centerx - gray_img.get_width() // 2 + PRZESUNIECIE_X
+                        rys_y = rect.centery - gray_img.get_height() // 2 + PRZESUNIECIE_Y
+                        screen.blit(gray_img, (rys_x, rys_y))
+                        drawn = True
+                    except: pass
+
+                if not drawn:
+                    label = str(u_name)[:4].upper()
+                    txt = font.render(label, True, (255, 255, 255))
+                    screen.blit(txt, txt.get_rect(centerx=rect.centerx, centery=rect.centery))
+                    
+                count = getattr(display_unit, 'count', 1)
+                if count > 1:
+                    c_txt = font_cnt.render(str(count), True, (255, 255, 0))
+                    screen.blit(c_txt, (rect.right - c_txt.get_width() - 2, rect.bottom - c_txt.get_height() - 2))
+
+                # ===============================================
+                # 2. RYSOWANIE IKON 
+                # ===============================================
+                if unit is not None:
+                    # Krzyżyk (Idealnie w prawym górnym rogu wewnątrz slota)
+                    if unit in selected_units:
+                        krzyz_x = rect.right - 20 # Wyrównane do prawej krawędzi
+                        krzyz_y = rect.y + 0 
+                        if hasattr(self, 'icon_cross') and self.icon_cross:
+                            screen.blit(self.icon_cross, (krzyz_x, krzyz_y))
+                        else:
+                            pygame.draw.rect(screen, (255, 255, 0), rect.inflate(4, 4), 3)
+
+                    # Serce
+                    h_turns = getattr(unit, 'healing_turns', 0) 
+                    if h_turns > 0:
+                        serce_x, serce_y = rect.x - 5, rect.y + 5
+                        if hasattr(self, 'icon_heart') and self.icon_heart:
+                            screen.blit(self.icon_heart, (serce_x, serce_y))
+                        # Używamy nowej, grubszej czcionki:
+                        screen.blit(font_turns.render(str(h_turns), True, (255, 100, 100)), (serce_x + 24, serce_y))
+
+                    # Miecze
+                    t_turns = getattr(unit, 'training_turns', 0) 
+                    if t_turns > 0:
+                        miecze_x, miecze_y = rect.x - 0, rect.y + 0
+                        if hasattr(self, 'icon_swords') and self.icon_swords:
+                            screen.blit(self.icon_swords, (miecze_x, miecze_y))
+                        # Używamy nowej, grubszej czcionki oraz czystej bieli:
+                        screen.blit(font_turns.render(str(t_turns), True, (255, 255, 255)), (miecze_x + 24, miecze_y))
+
+                # ===============================================
+                # 2b. RYSOWANIE ŻYCIA (HP) NA DOLE RAMKI
+                # ===============================================
+                if display_unit is not None:
+                    # Pobieramy HP jednostki (zmień 'hp' na nazwę swojej zmiennej, np. 'health' lub 'zycie')
+                    # Jeśli gra nie znajdzie zmiennej, domyślnie wstawi 100.
+                    hp_val = getattr(display_unit, 'hp', 100) 
+                    
+                    # Generujemy tekst i cień
+                    hp_txt = font_hp.render(str(hp_val), True, (255, 255, 255)) # Śnieżnobiały
+                    hp_shadow = font_hp.render(str(hp_val), True, (0, 0, 0))    # Czarny cień
+                    
+                    # Obliczamy pozycję na samym dole, wyśrodkowaną w ramce
+                    hp_x = rect.centerx - hp_txt.get_width() // 2
+                    hp_y = rect.bottom - hp_txt.get_height() - 2
+                    
+                    # Rysujemy cień (przesunięty o 2 piksele w dół i prawo)
+                    screen.blit(hp_shadow, (hp_x + 2, hp_y + 2))
+                    # Rysujemy właściwy tekst
+                    screen.blit(hp_txt, (hp_x, hp_y))
+
+            # ===============================================
+            # 3. RYSOWANIE DRZWI (Teraz znikają całkowicie!)
+            # ===============================================
+            idx = self.door_frame_indices[i] 
+            
+            # Wymuszamy stan statyczny, gdy nie ma animacji
+            if self.door_anim_timers[i] == 0:
+                if display_unit is not None:
+                    idx = 7 # Ktoś tu jest -> drzwi otwarte na oścież
+                else:
+                    idx = 0 # Pusto -> drzwi zamknięte na głucho
+            
+            # MAGIA: Rysujemy drzwi TYLKO wtedy, kiedy nie są w pełni otwarte (czyli idx jest mniejsze niż 7)
+            if hasattr(self, 'door_frames') and self.door_frames:
+                if idx != 7:
+                    screen.blit(self.door_frames[idx], rect.topleft)
                              
-# 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
+        # 4. Tabelka statystyk (NOWE OKIENKO Z UI_COMPONENTS)
         if inspected_unit is not None:
-            info_x = int(ORIG_TABLE_X * self.sx)
-            info_y = int(ORIG_TABLE_Y * self.sy)
+            info_x = 353 # Zmień na inną wartość, żeby przesuwać lewo/prawo (np. 150)
+            info_y = 461 # Zmień na inną wartość, żeby przesuwać góra/dół (np. 400)
             # Rysujemy nasze piękne, uniwersalne okno w starych koordynatach
             self.info_window.draw_combat_info(screen, info_x, info_y, inspected_unit)
 
@@ -316,6 +386,22 @@ class GarrisonGraphics:
         if btn_img:
             screen.blit(btn_img, self.btn_release_rect.topleft)
 
+        # ==============================================================
+        # WYSWIETLANIE ZŁOTA W GARNIZONIE
+        # ==============================================================
+        # 1. Definiujemy czcionkę (możesz zmienić rozmiar z 24 na inny)
+        font_gold = pygame.font.SysFont("Times New Roman", 24, bold=True)
+        
+        # 2. Pobieramy złoto z zamku
+        gold_amount = getattr(castle, 'gold', 0)
+        gold_txt = font_gold.render(str(gold_amount), True, (255, 215, 0))
+        
+        # 3. KOORDYNATY - Zmień te liczby, aby trafić w skrzynię na grafice!
+        gold_x = 930  # Przesuwaj lewo/prawo
+        gold_y = 80   # Przesuwaj góra/dół
+        
+        # 4. Rysowanie tekstu (odjęcie połowy szerokości ładnie go wyśrodkuje)
+        screen.blit(gold_txt, (gold_x - gold_txt.get_width() // 2, gold_y))
         return self.slot_rects
         
     def _draw_unit_table(self, screen: pygame.Surface, unit) -> None:

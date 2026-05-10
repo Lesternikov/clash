@@ -18,6 +18,13 @@ class ControlsHandler:
             
             # --- 1. KLAWIATURA ---
             elif event.type == pygame.KEYDOWN:
+                # --- NOWY WARUNEK: Zamknięcie ekranu INFO dowolnym klawiszem ---
+                if self.world.screen == "unit_info":
+                    # Wracamy do zapisanego ekranu lub awaryjnie do rekrutacji
+                    self.world.screen = getattr(self.world, 'previous_screen', 'recruitment')
+                    self.world.inspected_unit = None  # <--- DODAJ TĘ LINIJĘ
+                    continue # Pomija resztę pętli, aby jedno kliknięcie nie robiło dwóch rzeczy
+
                 # --- DEBUG: MAGIGCZNY KLAWISZ F1 ---
                 if event.key == pygame.K_F1:
                     print("DEBUG: Teleportacja do koszar!")
@@ -63,13 +70,35 @@ class ControlsHandler:
                 elif event.key == pygame.K_h:  # Klawisz 'M' przełącza podgląd maski
                     self.debug_show_masks = not self.debug_show_masks
                     print(f"DEBUG: Podgląd masek: {self.debug_show_masks}")
+            
             # --- 3. WCIŚNIĘCIE MYSZY ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                # --- Zamykanie ekranu INFO dowolnym przyciskiem myszy ---
+                if self.world.screen == "unit_info":
+                    self.world.screen = getattr(self.world, 'previous_screen', 'recruitment')
+                    self.world.inspected_unit = None  
+                    continue 
+                
+                # =======================================================
+                # NOWOŚĆ: OBSŁUGA ROLKI MYSZY (Scrool)
+                # Przycisk 4 to rolka w górę, Przycisk 5 to rolka w dół
+                # =======================================================
+                if event.button == 4 or event.button == 5:
+                    # Przekazujemy zdarzenie do Koszar
+                    if self.world.screen == "recruitment" and hasattr(self.world, 'recruitment_manager'):
+                        self.world.recruitment_manager.handle_scroll_wheel(event)
+                    # Przekazujemy zdarzenie do ekranu Chłopów
+                    elif self.world.screen == "peasants" and hasattr(self.world, 'peasant_menu'):
+                        self.world.peasant_menu.handle_scroll_wheel(event, self.world)
+                    
+                    continue # Ważne: przerywamy dalszą logikę, rolka obsłużona!
+                # =======================================================
+
                 mx, my = event.pos
                 
                 if event.button == 3: # Prawy przycisk
                     self.world.inspected_unit = None
-                    
+
                     if self.world.screen == "garrison":
                         self.check_unit_info(mx, my)
                     
@@ -220,29 +249,36 @@ class ControlsHandler:
             # Po puszczeniu myszki zawsze zamykamy menu
             self.active_dropdown = None
     def handle_mouse_motion(self, mx, my):
-        # Resetujemy podgląd, jeśli nie znajdziemy jednostki
-        self.inspected_unit = None
+        # 1. ZAWSZE na początku ruchu usuwamy podgląd!
+        self.world.inspected_unit = None 
 
-        if self.screen == "garrison":
+        if self.world.screen == "garrison":
             start_x, start_y = 100, 120
             offset_x, offset_y = 130, 210
             slot_w, slot_h = 100, 180
             cols = 6
 
             # Sprawdzamy, czy mysz jest nad którymś ze slotów
-            for i in range(len(self.selected_castle.garrison)):
-                row = i // cols
-                col = i % cols
-                x = start_x + col * offset_x
-                y = start_y + row * offset_y
-                rect = pygame.Rect(x, y, slot_w, slot_h)
+            if hasattr(self.world, 'selected_castle') and self.world.selected_castle:
+                for i in range(len(self.world.selected_castle.garrison)):
+                    row = i // cols
+                    col = i % cols
+                    x = start_x + col * offset_x
+                    y = start_y + row * offset_y
+                    rect = pygame.Rect(x, y, slot_w, slot_h)
 
-                if rect.collidepoint(mx, my):
-                    unit = self.selected_castle.garrison[i]
-                    if unit:
-                        self.inspected_unit = unit
-                        break
+                    if rect.collidepoint(mx, my):
+                        unit = self.world.selected_castle.garrison[i]
+                        if unit:
+                            self.world.inspected_unit = unit
+                            break
     def handle_map_click(self, mx, my, button):
+        # Wyjście z ekranu INFO po kliknięciu
+        if self.world.screen == "unit_info":
+            # Wracamy do zapisanego poprzedniego ekranu (np. 'recruitment')
+            self.world.screen = getattr(self.world, 'previous_screen', 'castle')
+            return
+        
         # Przeliczamy kliknięcie na współrzędne kafelków
         tile_x = (mx + self.world.camera_x) // TILE_SIZE
         tile_y = (my + self.world.camera_y) // TILE_SIZE
@@ -320,21 +356,19 @@ class ControlsHandler:
                         
                         # SPRAWDZENIE WŁAŚCICIELA (To serce naszej blokady tur)
                         current_player_obj = self.world.players[self.world.current_player]
+                        # W pliku controls.py, sekcja wejścia do zamku:
                         if castle.owner == current_player_obj:
                             self.world.selected_castle = castle
+                            self.world.screen = "castle"
                             
-                            # Wybór odpowiedniego ekranu
-                            if castle.building_type == "Strażnica":
-                                self.world.screen = "garrison"
-                            else:
-                                self.world.screen = "castle"
+                           # RESETOWANIE Z DODATKOWĄ PEWNOŚCIĄ
+                            print("DEBUG: Próbuję zresetować krzyżyk w rekrutacji...")
                             
-                            print(f"Wchodzisz do: {castle.building_type}")
-                        else:
-                            print("To budowla przeciwnika! Nie masz dostępu.")
-                        
-                        return # Znaleźliśmy zamek, wychodzimy z pętli
-                    
+                            # Używamy POPRAWNEJ nazwy: recruitment_manager
+                            if hasattr(self.world, 'recruitment_manager'):
+                                self.world.recruitment_manager.selected_patent_index = None
+                                print("DEBUG: Zresetowano przez recruitment_manager!")
+
     def handle_ui_click(self, mx, my, button=1):
         # 1. SPRAWDZANIE GÓRNEGO PASKA (System/Mapa/Tura)
         if self.world.show_top_ui:
@@ -387,46 +421,61 @@ class ControlsHandler:
         u = self.world.selected_unit
 
         # --- KROK 1: PRIORYTET DLA MENU BUDOWANIA ---
-        # Jeśli menu jest otwarte, WSZYSTKIE 6 przycisków przejmuje execute_build_action
         if getattr(self.world, 'build_menu_open', False):
-            if u: # Budowanie wymaga jednostki
+            if u: 
                 self.world.execute_build_action(index, u)
-            return # Ważne: kończymy tutaj, nie sprawdzamy standardowych akcji!
+            return 
 
-       # --- KROK 2: STANDARDOWE AKCJE (Gdy build_menu_open == False) ---
+        # --- KROK 2: STANDARDOWE AKCJE ---
         
         # Indeks 0: Powrót/System
         if index == 0:
             self.handle_tryb_mapy_button()
             return
 
-        # Indeksy 1 i 2: Przełączanie jednostek/zamków
+        # Indeks 1: Przełączanie jednostek
         if index == 1:
             print("Szukam kolejnego oddziału...")
-            self.world.select_next_active_unit() # Zmieniona nazwa na tę z world.py
+            self.world.select_next_active_unit() 
             return
             
+        # Indeks 2: Przełączanie zamków
         elif index == 2:
             print("Szukam kolejnego zamku...")
-            self.world.select_next_building() # Zmieniona nazwa na tę z world.py
+            # Natychmiastowe odznaczenie jednostki (Włączenie trybu świata)
+            if self.world.selected_unit:
+                self.world.selected_unit.target_x = None
+                self.world.selected_unit.target_y = None
+                self.world.selected_unit.planned_path = []
+                self.world.selected_unit = None
+            
+            self.world.merge_mode = False
+            self.world.select_next_building() 
             return
 
-        # Pozostałe akcje wymagają zaznaczonej jednostki
+        # ==============================================================
+        # BLOKADA: Akcje 3, 4, 5 ABSOLUTNIE WYMAGAJĄ zaznaczonej jednostki!
+        # ==============================================================
         if not u:
+            print(f"Zablokowano kliknięcie w przycisk {index} - brak wybranej jednostki!")
+            self.world.merge_mode = False # Twardy reset dla bezpieczeństwa
             return
 
-        if index == 3: # POŁĄCZ
+        # Indeks 3: POŁĄCZ ARMIE
+        if index == 3: 
             self.world.merge_mode = not getattr(self.world, 'merge_mode', False)
             print(f"Tryb łączenia: {self.world.merge_mode}")
 
-        elif index == 4: # BUDUJ (Otwieranie menu)
+        # Indeks 4: BUDOWANIE (Otwieranie menu)
+        elif index == 4: 
             if self.world.has_builder(u):
                 self.world.build_menu_open = True
                 print("Otwarto menu budowania.")
             else:
                 print("Brak budowniczego w oddziale!")
 
-        elif index == 5: # UKRYCIE
+        # Indeks 5: UKRYCIE W LESIE
+        elif index == 5: 
             if u.type == "Generał" or getattr(u, 'level', 0) >= 6:
                 if self.world.is_far_from_enemies(u, 8):
                     u.is_hidden = True
