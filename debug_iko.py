@@ -23,12 +23,12 @@ font = pygame.font.SysFont("Arial", 16, bold=True)
 
 RECTS_TO_TEST = {
     # 1. BANERY MENU (Po prawej stronie, pionowo)
-    "MENU_FRAME_1": (508, 1, 129, 69),   # Pierwszy od góry
-    "MENU_FRAME_2": (508, 72, 129, 69), # Drugi od góry
-    "MENU_FRAME_3": (508, 143, 129, 69), # Trzeci
-    "MENU_FRAME_4": (508, 215, 129, 69), # Trzeci
-    "MENU_FRAME_5": (508, 287, 129, 69), # Trzeci
-    "MENU_FRAME_6": (508, 359, 129, 69), # Trzeci
+    "MENU_FRAME_1": (508, 1, 123, 68),   # Pierwszy od góry
+    "MENU_FRAME_2": (508, 72, 123, 68), # Drugi od góry
+    "MENU_FRAME_3": (508, 144, 123, 68), # Trzeci
+    "MENU_FRAME_4": (508, 216, 123, 68), # Trzeci
+    "MENU_FRAME_5": (508, 288, 123, 68), # Trzeci
+    "MENU_FRAME_6": (508, 360, 123, 68), # Trzeci
     
     # 2. PRZYCISKI BACK (Dół, lewa strona)
     "BACK_NORMAL":  (7, 430, 80, 48),    # Pierwszy od lewej na dole

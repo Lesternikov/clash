@@ -1,7 +1,9 @@
 import pygame
+import os
 import random
 from settings import TERRAIN_TYPES, TILE_SIZE, SCREEN_HEIGHT, SCREEN_WIDTH
 from buildings import BuildingsMixin
+
 from utils import draw_text
 from custom_font import BitmapFont
 class Renderer:
@@ -30,6 +32,19 @@ class Renderer:
         except Exception as e:
             print(f"Błąd ładowania tła budynków: {e}")
             self.bldg_bg = None
+            # --- GRAFIKI GÓRNEGO MENU (Pergaminy) ---
+        try:
+            self.top_bar_img = pygame.image.load(os.path.join("assets","minimum","MENU_S32", "MENU_S32_0.png")).convert_alpha()
+            self.menu_bg_img = pygame.image.load(os.path.join("assets","minimum","MENU_S32", "MENU_S32_3.png")).convert_alpha()
+            
+            # Przywracamy naturalną przezroczystość pliku, żeby zachować pikselowy cień!
+            self.menu_bottom_img = pygame.image.load(os.path.join("assets","minimum","MENU_S32", "MENU_S32_4.png")).convert_alpha()
+            
+        except Exception as e:
+            print(f"Błąd ładowania grafik górnego menu: {e}")
+            self.top_bar_img = None
+            self.menu_bg_img = None
+            self.menu_bottom_img = None
 
     def draw(self, screen):
         w = self.world
@@ -221,9 +236,9 @@ class Renderer:
             world.menu_anim_frame = 0.0
 
         # Ustalamy obszar MENU (Prawy Górny Róg)
-        ban_w, ban_h = 130 * 1.3, 72 * 1.3 # Powiększamy (ok. 169x93 px)
+        ban_w, ban_h = 130 * 1.4, 72 * 1.5 # Powiększamy (ok. 169x93 px)
         ban_x = screen.get_width() - ban_w - 20
-        ban_y = 20
+        ban_y = 0
         banner_rect = pygame.Rect(ban_x, ban_y, ban_w, ban_h)
 
         # Sprawdzamy najechanie myszką na baner
@@ -331,66 +346,116 @@ class Renderer:
 
     def draw_top_bar(self, screen):
         mx, my = pygame.mouse.get_pos()
+        w = self.world
         
         # --- 1. LOGIKA POKAZYWANIA/CHOWANIA ---
-        # Używamy self.world.show_top_ui, bo to stan gry
-        if self.world.top_ui_trigger_area.collidepoint(mx, my):
-            self.world.show_top_ui = True
-        elif not self.world.top_ui_full_area.collidepoint(mx, my) and self.world.active_dropdown is None:
-            self.world.show_top_ui = False
+        if w.top_ui_trigger_area.collidepoint(mx, my):
+            w.show_top_ui = True
+        elif not w.top_ui_full_area.collidepoint(mx, my) and w.active_dropdown is None:
+            w.show_top_ui = False
 
-        # --- 2. RYSOWANIE PASKA ---
-        if self.world.show_top_ui:
-            # Tło paska
-            pygame.draw.rect(screen, (40, 40, 40), (0, 0, 1024, 40))
+        # --- 2. RYSOWANIE GÓRNEGO PASKA ---
+        if w.show_top_ui:
+            bar_h = 45 # Wysokość paska górnego
             
-            # Przycisk SYSTEM
-            pygame.draw.rect(screen, (100, 100, 100), self.world.btn_system)
-            screen.blit(self.font.render("System", True, (255, 255, 255)), (self.world.btn_system.x + 5, 10))
+            # --- AKTUALIZACJA STREF KLIKANIA ---
+            w.btn_system = pygame.Rect(10, 0, 150, bar_h)
+            w.btn_mapa = pygame.Rect(170, 0, 150, bar_h)
+            w.next_turn_button = pygame.Rect(screen.get_width() - 220, 0, 210, bar_h)
 
-            # Przycisk MAPA
-            pygame.draw.rect(screen, (100, 100, 100), self.world.btn_mapa)
-            screen.blit(self.font.render("Mapa", True, (255, 255, 255)), (self.world.btn_mapa.x + 15, 10))
-
-            # Przycisk KONIEC TURY
-            pygame.draw.rect(screen, (139, 69, 19), self.world.next_turn_button)
-            pygame.draw.rect(screen, (212, 175, 55), self.world.next_turn_button, 2)
-            txt_turn = self.font.render(f"Koniec tury {self.world.turn}", True, (255, 255, 255))
-            screen.blit(txt_turn, (self.world.next_turn_button.x + 10, 10))
-
-            # --- 3. LOGIKA DROPDOWN (MENU ROZWIJANE) ---
-            options = []  # BEZPIECZNIK: Inicjalizacja pustej listy
-            start_x = 0
-
-            if self.world.active_dropdown in self.world.menu_options:
-                options = self.world.menu_options[self.world.active_dropdown]
-                start_x = self.world.btn_system.x if self.world.active_dropdown == "System" else self.world.btn_mapa.x
+            if hasattr(self, 'top_bar_img') and self.top_bar_img:
+                scaled_top_bar = pygame.transform.scale(self.top_bar_img, (screen.get_width(), bar_h))
+                screen.blit(scaled_top_bar, (0, 0))
                 
-                # CZYŚCIMY słowniki (są w Rendererze, bo służą do wykrywania kliknięć w UI)
-                self.system_buttons = {}
-                self.mapa_buttons = {}
+                font_turn = pygame.font.SysFont("Times New Roman", 24, bold=True)
+                turn_txt = font_turn.render(str(w.turn), True, (30, 20, 10))
+                tx = screen.get_width() - 58
+                ty = 5
+                screen.blit(turn_txt, (tx, ty))
+            else:
+                pygame.draw.rect(screen, (40, 40, 40), (0, 0, screen.get_width(), bar_h))
 
-                # Pętla rysująca opcje dropdowna
-                for i, opt in enumerate(options):
-                    rect = pygame.Rect(start_x, 40 + i * 30, 120, 30)
-                    
-                    # Zapisujemy Rect do odpowiedniego słownika dla ControlsHandlera
-                    if self.world.active_dropdown == "System":
-                        self.system_buttons[opt] = rect
-                    else:
-                        self.mapa_buttons[opt] = rect
+            # =========================================================
+            # --- 3. RYSUJEMY ZWÓJ (Na wierzchu)
+            # =========================================================
+            if w.active_dropdown in getattr(w, 'menu_options', {}):
+                options = w.menu_options[w.active_dropdown]
+                
+                if not hasattr(w, 'system_buttons'): w.system_buttons = {}
+                if not hasattr(w, 'mapa_buttons'): w.mapa_buttons = {}
+                target_dict = w.system_buttons if w.active_dropdown == "System" else w.mapa_buttons
+                target_dict.clear() 
 
-                    # Rysowanie kafelka opcji
-                    is_hovered = rect.collidepoint(mx, my)
-                    color = (150, 150, 150) if is_hovered else (80, 80, 80)
-                    
-                    pygame.draw.rect(screen, color, rect)
-                    pygame.draw.rect(screen, (200, 200, 200), rect, 1) # Obramowanie
-                    
-                    txt_opt = self.font.render(opt, True, (255, 255, 255))
-                    screen.blit(txt_opt, (rect.x + 10, rect.y + 5))
+                # Obydwa zwoje mają TĘ SAMĄ szerokość (165) i ten sam styl!
+                start_x = w.btn_system.x - 10 if w.active_dropdown == "System" else w.btn_mapa.x - 0
+                
+                # Zaczynamy od wysokości 36, co ładnie połączy wałek z belką
+                self.draw_parchment_menu(screen, start_x, 20, 200, options, target_dict, mx, my)
+ 
+    def draw_parchment_menu(self, screen, x, y, width, options, buttons_dict, mx, my):
+        """Uniwersalne rysowanie menu - inteligentne wycinanie i dopasowanie."""
+        if not options or not getattr(self, 'menu_bg_img', None):
+            return
 
+        # Zmniejszamy odstępy, by teksty były bliżej siebie (jak w starych grach)
+        item_h = 32 
+        padding_top = 12
+        body_h = (len(options) * item_h) + padding_top + 5
+        
+        # =========================================================
+        # 1. INTELIGENTNE RYSOWANIE TŁA
+        # =========================================================
+        original_h = self.menu_bg_img.get_height()
+        
+        # Jeśli potrzebujemy więcej miejsca niż ma obrazek (np. 6 opcji w Systemie),
+        # musimy go rozciągnąć. Jeśli mniej (Mapa), zostawiamy oryginalną wysokość.
+        target_h = max(body_h, original_h)
+        
+        # Skalujemy
+        bg_scaled = pygame.transform.scale(self.menu_bg_img, (width, target_h))
+        
+        # Wycinamy nasz ostateczny prostokąt (teraz zawsze starczy nam "papieru"!)
+        bg_cutout = bg_scaled.subsurface(pygame.Rect(0, 0, width, body_h))
+        screen.blit(bg_cutout, (x, y))
+        
+        # =========================================================
+        # 2. Rysowanie IDENTYCZNYCH WAŁKÓW
+        # =========================================================
+        if getattr(self, 'menu_bottom_img', None):
+            roller_scaled = pygame.transform.scale(self.menu_bottom_img, (width, 30))
             
+            # DOLNY WAŁEK (idealnie na końcu uciętego/naciągniętego papieru)
+            screen.blit(roller_scaled, (x, y + body_h - 14))
+
+        # =========================================================
+        # 3. Rysowanie opcji i hitboxów
+        # =========================================================
+        font_scroll = pygame.font.SysFont("Arial", 20, bold=True)
+
+        for i, opt in enumerate(options):
+            rect = pygame.Rect(x, y + padding_top + (i * item_h), width, item_h)
+            buttons_dict[opt] = rect 
+
+            is_hover = rect.collidepoint(mx, my)
+            color = (255, 255, 100) if is_hover else (255, 255, 255)
+            
+            if is_hover:
+                hover_surf = pygame.Surface((width - 20, item_h), pygame.SRCALPHA)
+                hover_surf.fill((255, 255, 255, 30))
+                screen.blit(hover_surf, (rect.x + 10, rect.y))
+                
+            txt_shadow = font_scroll.render(opt.lower(), True, (0, 0, 0))
+            txt = font_scroll.render(opt.lower(), True, color)
+            
+            txt_x = rect.x + 30 
+            txt_y = rect.y + (item_h // 2) - (txt.get_height() // 2)
+            
+            screen.blit(txt_shadow, (txt_x + 2, txt_y + 2))
+            screen.blit(txt, (txt_x, txt_y))
+
+            # Możesz to odkomentować (# usuwając hash), jeśli znów będziesz chciał diagnozować klikanie
+            # pygame.draw.rect(screen, (255, 0, 0), rect, 1)
+
     def draw_button(self, screen, text, rect, color=(90, 90, 90), style=None):
         """
         style=None      -> zwykły przycisk (prostokąt z tekstem)
@@ -749,77 +814,51 @@ class Renderer:
         
     def draw_castle_menu(self, screen, mx, my):
         w = self.world
-        if w.screen != "castle":
-            return 
+        if w.screen != "castle": return 
 
         options = ["Buduj", "ZBURZ ZAMEK", "ROZBUDUJ MURY"]
         w.menu_rects.clear()
 
-        # Pobieramy X i Y z animowanego banera (żeby opcje przykleiły się idealnie)
-        menu_w, menu_h = 168, 35 # Szerokość idealnie pod baner
+        # Pozycje bierzemy z animowanego banera
         menu_x = getattr(w, 'menu_options_start_x', 800)
         menu_y = getattr(w, 'menu_options_start_y', 100)
 
-        # Pokazujemy opcje dopiero, gdy baner opuści się wystarczająco nisko (klatka 3+)
+        # Pokazujemy zwój dopiero gdy baner zjedzie kawałek (klatka 3+)
         if getattr(w, 'menu_anim_frame', 0) >= 3.0:
-            for i, opt in enumerate(options):
-                rect = pygame.Rect(menu_x, menu_y + i * menu_h, menu_w, menu_h)
-                
-                # Zamiast szarych przycisków robimy customowe (ciemnozielone, komponujące się z banerem)
-                is_hovered = rect.collidepoint(mx, my)
-                color = (60, 100, 60) if is_hovered else (40, 50, 40)
-                pygame.draw.rect(screen, color, rect)
-                pygame.draw.rect(screen, (20, 30, 20), rect, 2) # Obramowanie
-                
-                # Tekst w kolorze pożółkłego pergaminu
-                font = pygame.font.SysFont("Arial", 16, bold=True)
-                txt = font.render(opt.upper(), True, (200, 220, 200) if is_hovered else (150, 170, 150))
-                screen.blit(txt, (rect.centerx - txt.get_width()//2, rect.centery - txt.get_height()//2))
-                
-                w.menu_rects[opt] = rect
+            self.draw_parchment_menu(screen, menu_x, menu_y, 200, options, w.menu_rects, mx, my)
 
-            w.demolish_button = w.menu_rects.get("ZBURZ ZAMEK")
-            w.wall_button = w.menu_rects.get("ROZBUDUJ MURY")
-
+            # Obsługa sub-menu Budowy (Buduj)
             buduj_rect = w.menu_rects.get("Buduj")
-            if not buduj_rect: return
-            
-            # Bezpieczna strefa do przejścia na lewo do sub-menu (np. do listy budynków)
-            safe_zone_to_submenu = pygame.Rect(menu_x - 165, menu_y, 170, 200)
-
-            if buduj_rect.collidepoint(mx, my) or (getattr(w, "build_open", False) and safe_zone_to_submenu.collidepoint(mx, my)):
-                w.build_open = True
-                self.draw_build_submenu(screen, menu_x, menu_y)
-            else:
-                if mx > menu_x: 
-                    w.build_open = False
+            if buduj_rect:
+                safe_zone = pygame.Rect(menu_x - 185, menu_y, 170, 200)
+                if buduj_rect.collidepoint(mx, my) or (getattr(w, "build_open", False) and safe_zone.collidepoint(mx, my)):
+                    w.build_open = True
+                    self.draw_build_submenu(screen, menu_x, menu_y)
+                else:
+                    if mx > menu_x: w.build_open = False
         
     def draw_build_submenu(self, screen, menu_x, menu_y):
         w = self.world
         castle = w.selected_castle
         if not castle: return
 
-        sub_w, sub_h = 160, 40 
-        sub_x = menu_x - sub_w
-        sub_y = menu_y
+        # Lista budynków do budowy
+        all_buildings = ["hospital", "school", "koszary", "forge", "workshop"]
+        
+        # Filtrujemy tylko te, których jeszcze nie ma
+        to_build = [b.upper() for b in all_buildings if b not in castle.buildings]
+        
+        if not to_build:
+            to_build = ["BRAK OPCJI"]
 
-        buildings = ["hospital", "school", "koszary", "forge", "workshop"]
         w.build_rects.clear()
-
-        for i, b in enumerate(buildings):
-            rect = pygame.Rect(sub_x, sub_y + i * sub_h, sub_w, sub_h)
-            is_built = b in castle.buildings
-            
-            if is_built:
-                pygame.draw.rect(screen, (50, 50, 50), rect) 
-                pygame.draw.rect(screen, (80, 80, 80), rect, 1) 
-                small_font = pygame.font.SysFont(None, 20)
-                txt_surf = small_font.render(b, True, (100, 100, 100)) 
-                screen.blit(txt_surf, txt_surf.get_rect(center=rect.center))
-            else:
-                self.draw_button(screen, b, rect)
-
-            w.build_rects[b] = rect
+        
+        # Rysujemy zwój po lewej stronie głównego menu
+        sub_x = menu_x - 165
+        sub_y = menu_y + 20
+        
+        mx, my = pygame.mouse.get_pos()
+        self.draw_parchment_menu(screen, sub_x, sub_y, 180, to_build, w.build_rects, mx, my)
     
     def draw_trap_popup(self, screen):
         w = self.world

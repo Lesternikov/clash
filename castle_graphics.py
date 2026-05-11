@@ -137,3 +137,8 @@ class CastleGraphics:
             font = pygame.font.SysFont("Arial", 20, bold=True)
             txt = font.render(f"TRYB DEBUG MASKI | Lewa: {left_key} | Prawa: {right_key}", True, (255, 0, 0))
             screen.blit(txt, (10, 10))
+            
+    if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])
