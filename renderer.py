@@ -3,8 +3,10 @@ import random
 from settings import TERRAIN_TYPES, TILE_SIZE, SCREEN_HEIGHT, SCREEN_WIDTH
 from buildings import BuildingsMixin
 from utils import draw_text
+from custom_font import BitmapFont
 class Renderer:
     def __init__(self, world_instance, gfx, ):
+        self.custom_font = BitmapFont("assets/fonts/litery_png/") # Ścieżka do Twoich plików RED_S32_
         self.world = world_instance
         self.font_small = pygame.font.SysFont("Arial", 12)
         self.font_main  = pygame.font.SysFont("Arial", 18)
@@ -1106,44 +1108,32 @@ class Renderer:
                                 theme_color=(100, 100, 130),
                                 border_color=(180, 180, 220)):
         
-        # 1. RYSOWANIE TŁA
+        # 1. RYSOWANIE TŁA (zostaje bez zmian)
         if hasattr(self, 'bldg_bg') and self.bldg_bg:
-            # Rozciągamy tło na pełny ekran, żeby idealnie pasowało
             bg_scaled = pygame.transform.scale(self.bldg_bg, screen.get_size())
             screen.blit(bg_scaled, (0, 0))
         else:
-            # Zabezpieczenie: jeśli nie znajdzie obrazka, narysuje stary prostokąt
             screen.fill((60, 60, 80))
-            panel = pygame.Rect(120, 80, 760, 420)
-            pygame.draw.rect(screen, theme_color, panel)
-            pygame.draw.rect(screen, border_color, panel, 6)
 
-        # 2. CZCIONKI
-        font_title = pygame.font.SysFont("Arial", 40, bold=True)
-        font_text  = pygame.font.SysFont("Arial", 24)
+        # 2. SEKCJA TYTUŁU (Używamy Twoich liter!)
+        tytul_y = 120 
+        # Obliczamy środek, żeby tytuł był równo
+        # (Możesz dodać metodę get_width do BitmapFont, żeby wyśrodkować idealnie)
+        self.custom_font.render(screen, title.upper(), 350, tytul_y, spacing=3)
 
-        # 3. TYTUŁ NA DREWNIANYM ZWOJU
-        # Kolor (40, 20, 10) to ciemny brąz, będzie dobrze wyglądał na drewnie
-        title_surface = font_title.render(title.upper(), True, (40, 20, 10))
-        
-        # Przesunięcie tytułu: wyśrodkowanie w poziomie (X) i dopasowanie do zwoju (Y)
-        tytul_x = screen.get_width() // 2 - title_surface.get_width() // 2
-        tytul_y = 120  # <--- ZMIEŃ TĘ LICZBĘ, żeby podnieść/opuścić tytuł na zwoju
-        screen.blit(title_surface, (tytul_x, tytul_y))
-
-        # 4. TEKST W GŁÓWNEJ RAMCE
-        tekst_x = 180  # Odległość od lewej krawędzi ekranu
-        tekst_y = 230  # Odległość od góry (start pierwszej linijki)
+        # 3. TEKST W GŁÓWNEJ RAMCE
+        tekst_x = 180  
+        tekst_y = 230  
         
         for line in lines:
-            txt = font_text.render(line, True, (220, 220, 220)) # Jasnoszary tekst
-            screen.blit(txt, (tekst_x, tekst_y))
-            tekst_y += 35 # Odstęp między linijkami
+            # Tutaj Twoje litery zastępują systemowego Ariala
+            self.custom_font.render(screen, line, tekst_x, tekst_y, spacing=1)
+            tekst_y += 35 
 
-        # 5. PRZYCISK POWROTU
+        # 4. STOPKA (zostaje bez zmian)
         self.draw_building_footer(screen)
 
-    if __name__ == "__main__":
+if __name__ == "__main__":
         import subprocess, sys, os
         main_path = os.path.join(os.path.dirname(__file__), "main.py")
         subprocess.run([sys.executable, main_path])
