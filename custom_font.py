@@ -6,49 +6,71 @@ class BitmapFont:
         self.chars = {}
         self.folder_path = folder_path
         
-        # Mapowanie: klucz to znak, wartość to numer pliku
         # Duże litery A-Z (33-58)
         for i in range(33, 59):
-            char = chr(65 + (i - 33)) # 65 to 'A' w ASCII
+            char = chr(65 + (i - 33)) 
             self.chars[char] = f"RED_S32_{i}.png"
             
         # Małe litery a-z (59-90)
         for i in range(59, 91):
-            char = chr(97 + (i - 59)) # 97 to 'a' w ASCII
+            char = chr(97 + (i - 59)) 
             self.chars[char] = f"RED_S32_{i}.png"
 
-        # Dodatkowe znaki (możesz dopisać więcej, jeśli odkryjesz numery)
-        self.chars[" "] = None # Spacja - obsłużona logiką odstępu
+        self.chars[" "] = None
 
+        # Polskie znaki (dopisz resztę jeśli znajdziesz)
         self.chars["ł"] = "RED_S32_114.png"
         self.chars["ą"] = "RED_S32_102.png"
         self.chars["ć"] = "RED_S32_109.png"
         self.chars["ę"] = "RED_S32_113.png"
 
-        # Słownik na załadowane obrazki (cache)
-        self.images = {}
-        self._load_images()
+        # Tu trzymamy surowe obrazki
+        self.raw_images = {}
+        
+        # Tu trzymamy gotowe, pokolorowane zestawy liter (np. 'gold', 'red', 'blue')
+        self.palettes = {} 
+        
+        self._load_raw_images()
 
-    def _load_images(self):
+    def _load_raw_images(self):
+        """Ładuje oryginały. Jeśli ich nie ma, wypisuje błąd w konsoli."""
         for char, filename in self.chars.items():
             if filename:
                 path = os.path.join(self.folder_path, filename)
                 if os.path.exists(path):
-                    # Ładujemy i od razu możemy podbić kolor na biały/złoty jeśli trzeba
-                    img = pygame.image.load(path).convert_alpha()
-                    self.images[char] = img
+                    self.raw_images[char] = pygame.image.load(path).convert_alpha()
+                else:
+                    print(f"OSTRZEŻENIE: Brak pliku {path}")
 
-    def render(self, screen, text, x, y, spacing=2):
-        current_x = x
+    def add_palette(self, palette_name, color_map):
+        """Tworzy nowy zestaw liter na podstawie Twojego COLOR_MAP."""
+        self.palettes[palette_name] = {}
+        for char, img in self.raw_images.items():
+            colored_img = img.copy()
+            # Podmiana kolorów
+            for x in range(colored_img.get_width()):
+                for y in range(colored_img.get_height()):
+                    pixel = tuple(colored_img.get_at((x, y)))
+                    if pixel in color_map:
+                        colored_img.set_at((x, y), color_map[pixel])
+            self.palettes[palette_name][char] = colored_img
+
+    def render(self, screen, text, x, y, spacing=1, palette_name=None):
+        # Jeśli nie podasz palety, weź pierwszą dostępną
+        if palette_name is None and self.palettes:
+            palette_name = list(self.palettes.keys())[0]
+        
+        if palette_name not in self.palettes:
+            return # Nie rysuj nic, jeśli nie ma palet
+
+        active_set = self.palettes[palette_name]
+        curr_x = x
         for char in text:
             if char == " ":
-                current_x += 10 # Szerokość spacji
+                curr_x += 10
                 continue
-                
-            if char in self.images:
-                img = self.images[char]
-                screen.blit(img, (current_x, y))
-                current_x += img.get_width() + spacing
+            if char in active_set:
+                screen.blit(active_set[char], (curr_x, y))
+                curr_x += active_set[char].get_width() + spacing
             else:
-                # Jeśli znaku nie ma, przesuń o stałą wartość, żeby nie było dziury
-                current_x += 8
+                curr_x += 8

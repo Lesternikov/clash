@@ -4,7 +4,7 @@ import sys
 # ============================================================
 # USTAWIENIA - Wpisz plik, który chcesz badać
 # ============================================================
-PLIK_ZRODLOWY = "DZ_INFO_S32_ZIEL.png"
+PLIK_ZRODLOWY = "r.png"
 
 def main():
     pygame.init()

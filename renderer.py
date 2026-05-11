@@ -8,7 +8,28 @@ from utils import draw_text
 from custom_font import BitmapFont
 class Renderer:
     def __init__(self, world_instance, gfx, ):
-        self.custom_font = BitmapFont("assets/fonts/litery_png/") # Ścieżka do Twoich plików RED_S32_
+        self.custom_font = BitmapFont("assets/RED_S32") # Ścieżka do Twoich plików RED_S32_
+        # 1. Definiujesz swoją paletę z posta (Złota)
+        GOLDEN_COLOR_MAP = {
+            (255, 255, 255, 255): (0, 0, 0, 255),
+            (10, 0, 0, 255): (36, 24, 16, 255),
+            (33, 17, 0, 255): (215, 203, 158, 255),
+            (16, 48, 0, 255): (24, 16, 12, 255),
+            (66, 57, 0, 255): (16, 8, 0, 255),
+            (0, 0, 0, 255): (69, 56, 48, 255),
+            (18, 9, 0, 255): (255, 243, 199, 255),
+            (43, 31, 0, 255): (154, 142, 105, 255),
+            (26, 57, 0, 255): (255, 243, 199, 255),
+            (69, 56, 48, 255): (89, 65, 69, 255)
+            # USUNĄŁEM OSTATNI KLUCZ (66, 57, 0, 255), bo powtarzał się z tym wyżej 
+            # (w słowniku klucz musi być unikalny)
+        }
+        # 2. Generujesz gotowe literki pod nazwą 'golden'
+        self.custom_font.add_palette("golden", GOLDEN_COLOR_MAP)
+        
+        # W PRZYSZŁOŚCI MOŻESZ DODAĆ KOLEJNĄ:
+        # self.custom_font.add_palette("evil_red", RED_COLOR_MAP)
+
         self.world = world_instance
         self.font_small = pygame.font.SysFont("Arial", 12)
         self.font_main  = pygame.font.SysFont("Arial", 18)
@@ -706,16 +727,16 @@ class Renderer:
         lines = w.unit_info_text.split("\n")
         y = 120
 
-        # Nagłówek (pierwsza linia na żółto)
+        # Nagłówek (pierwsza linia tekstu np. "Chłopi")
         if lines:
-            screen.blit(font_title.render(lines[0], True, (255, 255, 0)), (120, y))
-            y += 80
+            if hasattr(self, 'custom_font'):
+                self.custom_font.render(screen, lines[0].upper(), 120, y, spacing=2, palette_name="golden")
+            y += 60
 
-        # Opis (reszta tekstu na szaro)
+        # Opis
         for line in lines[1:]:
-            txt_surf = font_text.render(line, True, (200, 200, 200))
-            screen.blit(txt_surf, (120, y))
-            y += 35
+            if hasattr(self, 'custom_font'):
+                self.custom_font.render(screen, line, 120, y, spacing=1, palette_name="golden")
 
         # Informacja o powrocie na dole ekranu
         info = font_text.render("Kliknij dowolny klawisz lub przycisk myszy, aby wrócić", True, (120, 120, 120))
@@ -1158,7 +1179,7 @@ class Renderer:
         tytul_y = 120 
         # Obliczamy środek, żeby tytuł był równo
         # (Możesz dodać metodę get_width do BitmapFont, żeby wyśrodkować idealnie)
-        self.custom_font.render(screen, title.upper(), 350, tytul_y, spacing=3)
+        self.custom_font.render(screen, title.upper(), 350, y, spacing=3, palette_name="nacja_1")
 
         # 3. TEKST W GŁÓWNEJ RAMCE
         tekst_x = 180  
