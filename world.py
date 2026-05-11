@@ -114,8 +114,8 @@ class World(BuildingsMixin):
             self.back_img_bldg_pressed   = dummy
 
         # MENU GÓRNE (Mapa)
-        self.btn_system = pygame.Rect(10, 0, 100, 40)
-        self.btn_mapa = pygame.Rect(115, 0, 100, 40)
+        self.btn_system = pygame.Rect(500, 0, 100, 40)
+        self.btn_mapa = pygame.Rect(305, 0, 100, 40)
         self.next_turn_button = pygame.Rect(w - 220, 0, 200, 45)
         self.top_ui_trigger_area = pygame.Rect(0, 0, w, 10)
         self.top_ui_full_area = pygame.Rect(0, 0, w, 55)
@@ -214,15 +214,15 @@ class World(BuildingsMixin):
             
             # 3. ANIMACJA ZIELONEGO MENU (Na razie wycinamy i szykujemy do użycia)
             self.menu_frames = [
-                z_iko_sheet.subsurface(pygame.Rect(508, 1, 130, 69)),
-                z_iko_sheet.subsurface(pygame.Rect(508, 72, 130, 69)),
-                z_iko_sheet.subsurface(pygame.Rect(508, 143, 130, 69)),
-                z_iko_sheet.subsurface(pygame.Rect(508, 215, 130, 69)),
-                z_iko_sheet.subsurface(pygame.Rect(508, 287, 130, 69)),
-                z_iko_sheet.subsurface(pygame.Rect(508, 359, 130, 69))
+                z_iko_sheet.subsurface(pygame.Rect(509, 1, 123, 68)),
+                z_iko_sheet.subsurface(pygame.Rect(509, 72, 123, 68)),
+                z_iko_sheet.subsurface(pygame.Rect(509, 144, 123, 68)),
+                z_iko_sheet.subsurface(pygame.Rect(509, 216, 123, 68)),
+                z_iko_sheet.subsurface(pygame.Rect(509, 288, 123, 68)),
+                z_iko_sheet.subsurface(pygame.Rect(509, 360, 123, 68))
             ]
             print("Wycinki z arkusza Z_IKO załadowane pomyślnie!")
-            
+           
         except Exception as e:
             print(f"Błąd wycinania z Z_IKO_PCX: {e}")
             self.title_bar_img = None
@@ -495,7 +495,6 @@ class World(BuildingsMixin):
                 return u
         return None   
 
-              
     def select_castle(self, x, y):
             for c in self.castles:
                 # Pobieramy rozmiar zamku (1 to 32px, 2 to 64px itd.)

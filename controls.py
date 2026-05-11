@@ -2,7 +2,6 @@ import pygame
 import sys
 from settings import UNIT_STATS, UNIT_NAMES, TERRAIN_TYPES, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE, COLOR_TO_ID, SCREEN_HEIGHT, SCREEN_WIDTH
 
-
 class ControlsHandler:
     def __init__(self, world_instance):
         self.world = world_instance
@@ -370,49 +369,60 @@ class ControlsHandler:
                                 print("DEBUG: Zresetowano przez recruitment_manager!")
 
     def handle_ui_click(self, mx, my, button=1):
-        # 1. SPRAWDZANIE GÓRNEGO PASKA (System/Mapa/Tura)
-        if self.world.show_top_ui:
-            if self.handle_dropdown_clicks(mx, my): return True
-            if self.world.top_ui_full_area.collidepoint(mx, my):
-                if self.world.btn_system.collidepoint(mx, my): self.active_dropdown = "System"
-                elif self.world.btn_mapa.collidepoint(mx, my): self.active_dropdown = "Mapa"
-                elif self.world.next_turn_button.collidepoint(mx, my): self.world.next_turn()
+        w = self.world
+        
+        # 0. ZAWSZE najpierw sprawdzamy rozwinięte zwoje (blokuje to klikanie "przez" pergamin)
+        if self.handle_dropdown_clicks(mx, my):
+            return True
+
+        # 1. GÓRNY PASEK
+        if getattr(w, 'show_top_ui', False):
+            if w.top_ui_full_area.collidepoint(mx, my):
+                if hasattr(w, 'btn_system') and w.btn_system.collidepoint(mx, my):
+                    w.active_dropdown = "System" if w.active_dropdown != "System" else None
+                    return True
+                elif hasattr(w, 'btn_mapa') and w.btn_mapa.collidepoint(mx, my):
+                    w.active_dropdown = "Mapa" if w.active_dropdown != "Mapa" else None
+                    return True
+                elif hasattr(w, 'next_turn_button') and w.next_turn_button.collidepoint(mx, my):
+                    w.next_turn()
+                    return True
+            else:
+                # Jeśli zjechaliśmy myszką z paska i kliknęliśmy obok - zwijamy
+                if getattr(w, 'active_dropdown', None):
+                    w.active_dropdown = None
+
+        # 2. PRZYCISK "MENU" W ZAMKU (Zielony baner na łańcuchach)
+        if w.screen == "castle":
+            if hasattr(w, 'menu_button') and w.menu_button.collidepoint(mx, my):
+                w.menu_open = not getattr(w, 'menu_open', False)
                 return True
 
-       # --- 2. SPRAWDZANIE DOLNEJ STREFY (y >= 620) ---
-        if my >= 610: # Obniżyłem lekko próg, by łapało też ramkę (zgodnie z draw_ui)
-            # --- A. PRZYCISKI AKCJI ---
-            for i, rect in enumerate(self.world.action_buttons):
+        # 3. DOLNA STREFA (Przyciski akcji, Armia)
+        if my >= 610:
+            for i, rect in enumerate(w.action_buttons):
                 if rect.collidepoint(mx, my):
                     if button == 1:
-                        # KLUCZOWA ZMIANA:
-                        if getattr(self.world, 'build_menu_open', False):
-                            # Jeśli menu budowy jest otwarte, wykonaj akcję budowy (0-5)
-                            self.world.execute_build_action(i, self.world.selected_unit)
+                        if getattr(w, 'build_menu_open', False):
+                            w.execute_build_action(i, w.selected_unit)
                         else:
-                            # Standardowe zachowanie (Ruch, Atak, otwarcie menu budowy)
                             self.handle_action_button_click(i)
-                    return True # Zablokuj mapę pod przyciskiem
+                    return True 
 
-            # --- B. PANEL ARMII (Po lewej stronie) ---
-            u = self.world.selected_unit
+            u = w.selected_unit
             if u:
                 garrison = getattr(u, 'garrison', [])
                 display_units = [unit for unit in ([u] + garrison) if unit is not None]
 
                 if len(display_units) >= 2:
-                    # Sprawdzamy kliknięcia w konkretne jednostki w armii
-                    if hasattr(self.world, 'army_slot_rects'):
-                        for i, rect in enumerate(self.world.army_slot_rects):
+                    if hasattr(w, 'army_slot_rects'):
+                        for i, rect in enumerate(w.army_slot_rects):
                             if rect.collidepoint(mx, my):
                                 print(f"Kliknięto jednostkę w armii: {display_units[i].type}")
-                                # Tutaj w przyszłości dodasz kod na WYCIĄGANIE oddziału z armii
-                                # np. self.world.split_army(u, display_units[i])
-                                return True # Zablokuj mapę
+                                return True 
                     
-                    # Jeśli kliknąłeś w drewniane tło panelu (mx < 800), ale nie w jednostkę
                     if mx < 800: 
-                        return True # Zablokuj mapę pod brązowym panelem
+                        return True 
 
         return False # Zezwól na kliknięcie w mapę
     
@@ -590,7 +600,6 @@ class ControlsHandler:
         self.world.trap_build_mode = False 
         print("Tryb mapy: Odznaczono wszystko.")
     
-    
     def handle_dropdown_clicks(self, mx, my):
         #tu jest dokłana obsługa
         # def execute_menu_command(self, menu, index):
@@ -614,30 +623,61 @@ class ControlsHandler:
           #  if index == 3: # "Nic"
            #     print("Ukrywam elementy mapy...")
 
-        """Obsługuje kliknięcia wewnątrz rozwiniętych list System i Mapa."""
-        if not self.world.active_dropdown:
-            return False
+        """Obsługuje kliknięcia we WSZYSTKIE rozwinięte pergaminy w grze."""
+        w = self.world
 
-        # Pobieramy przyciski dla aktualnie otwartego menu
-        buttons_to_check = {}
-        if self.world.active_dropdown == "System":
-            buttons_to_check = getattr(self.world, 'system_buttons', {})
-        elif self.world.active_dropdown == "Mapa":
-            buttons_to_check = getattr(self.world, 'mapa_buttons', {})
+        # ==========================================
+        # A. SPRAWDZANIE ZWOJÓW GÓRNEGO PASKA
+        # ==========================================
+        if getattr(w, 'active_dropdown', None):
+            buttons_to_check = getattr(w, 'system_buttons', {}) if w.active_dropdown == "System" else getattr(w, 'mapa_buttons', {})
+            
+            # WYDRUK KONTROLNY: Zobaczmy, ile przycisków widzi Python
+            print(f"TEST: Próbuję kliknąć w menu '{w.active_dropdown}'. Znaleziono {len(buttons_to_check)} przycisków.")
+            
+            for name, rect in buttons_to_check.items():
+                if rect.collidepoint(mx, my):
+                    print(f"BINGO! Kliknięto w opcję: {name}")
+                    
+                    if name == "Koniec":
+                        import pygame, sys
+                        pygame.quit()
+                        sys.exit()
+                    elif name == "Siatka":
+                        w.show_grid = not getattr(w, 'show_grid', False)
+                    
+                    w.active_dropdown = None
+                    return True
+            
+            print("PUDŁO: Kliknięcie nie trafiło w żaden czerwony prostokąt!")
 
-        # Sprawdzamy kolizję dla każdej opcji w słowniku
-        for name, rect in buttons_to_check.items():
-            if rect.collidepoint(mx, my):
-                print(f"DEBUG {self.world.active_dropdown}: Wybrano opcję -> {name}")
-                
-                # Tymczasowe zamykanie gry dla testów
-                pygame.quit()
-                import sys
-                sys.exit()
-                return True
+        # ==========================================
+        # B. SPRAWDZANIE ZIELONEGO MENU W ZAMKU
+        # ==========================================
+        if getattr(w, 'menu_open', False):
+            if getattr(w, 'build_open', False):
+                for name, rect in getattr(w, 'build_rects', {}).items():
+                    if rect.collidepoint(mx, my):
+                        print(f"BINGO ZAMEK: Zlecono budowę: {name}")
+                        w.build_open = False
+                        w.menu_open = False
+                        return True
+
+            for name, rect in getattr(w, 'menu_rects', {}).items():
+                if rect.collidepoint(mx, my):
+                    print(f"BINGO ZAMEK: Akcja -> {name}")
+                    if name == "ZBURZ ZAMEK":
+                        w.demolish_confirm = True
+                        w.menu_open = False
+                        return True
+                    elif name == "Buduj":
+                        return True
                         
+            if mx < getattr(w, 'menu_options_start_x', 800) - 170:
+                w.menu_open = False
+                w.build_open = False
+
         return False
- 
                            
     def handle_castle_entry(self, mx, my):
         """Sprawdza kliknięcie w budynki na mapie. Zwraca True, jeśli wejdzie do środka."""
