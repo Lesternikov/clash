@@ -74,3 +74,56 @@ class BitmapFont:
                 curr_x += active_set[char].get_width() + spacing
             else:
                 curr_x += 8
+
+                
+                
+                koniec
+                koniec
+
+                koniec
+
+                koniec
+
+                koniec
+
+                koniec
+
+                koniec
+
+                koniec
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                koniec
+
+
+                koniec
+
+                koniec
+
+                koniec
+
+
+                koniec
+
+                koniec
+
+                koniec
+                koniec
+                koniec
+                koniec
+                koniec
+                koniec
+
