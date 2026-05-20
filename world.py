@@ -14,7 +14,7 @@ from castle_graphics import CastleGraphics
 from garrison_graphics import GarrisonGraphics
 from recruitment import RecruitmentManager
 from peasant_menu import PeasantMenu
-
+from court_graphics import CourtGraphics
 @property
 def back_button(self):
     if self.screen == "castle":
@@ -74,6 +74,7 @@ class World(BuildingsMixin):
         self.recruitment_manager = RecruitmentManager(self)
         self.peasant_menu = PeasantMenu(w, h)
         pygame.font.init()
+        self.court_gfx = CourtGraphics(w, h)
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)
         self.modal_font = pygame.font.SysFont(None, 32)
@@ -205,14 +206,15 @@ class World(BuildingsMixin):
         try:
             z_iko_sheet = pygame.image.load(os.path.join("assets", "Z_IKO_PCX.png")).convert_alpha()
             
-            # 1. PRZYCISK POWROTU (Rozdzielony na wciśnięty i odciśnięty)
-            self.back_img_bldg_normal = z_iko_sheet.subsurface(pygame.Rect(7, 430, 80, 48))
-            self.back_img_bldg_pressed = z_iko_sheet.subsurface(pygame.Rect(89, 430, 80, 48))
+            # 1. PRZYCISK POWROTU DLA ZAMKU (Rozdzielony na wciśnięty i odciśnięty)
+            # ZMIANA: Przypisujemy do back_img_castle, a NIE do back_img_bldg!
+            self.back_img_castle_normal = z_iko_sheet.subsurface(pygame.Rect(8, 431, 78, 45))
+            self.back_img_castle_pressed = z_iko_sheet.subsurface(pygame.Rect(90, 431, 78, 45))
             
             # 2. PASEK NAZWY BUDYNKU
             self.title_bar_img = z_iko_sheet.subsurface(pygame.Rect(180, 446, 285, 32))
             
-            # 3. ANIMACJA ZIELONEGO MENU (Na razie wycinamy i szykujemy do użycia)
+            # 3. ANIMACJA ZIELONEGO MENU
             self.menu_frames = [
                 z_iko_sheet.subsurface(pygame.Rect(509, 1, 123, 68)),
                 z_iko_sheet.subsurface(pygame.Rect(509, 72, 123, 68)),

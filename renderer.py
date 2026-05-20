@@ -125,7 +125,8 @@ class Renderer:
             w.recruitment_manager.draw(screen)
 
         elif w.screen == "court":
-            w.court.draw_court(screen)
+            mx, my = pygame.mouse.get_pos()
+            w.court_gfx.draw_screen(screen, w, mx, my)
 
         elif w.screen == "peasants":
             w.peasant_menu.draw(screen, w)
@@ -293,17 +294,21 @@ class Renderer:
 
         # --- WARSTWA 5: OPCJE MENU (Dropdown) ---
         if getattr(world, 'menu_open', False):
-            # Przekazujemy mx, my i rysujemy rozwijane opcje
             self.draw_castle_menu(screen, mx, my)
             
             # Podtrzymujemy otwarte menu, jeśli myszka zjedzie na rozwinięte przyciski
             for rect in world.menu_rects.values():
                 if rect.collidepoint(mx, my): mouse_over_ui = True
+                
             if getattr(world, 'build_open', False):
                 for rect in world.build_rects.values():
                     if rect.collidepoint(mx, my): mouse_over_ui = True
+                    
+                # Gwarantuje że bycie GDZIEKOLWIEK w obrębie podmenu budowy trzyma je otwarte
+                submenu_bg_rect = pygame.Rect(world.menu_options_start_x - 180, ban_y, 180, 300)
+                if submenu_bg_rect.collidepoint(mx, my): mouse_over_ui = True
             
-            # "Mostek bezpieczeństwa" - by menu nie znikało przy szybkim przesunięciu myszki w dół
+            # "Mostek bezpieczeństwa" pod głównym banerem
             bridge_rect = pygame.Rect(world.menu_options_start_x, ban_y, ban_w, 300)
             if bridge_rect.collidepoint(mx, my): mouse_over_ui = True
 
@@ -413,39 +418,26 @@ class Renderer:
                 # Zaczynamy od wysokości 36, co ładnie połączy wałek z belką
                 self.draw_parchment_menu(screen, start_x, 20, 200, options, target_dict, mx, my)
  
-    def draw_parchment_menu(self, screen, x, y, width, options, buttons_dict, mx, my):
+    def draw_parchment_menu(self, screen, x, y, width, options, buttons_dict, mx, my, disabled_options=None):
         """Uniwersalne rysowanie menu - inteligentne wycinanie i dopasowanie."""
         if not options or not getattr(self, 'menu_bg_img', None):
             return
 
-        # Zmniejszamy odstępy, by teksty były bliżej siebie (jak w starych grach)
+        if disabled_options is None:
+            disabled_options = []
+
         item_h = 32 
         padding_top = 12
         body_h = (len(options) * item_h) + padding_top + 5
         
-        # =========================================================
-        # 1. INTELIGENTNE RYSOWANIE TŁA
-        # =========================================================
         original_h = self.menu_bg_img.get_height()
-        
-        # Jeśli potrzebujemy więcej miejsca niż ma obrazek (np. 6 opcji w Systemie),
-        # musimy go rozciągnąć. Jeśli mniej (Mapa), zostawiamy oryginalną wysokość.
         target_h = max(body_h, original_h)
-        
-        # Skalujemy
         bg_scaled = pygame.transform.scale(self.menu_bg_img, (width, target_h))
-        
-        # Wycinamy nasz ostateczny prostokąt (teraz zawsze starczy nam "papieru"!)
         bg_cutout = bg_scaled.subsurface(pygame.Rect(0, 0, width, body_h))
         screen.blit(bg_cutout, (x, y))
         
-        # =========================================================
-        # 2. Rysowanie IDENTYCZNYCH WAŁKÓW
-        # =========================================================
         if getattr(self, 'menu_bottom_img', None):
             roller_scaled = pygame.transform.scale(self.menu_bottom_img, (width, 30))
-            
-            # DOLNY WAŁEK (idealnie na końcu uciętego/naciągniętego papieru)
             screen.blit(roller_scaled, (x, y + body_h - 14))
 
         # =========================================================
@@ -455,10 +447,16 @@ class Renderer:
 
         for i, opt in enumerate(options):
             rect = pygame.Rect(x, y + padding_top + (i * item_h), width, item_h)
-            buttons_dict[opt] = rect 
+            is_disabled = opt in disabled_options # Sprawdzamy czy budynek jest na liście "zbudowanych"
 
-            is_hover = rect.collidepoint(mx, my)
-            color = (255, 255, 100) if is_hover else (255, 255, 255)
+            if is_disabled:
+                is_hover = False
+                color = (130, 130, 130) # Ciemnoszary dla wybudowanych
+                # Celowo NIE dodajemy do buttons_dict, by nie można było w to kliknąć!
+            else:
+                buttons_dict[opt] = rect 
+                is_hover = rect.collidepoint(mx, my)
+                color = (255, 255, 100) if is_hover else (255, 255, 255)
             
             if is_hover:
                 hover_surf = pygame.Surface((width - 20, item_h), pygame.SRCALPHA)
@@ -473,7 +471,6 @@ class Renderer:
             
             screen.blit(txt_shadow, (txt_x + 2, txt_y + 2))
             screen.blit(txt, (txt_x, txt_y))
-
             # Możesz to odkomentować (# usuwając hash), jeśli znów będziesz chciał diagnozować klikanie
             # pygame.draw.rect(screen, (255, 0, 0), rect, 1)
 
@@ -840,46 +837,44 @@ class Renderer:
         options = ["Buduj", "ZBURZ ZAMEK", "ROZBUDUJ MURY"]
         w.menu_rects.clear()
 
-        # Pozycje bierzemy z animowanego banera
         menu_x = getattr(w, 'menu_options_start_x', 800)
         menu_y = getattr(w, 'menu_options_start_y', 100)
 
-        # Pokazujemy zwój dopiero gdy baner zjedzie kawałek (klatka 3+)
         if getattr(w, 'menu_anim_frame', 0) >= 3.0:
             self.draw_parchment_menu(screen, menu_x, menu_y, 200, options, w.menu_rects, mx, my)
 
-            # Obsługa sub-menu Budowy (Buduj)
             buduj_rect = w.menu_rects.get("Buduj")
-            if buduj_rect:
-                safe_zone = pygame.Rect(menu_x - 185, menu_y, 170, 200)
-                if buduj_rect.collidepoint(mx, my) or (getattr(w, "build_open", False) and safe_zone.collidepoint(mx, my)):
-                    w.build_open = True
-                    self.draw_build_submenu(screen, menu_x, menu_y)
-                else:
-                    if mx > menu_x: w.build_open = False
+            zburz_rect = w.menu_rects.get("ZBURZ ZAMEK")
+            rozbuduj_rect = w.menu_rects.get("ROZBUDUJ MURY")
+
+            # --- NOWA LOGIKA ZACZEPIANIA PODMENU ---
+            if buduj_rect and buduj_rect.collidepoint(mx, my):
+                w.build_open = True
+            elif (zburz_rect and zburz_rect.collidepoint(mx, my)) or (rozbuduj_rect and rozbuduj_rect.collidepoint(mx, my)):
+                w.build_open = False # Zamyka się tylko, gdy wybierzesz coś innego!
+
+            if getattr(w, "build_open", False):
+                self.draw_build_submenu(screen, menu_x, menu_y)
         
     def draw_build_submenu(self, screen, menu_x, menu_y):
         w = self.world
         castle = w.selected_castle
         if not castle: return
 
-        # Lista budynków do budowy
         all_buildings = ["hospital", "school", "koszary", "forge", "workshop"]
+        to_build = [b.upper() for b in all_buildings] # Pokazujemy pełną listę
         
-        # Filtrujemy tylko te, których jeszcze nie ma
-        to_build = [b.upper() for b in all_buildings if b not in castle.buildings]
-        
-        if not to_build:
-            to_build = ["BRAK OPCJI"]
+        # Tworzymy listę budynków, które Zamek już posiada:
+        disabled = [b.upper() for b in all_buildings if b.lower() in castle.buildings]
 
         w.build_rects.clear()
-        
-        # Rysujemy zwój po lewej stronie głównego menu
         sub_x = menu_x - 165
         sub_y = menu_y + 20
         
         mx, my = pygame.mouse.get_pos()
-        self.draw_parchment_menu(screen, sub_x, sub_y, 180, to_build, w.build_rects, mx, my)
+        
+        # Wysyłamy zmienną disabled_options do rysowania!
+        self.draw_parchment_menu(screen, sub_x, sub_y, 180, to_build, w.build_rects, mx, my, disabled_options=disabled)
     
     def draw_trap_popup(self, screen):
         w = self.world

@@ -352,7 +352,9 @@ class Castle:
         self.cancel_garrison_healing()
 
     def build(self, building_name):
+        # --- ZMIANA: Zawsze zamieniamy nazwę na małe litery ("HOSPITAL" -> "hospital") ---
         building_name = building_name.lower()
+
         # 1. Sprawdź, czy już coś wybudowano w tej turze
         if self.build_limit_reached:
             print("W tej turze już coś wybudowano!")
@@ -363,7 +365,7 @@ class Castle:
             return False
 
         if building_name not in BUILDINGS:
-            print("Nieznany budynek")
+            print(f"Nieznany budynek: {building_name}")
             return False
 
         cost = BUILDINGS[building_name]["cost"]
@@ -374,16 +376,15 @@ class Castle:
 
         # FAKTYCZNA BUDOWA
         self.gold -= cost
-        self.buildings.add(building_name)
+        self.buildings.add(building_name) # Dodajemy małą literą!
         
-        # --- KLUCZOWA POPRAWKA: Ustawiamy limit na True ---
+        # Ustawiamy limit na True
         self.build_limit_reached = True 
-        # --------------------------------------------------
 
         self.update_level()
         print("Zbudowano:", building_name)
         return True
-
+    
     def update_level(self):
         required = {"hospital", "koszary", "workshop", "forge"}
 
