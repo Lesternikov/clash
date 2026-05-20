@@ -4,7 +4,11 @@ import sys
 # ============================================================
 # USTAWIENIA - Wpisz plik, który chcesz badać
 # ============================================================
+<<<<<<< HEAD
 PLIK_ZRODLOWY = "STAT_S32_17.png"
+=======
+PLIK_ZRODLOWY = "r.png"
+>>>>>>> d5c1b9647eac7d318466d4cf5879f31b4346e1b7
 
 def main():
     pygame.init()
