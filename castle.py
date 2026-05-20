@@ -352,6 +352,7 @@ class Castle:
         self.cancel_garrison_healing()
 
     def build(self, building_name):
+        building_name = building_name.lower()
         # 1. Sprawdź, czy już coś wybudowano w tej turze
         if self.build_limit_reached:
             print("W tej turze już coś wybudowano!")

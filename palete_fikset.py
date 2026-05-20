@@ -9,7 +9,7 @@ pygame.display.set_caption("Warsztat Alchemika - Zamiana Kolorów")
 # 1. USTAWIENIA
 # ============================================================
 # Wpisz tutaj nazwę pliku, który chcesz badać i naprawiać
-PLIK_ZRODLOWY = "r1.png" 
+PLIK_ZRODLOWY = "ww.png" 
 
 # Tutaj wpisujesz kolory zebrane pipetą: (STARY KWASOWY) : (NOWY ŁADNY)
 COLOR_MAP = {

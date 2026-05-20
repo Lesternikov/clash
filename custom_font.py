@@ -5,125 +5,89 @@ class BitmapFont:
     def __init__(self, folder_path):
         self.chars = {}
         self.folder_path = folder_path
-        
-        # Duże litery A-Z (33-58)
-        for i in range(33, 59):
-            char = chr(65 + (i - 33)) 
-            self.chars[char] = f"RED_S32_{i}.png"
-            
-        # Małe litery a-z (59-90)
-        for i in range(59, 91):
-            char = chr(97 + (i - 59)) 
-            self.chars[char] = f"RED_S32_{i}.png"
+        self.raw_images = {}
+        self.palettes = {} 
 
+        # --- PRECYZYJNE MAPOWANIE ---
+
+        # Wielkie litery A-Z: Zazwyczaj są na początku (skoro a=65, to A to pewnie 33)
+        # Sprawdź: jeśli A to 33, zostaw tak:
+        wielkie = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        for i, char in enumerate(wielkie):
+            self.chars[char] = f"RED_S32_{33 + i}.png"
+
+        # Małe litery a-z: ZACZYNAJĄ SIĘ OD 65 (według Twojej informacji)
+        male = "abcdefghijklmnopqrstuvwxyz"
+        for i, char in enumerate(male):
+            self.chars[char] = f"RED_S32_{65 + i}.png"
+
+        # Polskie znaki (Twoja lista numerów)
+        polskie = {
+            "ł":"20","Ł":"124","ą":"102","Ą":"111","ć":"109","Ć":"117",
+            "ę":"113","Ę":"112","ś":"126","Ś":"120","ń":"132","Ń":"133",
+            "ó":"130","Ó":"131","ż":"135","Ż":"129","ź":"134","Ź":"128"
+        }
+        for char, num in polskie.items():
+            self.chars[char] = f"RED_S32_{num}.png"
+
+        # Interpunkcja
+        self.chars["."] = "RED_S32_14.png"
+        self.chars[","] = "RED_S32_12.png"
         self.chars[" "] = None
 
-        # Polskie znaki (dopisz resztę jeśli znajdziesz)
-        self.chars["ł"] = "RED_S32_114.png"
-        self.chars["ą"] = "RED_S32_102.png"
-        self.chars["ć"] = "RED_S32_109.png"
-        self.chars["ę"] = "RED_S32_113.png"
+    # Mapowanie cyfr 0-9 pod pliki RED_S32_16.png do RED_S32_25.png
+        cyfry = "0123456789"
+        for i, char in enumerate(cyfry):
+            self.chars[char] = f"RED_S32_{16 + i}.png"
 
-        # Tu trzymamy surowe obrazki
-        self.raw_images = {}
-        
-        # Tu trzymamy gotowe, pokolorowane zestawy liter (np. 'gold', 'red', 'blue')
-        self.palettes = {} 
-        
         self._load_raw_images()
 
     def _load_raw_images(self):
-        """Ładuje oryginały. Jeśli ich nie ma, wypisuje błąd w konsoli."""
         for char, filename in self.chars.items():
             if filename:
                 path = os.path.join(self.folder_path, filename)
                 if os.path.exists(path):
                     self.raw_images[char] = pygame.image.load(path).convert_alpha()
-                else:
-                    print(f"OSTRZEŻENIE: Brak pliku {path}")
 
-    def add_palette(self, palette_name, color_map):
-        """Tworzy nowy zestaw liter na podstawie Twojego COLOR_MAP."""
-        self.palettes[palette_name] = {}
+    def add_palette(self, name, color_map):
+        self.palettes[name] = {}
         for char, img in self.raw_images.items():
-            colored_img = img.copy()
-            # Podmiana kolorów
-            for x in range(colored_img.get_width()):
-                for y in range(colored_img.get_height()):
-                    pixel = tuple(colored_img.get_at((x, y)))
-                    if pixel in color_map:
-                        colored_img.set_at((x, y), color_map[pixel])
-            self.palettes[palette_name][char] = colored_img
+            new_img = img.copy()
+            pixels = pygame.PixelArray(new_img)
+            for old_c, new_c in color_map.items():
+                pixels.replace(old_c, new_c)
+            pixels.close()
+            self.palettes[name][char] = new_img
 
-    def render(self, screen, text, x, y, spacing=1, palette_name=None):
-        # Jeśli nie podasz palety, weź pierwszą dostępną
-        if palette_name is None and self.palettes:
-            palette_name = list(self.palettes.keys())[0]
+    def render(self, screen, text, x, y, spacing=0, palette_name=None, scale=1.0):
+        if not self.palettes: return
+        p_name = palette_name if palette_name in self.palettes else list(self.palettes.keys())[0]
+        active_set = self.palettes[p_name]
         
-        if palette_name not in self.palettes:
-            return # Nie rysuj nic, jeśli nie ma palet
-
-        active_set = self.palettes[palette_name]
         curr_x = x
         for char in text:
             if char == " ":
-                curr_x += 10
+                curr_x += int(10 * scale)
                 continue
-            if char in active_set:
-                screen.blit(active_set[char], (curr_x, y))
-                curr_x += active_set[char].get_width() + spacing
+            
+            # Pobieramy obrazek dokładnie dla takiego znaku, jaki jest w tekście
+            # Dzięki temu 'a' pobierze plik 59, a 'A' plik 33
+            img = active_set.get(char)
+
+            if img:
+                # SKALOWANIE
+                if scale != 1.0:
+                    new_size = (int(img.get_width() * scale), int(img.get_height() * scale))
+                    img = pygame.transform.scale(img, new_size)
+
+                screen.blit(img, (curr_x, y))
+                # Odstęp musi uwzględniać szerokość wyskalowanego obrazka
+                curr_x += img.get_width() + spacing
             else:
-                curr_x += 8
+                # Jeśli znaku nie ma (np. tabulacja), przesuń o mały odstęp
+                curr_x += int(5 * scale)
 
-                
-                
-                koniec
-                koniec
-
-                koniec
-
-                koniec
-
-                koniec
-
-                koniec
-
-                koniec
-
-                koniec
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                koniec
-
-
-                koniec
-
-                koniec
-
-                koniec
-
-
-                koniec
-
-                koniec
-
-                koniec
-                koniec
-                koniec
-                koniec
-                koniec
-                koniec
-
+if __name__ == "__main__":
+        import subprocess, sys, os
+        main_path = os.path.join(os.path.dirname(__file__), "main.py")
+        subprocess.run([sys.executable, main_path])

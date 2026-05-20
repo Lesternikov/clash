@@ -105,7 +105,10 @@ class MapGraphics:
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_75.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_95.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_96.png")),
-
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png")),
         ]
 
         self.river_anim = self.load_river_animation() 

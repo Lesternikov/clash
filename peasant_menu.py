@@ -29,7 +29,7 @@ class PeasantMenu:
 
         self.font = pygame.font.SysFont(None, 24)
         
-        # --- NOWE CZCIONKI ---
+        # --- CZCIONKI ---
         try:
             # Próba załadowania systemowej czcionki gotyckiej
             self.font_gothic = pygame.font.SysFont("Old English Text MT", 75) 
@@ -37,8 +37,9 @@ class PeasantMenu:
             # Fallback (awaryjnie) w razie braku czcionki w systemie
             self.font_gothic = pygame.font.SysFont("Times New Roman", 55, bold=True)
             
-        self.font_morale = pygame.font.SysFont("Times New Roman", 30, bold=True)
-        self.font_bottom = pygame.font.SysFont("Times New Roman", 20, bold=True)
+        self.font = pygame.font.SysFont("timesnewroman", 24, bold=True)
+        self.font_morale = pygame.font.SysFont("timesnewroman", 30, bold=True)
+        self.font_bottom = pygame.font.SysFont("timesnewroman", 20, bold=True)
         # ========================================================
         # ŁADOWANIE WSZYSTKICH STRZAŁEK
         # ========================================================
@@ -95,6 +96,17 @@ class PeasantMenu:
         path = os.path.join("assets", "TAX.png")
         self.TAX = pygame.image.load(path).convert_alpha() if os.path.exists(path) else None
 
+    def _draw_text_with_outline(self, screen, text, font, x, y, text_color=(255, 255, 255), outline_color=(0, 0, 0)):
+        """Rysuje tekst z bardzo delikatnym cieniem (1 piksel), leciutko podkreślając cyfry."""
+        text_str = str(text)
+        
+        # Rysujemy tylko jeden cień przesunięty o 1 piksel w prawo i 1 piksel w dół
+        shadow_surf = font.render(text_str, True, outline_color)
+        screen.blit(shadow_surf, (x + 2, y + 2))
+            
+        # Na to nakładamy główny biały tekst
+        text_surf = font.render(text_str, True, text_color)
+        screen.blit(text_surf, (x, y))
 
     def _draw_arrow(self, screen, rect, base_name):
         """Uniwersalna funkcja do rysowania interaktywnych grafik."""
@@ -133,17 +145,18 @@ class PeasantMenu:
 
         # 3. Informacje o wybranym zamku (Góra)
         
-        # --- GOTYCKA LICZBA CHŁOPÓW Z CIENIEM ---
-        peasants_count = int(getattr(castle, 'peasants', 0))
-        shadow_txt = self.font_gothic.render(str(peasants_count), True, (0, 0, 0))
-        main_txt = self.font_gothic.render(str(peasants_count), True, (255, 255, 255))
-        
-        # Obliczenie środka, żeby tekst ładnie leżał niezależnie od liczby cyfr
-        txt_x = self.screen_w // 2  - main_txt.get_width() // 2
+        # --- GRAFICZNA LICZBA CHŁOPÓW (Używa plików RED_S32 przez renderer) ---
+        peasants_count_str = str(int(getattr(castle, 'peasants', 0)))
+        # Szacunkowe centrowanie dla skali 1.5
+        txt_x = (self.screen_w // 2) - (len(peasants_count_str) * 20)
         txt_y = 40
         
-        screen.blit(shadow_txt, (txt_x + 3, txt_y + 3))  # Rysowanie cienia
-        screen.blit(main_txt, (txt_x, txt_y))            # Rysowanie właściwej liczby
+        # Wywołujemy render z custom_font, który znajduje się w obiekcie w.renderer
+        w.renderer.custom_font.render(
+            screen, peasants_count_str, 
+            txt_x, txt_y, 
+            spacing=2, palette_name="golden", scale=1.5
+        )
 
         # --- ZADOWOLENIE (MORALE) ---
         happiness_val = int(getattr(castle, 'happiness', 50)) # Zamiana na liczbę całkowitą
@@ -156,8 +169,8 @@ class PeasantMenu:
         screen.blit(hap_shadow, (hap_x + 2, hap_y + 2))
         screen.blit(hap_txt, (hap_x, hap_y))
 
-        # --- ZŁOTO --- (zostało bez zmian)
-        screen.blit(self.font.render(f"{castle.gold}", True, (255,215,0)), (self.screen_w - 125, 50))
+        # --- ZŁOTO --- 
+        self._draw_text_with_outline(screen, f"{castle.gold}", self.font, self.screen_w - 125, 50)
 
         # WSKAŹNIK TRENDU (Strzałka przy poziomie zadowolenia)
         trend_img = self.trend_up if castle.happiness >= 50 else self.trend_down
@@ -166,9 +179,9 @@ class PeasantMenu:
             scaled_trend = pygame.transform.scale(trend_img, (tw, th))
             screen.blit(scaled_trend, (self.screen_w//2 + 101, 31))
 
-        # 4. Podatki (Lewa strona)
-        screen.blit(self.font.render(f"{castle.tax_rate:.1f}", True, (255,255,255)), (365, self.screen_h//2 - 62))
-        screen.blit(self.font.render(f"{tax_income}", True, (255,255,0)), (757, self.screen_h//2 - 64))
+        # 4. Podatki (Lewa strona) - Z czarnym obrysem retro
+        self._draw_text_with_outline(screen, f"{castle.tax_rate:.1f}", self.font, 365, self.screen_h//2 - 62)
+        self._draw_text_with_outline(screen, f"{tax_income}", self.font, 757, self.screen_h//2 - 64)
 
         self._draw_arrow(screen, self.tax_minus_button, "tax_down")
         self._draw_arrow(screen, self.tax_plus_button, "tax_up")
@@ -249,9 +262,9 @@ class PeasantMenu:
         # --- PRZYCISK WYSYŁANIA ---
         self._draw_arrow(screen, self.send_button, "send_gold")
         
-        # Wartości do wysłania
-        screen.blit(self.font.render(f"{self.send_peasants_amount}", True, (255,255,255)), (self.screen_w-120, self.screen_h//2 + 190))
-        screen.blit(self.font.render(f"{self.send_gold_amount}", True, (255,255,0)), (self.screen_w-120, self.screen_h//2 + 55))
+        # Wartości do wysłania - Z czarnym obrysem retro
+        self._draw_text_with_outline(screen, f"{self.send_peasants_amount}", self.font, self.screen_w-120, self.screen_h//2 + 190)
+        self._draw_text_with_outline(screen, f"{self.send_gold_amount}", self.font, self.screen_w-120, self.screen_h//2 + 55)
 
         # 7. Przycisk Powrotu (obsługiwany przez funkcję z pliku world)
         w.renderer.draw_building_footer(screen)
@@ -261,12 +274,6 @@ class PeasantMenu:
             px, py, pw, ph = 268, 149, 112, 21
             scaled_obj = pygame.transform.scale(self.TAX, (int(pw * sx), int(ph * sy)))
             screen.blit(scaled_obj, (int(px * sx), int(py * sy)))
-
-        # =======================================================
-        # TRYB DEBUG - CZERWONE RAMKI (DO USUNIĘCIA PÓŹNIEJ)
-        # =======================================================
-        debug_color = (255, 0, 0)
-        thickness = 2
         
         # 1. Pojedyncze przyciski (podatki, chłopi, złoto, wyślij)
         buttons_to_draw = [
@@ -274,20 +281,8 @@ class PeasantMenu:
             self.peasants_minus_button, self.peasants_plus_button,
             self.gold_minus_button, self.gold_plus_button,
             self.send_button
-        ]
+        ] 
         
-        for b in buttons_to_draw:
-            pygame.draw.rect(screen, debug_color, b, thickness)
-            
-        # 2. Strzałki od zamków (Pokazujemy je POWIĘKSZONE, tak jak faktycznie czyta je myszka!)
-        pygame.draw.rect(screen, debug_color, self.castle_up_button.inflate(20, 20), thickness)
-        pygame.draw.rect(screen, debug_color, self.castle_down_button.inflate(20, 20), thickness)
-        
-        # 3. Pola do klikania w nazwy zamków (Lista na środku)
-        if hasattr(self, 'castle_list_rects'):
-            for r in self.castle_list_rects:
-                pygame.draw.rect(screen, (255, 100, 100), r, thickness) # Lekko jaśniejszy czerwony
-
     def handle_click(self, mx, my, w):
         """Obsługuje kliknięcia w menu."""
         if w.back_button.collidepoint(mx, my):
