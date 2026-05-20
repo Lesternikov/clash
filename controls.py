@@ -39,6 +39,13 @@ class ControlsHandler:
                             self.world.selected_castle = c
                             self.world.screen = "peasants"
                             break
+                if event.key == pygame.K_F3:
+                    print("DEBUG: Teleportacja do dworu!")
+                    for c in self.world.castles:
+                        if c.owner == self.world.players[self.world.current_player]:
+                            self.world.selected_castle = c
+                            self.world.screen = "court"
+                            break
                 # Zamiast self.screen używamy self.world.screen
                 if event.key == pygame.K_ESCAPE:
                     self.world.road_build_mode = False
