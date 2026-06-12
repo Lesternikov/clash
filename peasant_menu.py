@@ -12,7 +12,7 @@ class PeasantMenu:
         self.send_peasants_amount = 0
         self.send_gold_amount = 0 
         self.castle_list_offset = 0
-        # --- NOWE ZMIENNE LISTY ZAMKÓW ---
+        # --- ZMIENNE LISTY ZAMKÓW ---
         self.scroll = -2 
         self.castle_list_rects = []
         self.last_click_time = 0
@@ -170,7 +170,13 @@ class PeasantMenu:
         screen.blit(hap_txt, (hap_x, hap_y))
 
         # --- ZŁOTO --- 
-        self._draw_text_with_outline(screen, f"{castle.gold}", self.font, self.screen_w - 125, 50)
+        gold_str = str(castle.gold).replace(" ", "")
+        
+        w.renderer.custom_font.render(
+            screen, gold_str, 
+            self.screen_w - 142, 52, 
+            spacing=0.5, palette_name="golden", scale=1.55
+        )
 
         # WSKAŹNIK TRENDU (Strzałka przy poziomie zadowolenia)
         trend_img = self.trend_up if castle.happiness >= 50 else self.trend_down
@@ -180,8 +186,19 @@ class PeasantMenu:
             screen.blit(scaled_trend, (self.screen_w//2 + 101, 31))
 
         # 4. Podatki (Lewa strona) - Z czarnym obrysem retro
-        self._draw_text_with_outline(screen, f"{castle.tax_rate:.1f}", self.font, 365, self.screen_h//2 - 62)
-        self._draw_text_with_outline(screen, f"{tax_income}", self.font, 757, self.screen_h//2 - 64)
+        tax_rate_str = f"{castle.tax_rate:.1f}".replace(" ", "")
+        w.renderer.custom_font.render(
+            screen, tax_rate_str,
+            353, self.screen_h//2 - 62,
+            spacing=1, palette_name="golden", scale=1.55
+        )
+
+        tax_income_str = str(tax_income).replace(" ", "")
+        w.renderer.custom_font.render(
+            screen, tax_income_str,
+            754, self.screen_h//2 - 64,
+            spacing=1, palette_name="golden", scale=1.55
+)
 
         self._draw_arrow(screen, self.tax_minus_button, "tax_down")
         self._draw_arrow(screen, self.tax_plus_button, "tax_up")
@@ -234,19 +251,31 @@ class PeasantMenu:
                 screen.blit(sh_name, (base_x + 2, row_y + 2))
                 screen.blit(txt_name, (base_x, row_y))
                 
-                # MAGIA: Rysujemy Chłopów i Złoto TYLKO jeśli to nie jest nasz obecny zamek!
+                #Rysujemy Chłopów i Złoto TYLKO jeśli to nie jest nasz obecny zamek!
                 if c != castle:
-                    txt_p = self.font_bottom.render(f"P: {c.peasants}", True, t_col)
-                    txt_g = self.font_bottom.render(f"G: {c.gold}", True, t_col)
-                    
-                    sh_p = self.font_bottom.render(f"P: {c.peasants}", True, (0, 0, 0))
-                    sh_g = self.font_bottom.render(f"G: {c.gold}", True, (0, 0, 0))
-                    
-                    screen.blit(sh_p, (base_x + 160 + 2, row_y + 2))
-                    screen.blit(txt_p, (base_x + 160, row_y))
-                    
-                    screen.blit(sh_g, (base_x + 260 + 2, row_y + 2))
-                    screen.blit(txt_g, (base_x + 260, row_y))
+                    txt_p_lbl = self.font_bottom.render("P: ", True, t_col)
+                    sh_p_lbl = self.font_bottom.render("P: ", True, (0, 0, 0))
+                    screen.blit(sh_p_lbl, (base_x + 160 + 2, row_y + 2))
+                    screen.blit(txt_p_lbl, (base_x + 160, row_y))
+
+                    c_peasants_str = str(c.peasants).replace(" ", "")
+                    w.renderer.custom_font.render(
+                        screen, c_peasants_str,
+                        base_x + 185, row_y + 4.5,
+                        spacing=1, palette_name="golden", scale=1.2
+                    )
+
+                    txt_g_lbl = self.font_bottom.render("G: ", True, t_col)
+                    sh_g_lbl = self.font_bottom.render("G: ", True, (0, 0, 0))
+                    screen.blit(sh_g_lbl, (base_x + 260 + 2, row_y + 2))
+                    screen.blit(txt_g_lbl, (base_x + 260, row_y))
+
+                    c_gold_str = str(c.gold).replace(" ", "")
+                    w.renderer.custom_font.render(
+                        screen, c_gold_str,
+                        base_x + 285, row_y + 4.5,
+                        spacing=1, palette_name="golden", scale=1.2
+                    )
 
         # --- STRZAŁKI LISTY ZAMKÓW ---
         self._draw_arrow(screen, self.castle_up_button, "castle_up")
@@ -263,8 +292,19 @@ class PeasantMenu:
         self._draw_arrow(screen, self.send_button, "send_gold")
         
         # Wartości do wysłania - Z czarnym obrysem retro
-        self._draw_text_with_outline(screen, f"{self.send_peasants_amount}", self.font, self.screen_w-120, self.screen_h//2 + 190)
-        self._draw_text_with_outline(screen, f"{self.send_gold_amount}", self.font, self.screen_w-120, self.screen_h//2 + 55)
+        send_peasants_str = str(self.send_peasants_amount).replace(" ", "")
+        w.renderer.custom_font.render(
+            screen, send_peasants_str,
+            self.screen_w - 120, self.screen_h//2 + 190,
+            spacing=1, palette_name="golden", scale=1.55
+        )
+
+        send_gold_str = str(self.send_gold_amount).replace(" ", "")
+        w.renderer.custom_font.render(
+            screen, send_gold_str,
+            self.screen_w - 120, self.screen_h//2 + 55,
+            spacing=1, palette_name="golden", scale=1.55
+)
 
         # 7. Przycisk Powrotu (obsługiwany przez funkcję z pliku world)
         w.renderer.draw_building_footer(screen)
