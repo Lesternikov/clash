@@ -39,6 +39,14 @@ class ControlsHandler:
                             self.world.selected_castle = c
                             self.world.screen = "peasants"
                             break
+                if event.key == pygame.K_F4:
+                    print("DEBUG: Teleportacja do SZKOŁY!")
+                    for c in self.world.castles:
+                        if c.owner == self.world.players[self.world.current_player]:
+                            self.world.selected_castle = c
+                            self.world.screen = "school" 
+                            break
+
                 if event.key == pygame.K_F3:
                     print("DEBUG: Teleportacja do dworu!")
                     for c in self.world.castles:
@@ -131,7 +139,13 @@ class ControlsHandler:
 
     def handle_mouse_click(self, mx, my, button):
         if button != 1 and button != 3: return
-        w = self.world # Skrót dla wygody
+        w = self.world 
+
+        # --- NOWE: OKIENKO WALKI ZBIERA KLIKNIĘCIA ---
+        if w.screen == "combat_setup":
+            if button == 1:
+                w.combat_menu.handle_click(mx, my, w)
+            return # Kończymy, żeby gracz nie "przeklikał" przez tło
 
         # --- DODANE: Obsługa okienka ZBURZ ZAMEK (TAK/NIE) ---
         if getattr(w, 'demolish_confirm', False):
@@ -141,6 +155,24 @@ class ControlsHandler:
                 w.demolish_confirm = False
             return
         # ----------------------------------------------------
+
+        # ====================================================
+        # ---> DODAJ TO: Obsługa kliknięć w oknie przed walką
+        # ====================================================
+        if w.screen == "combat_setup":
+            if button == 1:
+                w.combat_menu.handle_click(mx, my, w)
+            return # Ważne: Zatrzymujemy sprawdzanie reszty mapy!
+        
+        if w.screen == "combat_tactical":
+            if button == 1 and hasattr(w, 'tactical_combat'):
+                w.tactical_combat.handle_click(mx, my)
+            return
+
+        # 1. PRIORYTET: Ekrany specjalne
+        if w.screen == "trap_info":
+            w.handle_trap_info_click(mx, my)
+            return
 
         # 1. PRIORYTET: Ekrany specjalne
         if w.screen == "trap_info":

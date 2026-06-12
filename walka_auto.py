@@ -49,10 +49,16 @@ def resolve_auto_combat(attacker, defender, world):
 
     # 4. Totalne czyszczenie z mapy jednostek, które zginęły (Przegrani + polegli Zwycięzcy)
     all_dead = losers + [w for w in winners if w not in survivors]
+    
+    # Określamy gracza, który wygrał to starcie (to on będzie brał jeńców)
+    killer_player = winner_leader.owner
+    
     for dead_unit in all_dead:
         dead_unit.hp = 0
-        if dead_unit in world.units: world.units.remove(dead_unit)
-        if dead_unit.owner and dead_unit in dead_unit.owner.units: dead_unit.owner.units.remove(dead_unit)
+        
+        # ZAMIAST ręcznego usuwania, wywołujemy nową, inteligentną funkcję ze świata gry!
+        # Funkcja sama usunie jednostkę, a jeśli to Generał - wyśle go do lochów "killer_player"
+        world.kill_unit(dead_unit, killer_player)
 
     # 5. Aktualizacja ocalałej armii
     if not survivors:

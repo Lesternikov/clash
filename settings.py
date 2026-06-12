@@ -253,7 +253,7 @@ UNIT_STATS = {
         tempie pokonują 
         każdy łańcuch górski."""},
 
-    "Budowniczy":{"hp":100,"moves":26,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
+    "Budowniczy":{"hp":100,"moves":126,"attack":60,"defense":70,"exp":0,"morale":10,"fatigue":0,"patent_cost":80 ,"production_cost":6 ,"production_time":3, "description":"""Budowniczy\n
         Budowniczy - formacje nie-
         zbędne przy konstruowaniu 
         zamków, dróg, mostów itd. 
@@ -422,6 +422,8 @@ UNIT_STATS = {
         wiają, że smok nie ma sobie
         równych przeciwników zarów-
         no w powietrzu, jak i na ziemi.""" },
+
+    "Generał":{"hp":100,"moves":36}
    }
 
 TERRAIN_TYPES = {

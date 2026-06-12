@@ -4,9 +4,9 @@ import sys
 # ============================================================
 # USTAWIENIA - Wpisz nazwy swoich plików
 # ============================================================
-PLIK_ZRODLO = "STAT_S32_27.png"   # np. "STAT_S32_17.png" (ten kwasowy)
-PLIK_CEL = "QUEEN_S32_3.png"       # np. "STAT_S32_46.png" (ten ze złotym krzyżem)
-PLIK_WYNIKOWY = "GOTOWA_PALETA.txt"
+PLIK_ZRODLO = "STAT_S32_24.png"   # np. "STAT_S32_17.png" (ten kwasowy)
+PLIK_CEL = "Screenshot 2026-05-20 214534.png"       # np. "STAT_S32_46.png" (ten ze złotym krzyżem)
+PLIK_WYNIKOWY = "statyka.txt"
 
 def main():
     pygame.init()

@@ -102,7 +102,16 @@ class Renderer:
         if w.screen == "map":
             self.draw_top_bar(screen)
             self.draw_ui(screen)
-
+        
+        elif w.screen == "combat_setup":
+            self.draw_map(screen) # Zostawiamy mapę w tle
+            w.combat_menu.draw(screen, w, self.gfx) # Rysujemy nowe okno walki na wierzchu!
+            
+        # ---> DODAJ TEN BLOK <---
+        elif w.screen == "combat_tactical":
+            if hasattr(w, 'tactical_combat'):
+                w.tactical_combat.draw(screen)
+                
         elif w.screen == "trap_info":
             self.draw_top_bar(screen)
             self.draw_ui(screen)
@@ -155,6 +164,8 @@ class Renderer:
 
         # Teren
         self.gfx.draw_terrain(screen, self.world)
+        # Place budowy (Na wierzchu nad trawą)
+        self.gfx.draw_construction_sites(screen, self.world)
         # Siatka
         if getattr(w, 'show_grid', False):
             self.draw_grid_lines(screen)
@@ -201,14 +212,26 @@ class Renderer:
         
     def draw_grid_lines(self, screen):
         w = self.world
-        offset_x = -(w.camera_x % TILE_SIZE)
-        offset_y = -(w.camera_y % TILE_SIZE)
-        for x in range(0, SCREEN_WIDTH + TILE_SIZE, TILE_SIZE):
-            pygame.draw.line(screen, (50, 50, 50),
-                             (x + offset_x, 0), (x + offset_x, SCREEN_HEIGHT))
-        for y in range(0, SCREEN_HEIGHT + TILE_SIZE, TILE_SIZE):
-            pygame.draw.line(screen, (50, 50, 50),
-                             (0, y + offset_y), (SCREEN_WIDTH, y + offset_y))
+        cam_x = int(w.camera_x)
+        cam_y = int(w.camera_y)
+        
+        # 1. Obliczamy, nad którymi kafelkami (kolumnami i wierszami) wisi teraz kamera
+        start_col = cam_x // TILE_SIZE
+        end_col = (cam_x + SCREEN_WIDTH) // TILE_SIZE + 1
+        
+        start_row = cam_y // TILE_SIZE
+        end_row = (cam_y + SCREEN_HEIGHT) // TILE_SIZE + 1
+        
+        # 2. Rysujemy PIONOWE linie bazując dokładnie na pozycji KAFELKÓW
+        for col in range(start_col, end_col + 1):
+            # Dokładnie ten sam wzór, którego używa grafika mapy!
+            x = (col * TILE_SIZE) - cam_x
+            pygame.draw.line(screen, (50, 50, 50), (x, 0), (x, SCREEN_HEIGHT))
+            
+        # 3. Rysujemy POZIOME linie bazując na wierszach mapy
+        for row in range(start_row, end_row + 1):
+            y = (row * TILE_SIZE) - cam_y
+            pygame.draw.line(screen, (50, 50, 50), (0, y), (SCREEN_WIDTH, y))
     
     def draw_castle_interface(self, screen, world):
         """Rysuje interfejs zamku."""
@@ -319,6 +342,7 @@ class Renderer:
 
         # --- WARSTWA 6: STOPKA (Kamienny przycisk Powrotu) ---
         self.draw_building_footer(screen)
+
     def draw_castle(self, screen, castle):
         """Ta funkcja rysuje tylko OBIEKT na mapie świata."""
         # Obliczamy pozycję na ekranie względem kamery
@@ -440,7 +464,10 @@ class Renderer:
             roller_scaled = pygame.transform.scale(self.menu_bottom_img, (width, 30))
             screen.blit(roller_scaled, (x, y + body_h - 14))
 
-        font_scroll = pygame.font.SysFont("Arial", 20, bold=True)
+        # =========================================================
+        # 3. Rysowanie opcji i hitboxów
+        # =========================================================
+        font_scroll = pygame.font.SysFont("Times New Roman", 20, bold=True)
 
         for i, opt in enumerate(options):
             rect = pygame.Rect(x, y + padding_top + (i * item_h), width, item_h)
@@ -968,7 +995,7 @@ class Renderer:
             # Tylko zamek ma graficzny przycisk z arkusza Z_IKO
             self.draw_button(screen, "", w.back_button_castle, style="castle")
 
-        elif w.screen in ["garrison", "Strażnica", "peasants"]:
+        elif w.screen in ["garrison", "Strażnica", "peasants","school","hospital","forge","workshop"]:
             # ZMIANA: używamy stylu "garrison_back"
             btn_rect = getattr(w, 'back_button_garrison', w.back_button_bldg)
             self.draw_button(screen, "", btn_rect, style="garrison_back")
@@ -1019,6 +1046,7 @@ class Renderer:
                 screen.blit(s, (draw_x, draw_y))
                 pygame.draw.rect(screen, (255, 0, 0), preview_rect, 2)
 
+    #strzałki drogi
     def draw_road_arrows(self, screen):
         w = self.world
         u = w.selected_unit
@@ -1050,7 +1078,6 @@ class Renderer:
                 offset_x = (TILE_SIZE - img.get_width())  // 2
                 offset_y = (TILE_SIZE - img.get_height()) // 2
                 screen.blit(img, (pos_x + offset_x, pos_y + offset_y))
-
 
     # -------------------------------------------------------
     # RYSOWANIE TRASY — STOPY zamiast kropek
@@ -1111,7 +1138,7 @@ class Renderer:
 
             current_x, current_y = px, py
 
-        # -------------------------------------------------------
+    # -------------------------------------------------------
     # RYSOWANIE BUDYNKÓW (teksty opisowe)
     # -------------------------------------------------------
 
@@ -1125,8 +1152,7 @@ class Renderer:
             "Jednocześnie łowisarze z górskich krain wytapiają tu stal",
             "na pancerze i wytwarzają broń palną.",
         ]
-        self.draw_building_template(screen, "Kuźnia", lines,
-                                    (120, 90, 60), (200, 170, 90))
+        self.draw_building_template(screen, "Kuźnia", lines)
 
     def draw_workshop(self, screen):
         lines = [
@@ -1148,41 +1174,50 @@ class Renderer:
 
     def draw_school(self, screen):
         lines = [
-            "Dzięki wykładanym tu naukom możliwe będzie szkolenie",
-            "Twoich wojsk w rzemiośle rycerskim.",
+            "   Dzięki wykładanym tu naukom, możliwe będzie szkolenie",
+            "Twoich wojsk w rzemiośle rycerskim. Wprawieni w sztuce",
+            "wojennej weterani bitew horbijskich sprawią, że byle żołdak",
+            "w szybkim tempie nauczy się wprawnie posługiwać posiadanym",
+            "orężem."
             "",
-            "Ponadto uczeni waldzcy umożliwią osiągnięcie wyższego",
-            "poziomu technologii w Twoim królestwie.",
+            "",
+            "   Ponadto, dzięki wysiłkom uczonych waldzkich, którzy tu",
+            "także przebywają, możliwe będzie osiągnięcie wyższego",
+            "poziomu tehnologi w Twoim królestwie",
         ]
-        self.draw_building_template(screen, "Szkoła", lines)
+        # Wszystkie parametry w jednym miejscu:
+        cfg = {
+            "pos_tytul": (450, 135), 
+            "pos_tekst": (150, 220), 
+            "scale_tytul": 2, 
+            "scale_tekst": 1.2
+        }
+        self.draw_building_template(screen, "Szkoła", lines, config=cfg)
 
-    def draw_building_template(self, screen, title, lines,
-                                theme_color=(100, 100, 130),
-                                border_color=(180, 180, 220)):
-        
-        # 1. RYSOWANIE TŁA (zostaje bez zmian)
-        if hasattr(self, 'bldg_bg') and self.bldg_bg:
-            bg_scaled = pygame.transform.scale(self.bldg_bg, screen.get_size())
-            screen.blit(bg_scaled, (0, 0))
-        else:
-            screen.fill((60, 60, 80))
+    def draw_building_template(self, screen, title, lines, config=None):
+        # Domyślne wartości
+        c = {
+            "pos_tytul": (450, 135), "pos_tekst": (150, 220),
+            "scale_tytul": 2.0, "scale_tekst": 1.2,
+            "spacing_tytul": 1, "spacing_tekst":0
+        }
+        if config: c.update(config)
 
-        # 2. SEKCJA TYTUŁU (Używamy Twoich liter!)
-        tytul_y = 120 
-        # Obliczamy środek, żeby tytuł był równo
-        # (Możesz dodać metodę get_width do BitmapFont, żeby wyśrodkować idealnie)
-        self.custom_font.render(screen, title.upper(), 350, y, spacing=3, palette_name="nacja_1")
+        # Tło
+        if hasattr(self, 'bldg_bg'):
+            screen.blit(pygame.transform.scale(self.bldg_bg, screen.get_size()), (0, 0))
 
-        # 3. TEKST W GŁÓWNEJ RAMCE
-        tekst_x = 180  
-        tekst_y = 230  
-        
+        # Renderowanie - Zawsze na złoto (palette_name="golden")
+        self.custom_font.render(screen, title.upper(), c["pos_tytul"][0], c["pos_tytul"][1], 
+                                spacing=c["spacing_tytul"], palette_name="golden", scale=c["scale_tytul"])
+
+        curr_y = c["pos_tekst"][1]
         for line in lines:
-            # Tutaj Twoje litery zastępują systemowego Ariala
-            self.custom_font.render(screen, line, tekst_x, tekst_y, spacing=1)
-            tekst_y += 35 
+            # Używamy .upper() jeśli małe litery w Twoich PNG są pomieszane - to często naprawia "bzdury"
+            self.custom_font.render(screen, line, c["pos_tekst"][0], curr_y, 
+                                    spacing=c["spacing_tekst"], palette_name="golden", scale=c["scale_tekst"])
+            curr_y += int(35 * c["scale_tekst"])
 
-        # 4. STOPKA (zostaje bez zmian)
         self.draw_building_footer(screen)
 
 if __name__ == "__main__":

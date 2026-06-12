@@ -4,7 +4,7 @@ import sys
 # ============================================================
 # USTAWIENIA 
 # ============================================================
-PLIK_ZRODLOWY = "QUEEN_S32_9.png"
+PLIK_ZRODLOWY = "STAT_S32_24.png"
 PLIK_WYNIKOWY = "CEL.txt"
 
 def main():

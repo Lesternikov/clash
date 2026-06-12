@@ -34,6 +34,23 @@ class MapGraphics:
         self.load_all_water_assets()
         self.pathfinder = Pathfinder(self.world)        
 
+        # GRAFIKI PLACU BUDOWY
+        # Używamy Twojej funkcji load_single_img, która automatycznie skaluje grafiki do 32x32 pikseli!
+        self.build_grass = {
+            (0, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_707.png")),
+            (1, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_708.png")),
+            (0, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_709.png")),
+            (1, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_710.png"))
+        }
+        
+        self.build_desert = {
+            (0, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_711.png")),
+            (1, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_712.png")),
+            (0, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_713.png")),
+            (1, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_714.png"))
+        }
+        
+
     def load_ui_assets(self):
         
         """Ładuje wszystkie grafiki interfejsu"""
@@ -536,12 +553,7 @@ class MapGraphics:
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
-                elif obj_tile == "#":
-                    is_left = (x == 0 or world.map[y][x-1] != "#")
-                    is_top = (y == 0 or world.map[y-1][x] != "#")
-                    if is_left and is_top:
-                        big_rect = pygame.Rect(pos[0], pos[1], TILE_SIZE * 2, TILE_SIZE * 2)
-                        pygame.draw.rect(screen, (255, 255, 255), big_rect, 4)
+                
                 elif obj_tile == "X":
                     trap_color = (200, 0, 0)
                     offset = 6
@@ -550,6 +562,34 @@ class MapGraphics:
                 elif obj_tile in self.terrain_images:
                     screen.blit(self.terrain_images[obj_tile], pos)
 
+    def draw_construction_sites(self, screen, world):
+        """Rysuje kompletne place budowy zamków niezależnie od krawędzi ekranu"""
+        if not world.map: 
+            return
+
+        for y in range(len(world.map)):
+            for x in range(len(world.map[0])):
+                if self.pathfinder.get_tile_at(x, y) == "#":
+                    
+                    px = (x * TILE_SIZE) - world.camera_x
+                    py = (y * TILE_SIZE) - world.camera_y
+                    
+                    # Rysujemy tylko, jeśli chociaż kawałek placu jest na ekranie
+                    margin = TILE_SIZE * 2
+                    if not (-margin < px < SCREEN_WIDTH + margin and -margin < py < SCREEN_HEIGHT + margin):
+                        continue
+
+                    bg_tile = self.pathfinder.get_bg_tile_at(x, y)
+                    if bg_tile in ["p", "P", "s"]:
+                        zestaw = getattr(self, 'build_desert', None)
+                    else:
+                        zestaw = getattr(self, 'build_grass', None)
+                        
+                    if zestaw:
+                        if (0, 0) in zestaw: screen.blit(zestaw[(0, 0)], (px, py))
+                        if (1, 0) in zestaw: screen.blit(zestaw[(1, 0)], (px + TILE_SIZE, py))
+                        if (0, 1) in zestaw: screen.blit(zestaw[(0, 1)], (px, py + TILE_SIZE))
+                        if (1, 1) in zestaw: screen.blit(zestaw[(1, 1)], (px + TILE_SIZE, py + TILE_SIZE))
 
     if __name__ == "__main__":
         import subprocess, sys, os

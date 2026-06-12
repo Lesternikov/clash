@@ -75,6 +75,16 @@ class World(BuildingsMixin):
         self.peasant_menu = PeasantMenu(w, h)
         pygame.font.init()
         self.court_gfx = CourtGraphics(w, h)
+        from combat_setup import CombatSetupMenu
+        self.combat_menu = CombatSetupMenu(w, h)
+        
+        # Zmienne przechowujące stan zawieszonej walki
+        self.combat_attacker = None
+        self.combat_defender = None
+        self.combat_nx = 0
+        self.combat_ny = 0
+        self.combat_cost = 0
+
         self.font = pygame.font.SysFont("Arial", 24)
         self.font_small = pygame.font.SysFont(None, 20)
         self.modal_font = pygame.font.SysFont(None, 32)
@@ -195,9 +205,14 @@ class World(BuildingsMixin):
         ]
 
         from player import Player
+        from player import Player
         for i in range(num_players):
             name, color_rgb, color_name = player_data[i]
             new_player = Player(i, name, color_rgb, color_name)
+            
+            # --- DODANE: Przypisanie frakcji na sztywno do testów ---
+            new_player.faction = "catholic" if i == 0 else "pagan" 
+            
             self.players.append(new_player)
 
         # ==========================================
@@ -230,25 +245,57 @@ class World(BuildingsMixin):
             self.title_bar_img = None
             self.menu_frames = []
 
+        # --- IZOLACJA WIĘZIEŃ DLA KAŻDEGO GRACZA (ZAPOBIEGA BLEEDINGOWI) ---
+        self.court_states = {}
+        for p in self.players:
+            p_slots = []
+            for old_slot in self.court.prison_slots:
+                # Tworzymy czysty, nowy obiekt tej samej klasy celi więziennej
+                new_slot = old_slot.__class__()
+                new_slot.general = None
+                p_slots.append(new_slot)
+                
+            self.court_states[p.id] = {
+                "slots": p_slots,
+                "action": None
+            }
+        
+        # Aktywujemy na start lochy pierwszego gracza
+        if self.players:
+            self.court.prison_slots = self.court_states[self.players[0].id]["slots"]
+            self.court.selected_prison_action = self.court_states[self.players[0].id]["action"]
    
     def setup_starting_units(self):
         """Rozdaje graczom początkowe wojsko pod ich zamkami."""
+        generals_created = [] # Zbieramy generałów, żeby jednego od razu uwięzić do testów
+        
         for c in self.castles:
             if c.owner:
                 owner_obj = self.players[c.owner] if isinstance(c.owner, int) else c.owner
                 
-                # 1. PIECHOTA (Dwa kafelki pod zamkiem)
+                # 1. PIECHOTA
                 start_x = int(c.x)
                 start_y = int(c.y + 2)
                 infantry = Unit("INFL", start_x, start_y, owner_obj)
                 self.add_unit(infantry)
                 
-                # Każdy zamek dostaje swojego budowniczego (razem 2 na gracza)
-                start_x = int(c.x + 2) # Stawiamy obok zamku
+                # 2. BUDOWNICZY
+                start_x = int(c.x + 2)
                 start_y = int(c.y)
-                builder = Unit("BUDOW", start_x, start_y, c.owner)
-                self.add_unit(builder)
+                builder = Unit("BUDOW", start_x, start_y, owner_obj)
+                self.add_unit(builder)               
                 
+                # 3. GENERAŁ (NOWOŚĆ)
+                gen_x = int(c.x + 1)
+                gen_y = int(c.y + 2)
+                general = Unit("Generał", gen_x, gen_y, owner_obj)
+                general.is_general = True
+                general.hp = 200 # Generał zazwyczaj jest dużo wytrzymalszy
+                self.add_unit(general)
+                
+                generals_created.append(general)
+                
+            
 
     def add_player(self, player):
         self.players.append(player)
@@ -271,9 +318,21 @@ class World(BuildingsMixin):
     def next_turn(self):
         if not self.players:
             return
+      
+        # --- 1. ZAPISUJEMY LOCHY I AKCJE GRACZA, KTÓRY KOŃCZY TURĘ ---
+        old_player = self.players[self.current_player]
+        if hasattr(self, 'court_states') and old_player.id in self.court_states:
+            self.court_states[old_player.id]["slots"] = list(self.court.prison_slots)
+            self.court_states[old_player.id]["action"] = self.court.selected_prison_action
 
-        # Przełączamy gracza
+        # Przełączamy gracza (TYLKO JEDEN RAZ!)
         self.current_player = (self.current_player + 1) % len(self.players)
+        
+        # --- 2. WCZYTUJEMY LOCHY I AKCJE GRACZA, KTÓRY ZACZYNA TURĘ ---
+        new_player = self.players[self.current_player]
+        if hasattr(self, 'court_states') and new_player.id in self.court_states:
+            self.court.prison_slots = self.court_states[new_player.id]["slots"]
+            self.court.selected_prison_action = self.court_states[new_player.id]["action"]
         
         # resetujemy UI i flagi dla nowego gracza
         self.reset_units()
@@ -388,16 +447,18 @@ class World(BuildingsMixin):
             if other.x == nx and other.y == ny:
                 if other.owner != unit.owner:
                     # ==========================================
-                    # TO JEST WRÓG -> WYWOŁANIE AUTOMATYCZNEJ WALKI
+                    # TO JEST WRÓG -> WYWOŁANIE EKRANU WALKI
                     # ==========================================
-                    from walka_auto import resolve_auto_combat
-                    attacker_survived = resolve_auto_combat(unit, other, self)
+                    # Zawieszamy ruch, zapisujemy parametry bitwy i pokazujemy pergamin!
+                    self.combat_attacker = unit
+                    self.combat_defender = other
+                    self.combat_nx = nx
+                    self.combat_ny = ny
+                    self.combat_cost = cost
+                    self.screen = "combat_setup"
                     
-                    if not attacker_survived:
-                        # Atakujący zginął w walce, więc kończymy jego ruch i odznaczamy
-                        if self.selected_unit == unit:
-                            self.selected_unit = None
-                        return False 
+                    self.center_camera_on(nx, ny) # Centrujemy kamerę, by ładnie wyglądało w tle
+                    return False # Zatrzymujemy jednostkę w miejscu. Walka dokończy się po kliknięciu!
                     # Jeśli przeżył, skrypt pójdzie dalej i poprawnie postawi go na nowym polu!
                     
                 else:
@@ -984,6 +1045,49 @@ class World(BuildingsMixin):
         self.selected_castle = next_c
         self.center_camera_on(next_c.x, next_c.y)
         print(f"Centrowanie na: {next_c.building_type} na pozycji ({next_c.x}, {next_c.y})")
+
+    def capture_prisoner(self, captured_unit, captor_player):
+        """Wtrąca pojmanego generała do lochu gracza, który wygrał bitwę."""
+        if not getattr(captured_unit, 'is_general', False):
+            return False 
+            
+        # Pobieramy magazyn lochów dedykowany dla gracza, który dokonał pojmania
+        if hasattr(self, 'court_states') and captor_player.id in self.court_states:
+            slots = self.court_states[captor_player.id]["slots"]
+        else:
+            slots = self.court.prison_slots # failsafe
+                
+        for slot in slots:
+            if slot.general is None:
+                slot.general = captured_unit
+                
+                # Ukrywamy jednostkę w lochu (zdejmujemy z planszy mapy świata)
+                captured_unit.x, captured_unit.y = -1, -1
+                if captured_unit in self.units:
+                    self.units.remove(captured_unit)
+                if captured_unit.owner and captured_unit in captured_unit.owner.units:
+                    captured_unit.owner.units.remove(captured_unit)
+                    
+                print(f"BITWA: Generał gracza {captured_unit.owner.name} zamknięty w lochu u {captor_player.name}!")
+                return True
+                
+        print("BITWA: Brak wolnych cel! Generał uciekł.")
+        return False
+
+    def kill_unit(self, unit, killer_player=None):
+        """Uniwersalna funkcja do zabijania jednostek. Sprawdza, czy to generał do wzięcia w niewolę."""
+        if getattr(unit, 'is_general', False) and killer_player:
+            # Jeśli to generał, próbujemy wziąć do niewoli
+            captured = self.capture_prisoner(unit, killer_player)
+            if captured: 
+                return # Sukces, wylądował w lochu, nie zabijamy go!
+            
+        # Standardowe usuwanie (śmierć)
+        unit.x, unit.y = -1, -1
+        if unit in self.units:
+            self.units.remove(unit)
+        if unit.owner and unit in unit.owner.units:
+            unit.owner.units.remove(unit)
 
 # --- URUCHOMIENIE ---
 # generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")
