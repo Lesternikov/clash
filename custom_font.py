@@ -10,13 +10,12 @@ class BitmapFont:
 
         # --- PRECYZYJNE MAPOWANIE ---
 
-        # Wielkie litery A-Z: Zazwyczaj są na początku (skoro a=65, to A to pewnie 33)
-        # Sprawdź: jeśli A to 33, zostaw tak:
+        # Wielkie litery A-Z
         wielkie = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         for i, char in enumerate(wielkie):
             self.chars[char] = f"RED_S32_{33 + i}.png"
 
-        # Małe litery a-z: ZACZYNAJĄ SIĘ OD 65 (według Twojej informacji)
+        # Małe litery a-z ZACZYNAJĄ SIĘ OD 65
         male = "abcdefghijklmnopqrstuvwxyz"
         for i, char in enumerate(male):
             self.chars[char] = f"RED_S32_{65 + i}.png"
@@ -35,24 +34,47 @@ class BitmapFont:
         self.chars[","] = "RED_S32_12.png"
         self.chars[" "] = None
 
-    # Mapowanie cyfr 0-9 pod pliki RED_S32_16.png do RED_S32_25.png
+    # 1. STARE CYFRY (żółtawe, z pliku RED_S32)
+        cyfrybe = "0123456789"
+        for i, char in enumerate(cyfrybe):
+            self.chars[f"{char}_be"] = f"RED_S32_{16 + i}.png"
+
+        # 2. NOWE CYFRY (białe) - z pliku cyfry
         cyfry = "0123456789"
         for i, char in enumerate(cyfry):
-            self.chars[char] = f"RED_S32_{16 + i}.png"
+            self.chars[char] = f"nowy{char}.png"
 
         self._load_raw_images()
 
     def _load_raw_images(self):
         for char, filename in self.chars.items():
             if filename:
-                path = os.path.join(self.folder_path, filename)
+                if filename.startswith("nowy"):
+                    czysta_nazwa = filename.replace("nowy", "") + ".png" if not filename.endswith(".png") else filename.replace("nowy", "")
+                    glowny_folder_assets = os.path.dirname(self.folder_path)
+                    # Budujemy poprawną ścieżkę: assets / cyfry / 0.png
+                    path = os.path.join(glowny_folder_assets, "cyfry", czysta_nazwa)
+                    print(f"[DEBUG CZCIONKA] Próba załadowania nowej cyfry '{char}' ze ścieżki: {path}")
+                else:
+                    path = os.path.join(self.folder_path, filename)
+                
                 if os.path.exists(path):
                     self.raw_images[char] = pygame.image.load(path).convert_alpha()
+                    if char in "0123456789":
+                        print(f"[DEBUG CZCIONKA] SUKCES! Załadowano nową cyfrę '{char}'")
+                else:
+                    print(f"[DEBUG CZCIONKA] BŁĄD! Brak pliku pod ścieżką: {path}")
 
     def add_palette(self, name, color_map):
         self.palettes[name] = {}
         for char, img in self.raw_images.items():
             new_img = img.copy()
+            
+            # OCHRONA BIAŁYCH CYFR PRZED PALETĄ
+            if char in "0123456789":
+                self.palettes[name][char] = new_img
+                continue
+                
             pixels = pygame.PixelArray(new_img)
             for old_c, new_c in color_map.items():
                 pixels.replace(old_c, new_c)
@@ -78,13 +100,11 @@ class BitmapFont:
                 # SKALOWANIE
                 if scale != 1.0:
                     new_size = (int(img.get_width() * scale), int(img.get_height() * scale))
-                    img = pygame.transform.scale(img, new_size)
+                    img = pygame.transform.smoothscale(img, new_size)
 
                 screen.blit(img, (curr_x, y))
-                # Odstęp musi uwzględniać szerokość wyskalowanego obrazka
                 curr_x += img.get_width() + spacing
             else:
-                # Jeśli znaku nie ma (np. tabulacja), przesuń o mały odstęp
                 curr_x += int(5 * scale)
 
 if __name__ == "__main__":

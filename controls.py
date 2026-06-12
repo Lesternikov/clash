@@ -33,7 +33,7 @@ class ControlsHandler:
                             self.world.screen = "recruitment"
                             break
                 if event.key == pygame.K_F2:
-                    print("DEBUG: Teleportacja do koszar!")
+                    print("DEBUG: Teleportacja do wioski!")
                     for c in self.world.castles:
                         if c.owner == self.world.players[self.world.current_player]:
                             self.world.selected_castle = c

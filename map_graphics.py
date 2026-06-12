@@ -23,7 +23,7 @@ class MapGraphics:
         self.river_overlays = {}
         self.treasure_imgs = {}
         self.army_panel_bg = pygame.image.load("assets//minimum/MARKS_S32/MARKS_S32_35.png").convert_alpha()
-        # --- NOWE: Grafiki interfejsu ---
+        # --- Grafiki interfejsu ---
         self.button_images = []
         self.load_ui_assets() # Ładujemy przyciski na starcie
         # -------------------------------
@@ -43,7 +43,7 @@ class MapGraphics:
         button_files = [f"MAP_BUTT_S32_{i}.png" for i in range(12)]
         self.button_images = self._load_button_set(path_ui, button_files)
 
-        # 2. PRZYCISKI BUDOWANIA (15-23) - Twoja nowa sekcja
+        # 2. PRZYCISKI BUDOWANIA (15-23)
         # 15,16=Droga, 17,18=Pułapka, 19,20=Wieża(?), 21=Puste(?), 22,23=Wyjście
         build_files = [
             "MAP_BUTT_S32_15.png", "MAP_BUTT_S32_16.png",
@@ -94,67 +94,119 @@ class MapGraphics:
 
     def load_all_assets(self):
         path_base = os.path.join("assets", "BACKGR3_S32")
+        
+        # ========================================================================
+        # 1. TRAWA (Warianty z wagami — czysta trawa dominuje)
+        # ========================================================================
+        # Ładujemy czyste warianty trawy (np. 715, 715a, 715b)
+        clean_grass_0 = self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png"))
+        clean_grass_1 = self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715a.png"))
+        clean_grass_3 = self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715b.png"))
+        
         self.grass_variants = [
-            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_0.png")),
-            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_1.png")),
-            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_3.png")),
+            # im więcej kopi tym większa szansa na wylosowanie
+            clean_grass_0, clean_grass_1, clean_grass_3,
+            clean_grass_0, clean_grass_1, clean_grass_3,
+            clean_grass_0, clean_grass_1, clean_grass_3,
+            clean_grass_0, clean_grass_1, clean_grass_3,
+            clean_grass_0, clean_grass_1, clean_grass_3,
+            clean_grass_0, clean_grass_1, clean_grass_3,
+
+            # Rzadkie warianty (z kamykami, krzaczkami itp.) - tylko po jednej sztuce na liście:
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_751.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_753.png")),
-            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_715.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_3.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_74.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_75.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_76.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_94.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_95.png")),
             self.load_single_img(os.path.join(path_base, "BACKGR3_S32_96.png")),
-
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_0.png")),
+            self.load_single_img(os.path.join(path_base, "BACKGR3_S32_1.png")),
         ]
 
+        # ========================================================================
+        # 2. INNE ASSETY (Woda, Krawędzie itp.)
+        # ========================================================================
+        self.river_anim = self.load_river_animation()
         self.river_anim = self.load_river_animation() 
         self.sea_anim = self.load_sea_animation()
         self.load_sea_cliffs()
 
+        # Definicja Trawy
         self.edges["."] = self.load_edge_only_set(20) 
         self.centers["."] = self.grass_variants 
 
+        # Definicja Bagna (?) G
         self.edges["G"] = self.load_edge_only_set(187)
         self.centers["G"] = [
             self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_699.png")),
             self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_700.png"))
         ]
         
+        # Wysokie góry
         self.high_mountain_grass_edges = self.load_edge_only_set(187) 
         self.high_mountain_desert_edges = self.load_edge_only_set(211) 
         self.high_mountain_swamp_edges = self.load_edge_only_set(199)  
         
+        # Pustynia p
         self.edges["p"] = self.load_edge_only_set(8) 
         self.centers["p"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_4.png"))]
 
+        # Inna Pustynia P
         self.edges["P"] = self.load_edge_only_set(32) 
         self.centers["P"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_44.png"))]
 
+        # ========================================================================
+        # 3. LAS (Autotiling Kontekstowy — Rzadki vs Gęsty)
+        # ========================================================================
+        # Krawędzie lasu (zawsze używane przy przejściu trawa<->las)
         self.edges["l"] = self.load_edge_only_set(45) 
-        self.edges["l"][0] = self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_58.png")
-        self.centers["l"] = [
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_54.png"),
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_56.png")
+        # Warianty autotilingu krawędzi (styki 45 stopni itp.)
+        self.edges["l"][0] = [ 
+            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_48.png"), 
+            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_46.png"), 
+            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_80.png"), 
+            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_80.png"), 
+            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_50.png"), 
         ]
         
+        # Standardowe wnętrze lasu (Rzadki las — używane na obrzeżach)
+        self.centers["l"] = [
+            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_49.png")
+        ]
+
+        self.dense_forest_centers = {
+            (0, 0): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_54.png"), # Lewy górny
+            (1, 0): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_55.png"), # Prawy górny
+            (0, 1): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_56.png"), # Lewy dolny
+            (1, 1): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_57.png")  # Prawy dolny
+        }
+        # ========================================================================
+        
+        # Bagno B
         self.edges["B"] = self.load_edge_only_set(24) 
         self.centers["B"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32", "BACKGR3_S32_7.png"))]
 
+        # Góry trawiaste g
         self.mountain_grass_edges = self.load_edge_only_set(174) 
         self.mountain_desert_edges = self.load_edge_only_set(161) 
         self.mountain_swamp_edges = self.load_edge_only_set(199) 
         self.centers["g"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32", "BACKGR3_S32_173.png"))]
         self.edges["g"] = self.mountain_grass_edges 
         
+        # Świątynie
         self.temple_img = self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_732.png"))
         self.temple2_img = self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_737.png"))
 
+        # Skarby
         self.treasure_imgs = {
             ".": self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_752.png")), 
             "p": self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_755.png"))  
         }
         
+        # Ruiny
         self.ruins_img = self.load_single_img(os.path.join("assets", "zamekczerwony", "BUILDIN1_S32_8.png"))
 
     def load_edge_only_set(self, start_id):
@@ -278,7 +330,28 @@ class MapGraphics:
 
     # ===================== LOGIKA RYSOWANIA MAPY =====================
 
+    # --- NOWE: FUNKCJA SPRAWDZAJĄCA GĘSTOŚĆ LASU ---
+    def is_dense_forest(self, x, y):
+        forest_neighbors = 0
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0: continue
+                if self.pathfinder.get_bg_tile_at(x + dx, y + dy) == "l": 
+                    forest_neighbors += 1
+        
+        # Twardy wymóg 8 sąsiadów - eliminuje pojedyncze wyrwane kafelki puszczy
+        if forest_neighbors < 8: 
+            return False
+            
+        # Szansa na puszczę 2x2 (np. 15%). Zależna od (x, y), żeby nie migała przy przesuwaniu kamery.
+        random.seed(x * 1000 + y)
+        create_puszcza = random.random() < 0.15 
+        random.seed() # reset seeda
+        return create_puszcza
+
     def get_tile_connection_id(self, world, x, y, target_type):
+        """Standardowa funkcja autotilingu (styki)"""
+        # (Zostawiam bez zmian, bo jest poprawna dla krawędzi)
         friends = {
             "p": ["p", "P","_", "g", "G", "W","S", "&", "$", None], 
             "P": ["P", "p", "g","_", "G", "W", "S", "&", "$", None],
@@ -293,31 +366,37 @@ class MapGraphics:
         }
         current_friends = friends.get(target_type, [target_type])
 
-        def is_friendly(tx, ty):
-            neighbor = self.pathfinder.get_bg_tile_at(tx, ty)
-            return neighbor in current_friends
+        n  = self.pathfinder.get_bg_tile_at(x, y-1) in current_friends
+        e  = self.pathfinder.get_bg_tile_at(x+1, y) in current_friends
+        s  = self.pathfinder.get_bg_tile_at(x, y+1) in current_friends
+        w  = self.pathfinder.get_bg_tile_at(x-1, y) in current_friends
+        ne = self.pathfinder.get_bg_tile_at(x+1, y-1) in current_friends
+        nw = self.pathfinder.get_bg_tile_at(x-1, y-1) in current_friends
+        se = self.pathfinder.get_bg_tile_at(x+1, y+1) in current_friends
+        sw = self.pathfinder.get_bg_tile_at(x-1, y+1) in current_friends
 
-        U, D, L, R = is_friendly(x, y-1), is_friendly(x, y+1), is_friendly(x-1, y), is_friendly(x+1, y)
-        UL, UR, DL, DR = is_friendly(x-1, y-1), is_friendly(x+1, y-1), is_friendly(x-1, y+1), is_friendly(x+1, y+1)
+        # Rogi wewnętrzne (skosy)
+        if n and w and not nw: return 11
+        if n and e and not ne: return 10
+        if s and w and not sw: return 9
+        if s and e and not se: return 8
 
-        if U and L and not UL: return 11
-        if U and R and not UR: return 10
-        if D and L and not DL: return 9
-        if D and R and not DR: return 8
+        # Rogi zewnętrzne
+        if not n and not w: return 0 
+        if not n and not e: return 2 
+        if not s and not w: return 5 
+        if not s and not e: return 7 
 
-        if not U and not L: return 0 
-        if not U and not R: return 2 
-        if not D and not L: return 5 
-        if not D and not R: return 7 
-
-        if not U: return 1
-        if not D: return 6
-        if not L: return 3
-        if not R: return 4
+        # Krawędzie proste
+        if not n: return 1
+        if not s: return 6
+        if not w: return 3
+        if not e: return 4
 
         return 12
-
+    
     def get_road_tile(self, world, x, y):
+        # (Logika dróg bez zmian)
         n = 1 if self.pathfinder.get_tile_at(x, y-1) == "_" else 0
         e = 2 if self.pathfinder.get_tile_at(x+1, y) == "_" else 0
         s = 4 if self.pathfinder.get_tile_at(x, y+1) == "_" else 0
@@ -351,6 +430,7 @@ class MapGraphics:
         return terrain_dict.get(connections, terrain_dict.get(10))
 
     def get_waterfall_context(self, pathfinder, x, y):
+        # (Logika wodospadów bez zmian)
         v_up = self.pathfinder.get_bg_tile_at(x, y-1) == "V"
         v_down = self.pathfinder.get_bg_tile_at(x, y+1) == "V"
         v_left = self.pathfinder.get_bg_tile_at(x-1, y) == "V"
@@ -367,6 +447,7 @@ class MapGraphics:
         return "S", "TOP_C"
 
     def get_bridge_tile(self, pathfinder, x, y):
+        # (Logika mostów bez zmian)
         def is_bridge(nx, ny):
             has_road = self.pathfinder.get_tile_at(nx, ny) == "_"
             has_water = self.pathfinder.get_bg_tile_at(nx, ny) in ["W", "V"]
@@ -390,6 +471,7 @@ class MapGraphics:
         return "H_C"
 
     def get_dominant_land_neighbor(self, pathfinder, x, y, tile_type):
+        # (Bez zmian)
         priority = ["B", "b", "p", "P", "s", "l", ".", "g", "G"] 
         for terrain in priority:
             if tile_type == terrain: continue
@@ -399,18 +481,22 @@ class MapGraphics:
         return "."
 
     def draw_custom_overlay(self, screen, x, y, pos, overlay_dict, edge_id):
+        """Rysuje kafelek ze słownika (może być Surface lub lista do losowania)"""
         data = overlay_dict.get(edge_id)
         if not data: return
 
+        # Jeśli data to lista (standard centers), losujemy
         if isinstance(data, list):
             random.seed(x * 1000 + y)
             img = random.choice(data)
             random.seed() 
+        # Jeśli data to pojedynczy Surface (nasza puszcza 2x2), rysujemy wprost
         else:
             img = data
         screen.blit(img, pos)
 
     def draw_water_tile(self, screen, world, x, y, pos, tile_type):
+        # (Animacje wody bez zmian)
         t = pygame.time.get_ticks()
         
         if tile_type == "M" and self.sea_anim:
@@ -442,6 +528,9 @@ class MapGraphics:
             if bridge_img:
                 screen.blit(bridge_img, pos)
 
+    # ========================================================================
+    # GŁÓWNA PĘTLA RYSOWANIA
+    # ========================================================================
     def draw_terrain(self, screen, world):
         """Główna pętla renderująca wszystkie kafelki podłoża i obiekty statyczne"""
         tiles_on_screen_x = SCREEN_WIDTH // TILE_SIZE + 1
@@ -449,7 +538,6 @@ class MapGraphics:
         start_x = max(0, world.camera_x // TILE_SIZE)
         start_y = max(0, world.camera_y // TILE_SIZE)
         
-        # Zabezpieczenie przed brakiem mapy
         if not world.map or not world.bg_map: return
         
         end_x = min(len(world.map[0]), start_x + tiles_on_screen_x)
@@ -464,18 +552,27 @@ class MapGraphics:
                 bg_tile = self.pathfinder.get_bg_tile_at(x, y)
                 obj_tile = self.pathfinder.get_tile_at(x, y) 
 
-                # --- TRYB DEBUGOWANIA (Widok samego biomu) ---
+                # ========================================================================
+                # --- ZMIANA: TRYB DEBUGOWANIA (Uwzględnia Kwadrat 2x2 Puszczy) ---
+                # ========================================================================
                 if getattr(world, 'show_only_biome', False):
                     if bg_tile in ["p", "P", "s"]: screen.blit(self.centers["p"][0], pos)
                     elif bg_tile in ["B", "b"]: screen.blit(self.centers["B"][0], pos)
                     elif bg_tile == "W": screen.blit(self.river_anim[0], pos)
                     elif bg_tile == "M": screen.blit(self.sea_anim[0], pos)
                     elif bg_tile in ["G", "g"]: screen.blit(self.centers["g"][0], pos) 
-                    elif bg_tile == "l": screen.blit(self.centers["l"][0], pos)
+                    elif bg_tile == "l": 
+                        # Sprawdzamy gęstość
+                        if self.is_dense_forest(x, y):
+                            # Pobiera odpowiedni fragment kwadratu na podstawie współrzędnych (modulo)
+                            # Dzięki temu puszcza w debugu też tworzy spójny wzór 2x2
+                            screen.blit(self.dense_forest_centers[(x % 2, y % 2)], pos)
+                        else:
+                            screen.blit(self.centers["l"][0], pos)
                     else: screen.blit(self.grass_variants[0], pos)
                     continue 
 
-                # ================= WARSTWA 1: TŁO (Biom z bg_map) =================
+                # ================= WARSTWA 1: TŁO (Biom) =================
                 if bg_tile in ["W", "M"]:
                     self.draw_water_tile(screen, world, x, y, pos, bg_tile)
                 elif bg_tile == "V":
@@ -486,16 +583,20 @@ class MapGraphics:
                             wf_idx = (current_time // 160) % len(wf_frames)
                             screen.blit(wf_frames[wf_idx], pos)
                 else:
+                    # Domyślny podkład trawy (zawsze pod spodem)
                     screen.blit(self.grass_variants[0], pos)
 
+                    # Rysujemy trawę właściwą (z wagami)
                     grass_edge_id = self.get_tile_connection_id(world, x, y, ".")
                     grass_full_set = self.edges["."].copy()
                     grass_full_set[12] = self.centers.get(".", self.grass_variants)
                     self.draw_custom_overlay(screen, x, y, pos, grass_full_set, grass_edge_id)
 
+                    # Nakładamy inne biomy (Las, Pustynia, Bagno itp.)
                     if bg_tile in self.edges and bg_tile != ".":
                         edge_id = self.get_tile_connection_id(world, x, y, bg_tile)
                         
+                        # Specjalna logika dla Gór (zmiana tła krawędzi)
                         if bg_tile in ["g", "G"]:
                             if bg_tile == "G":
                                 swamp_set = getattr(self, 'high_mountain_swamp_edges', self.mountain_grass_edges)
@@ -515,38 +616,59 @@ class MapGraphics:
                             if center_img: current_set[12] = center_img
                             self.draw_custom_overlay(screen, x, y, pos, current_set, edge_id)
                         
+                        # Logika dla reszty biomów (w tym Lasu)
                         else:
                             full_set = self.edges[bg_tile].copy()
-                            full_set[12] = self.centers.get(bg_tile, self.grass_variants)
+                            
+                            # ========================================================================
+                            # --- MODYFIKACJA KONTEKSTOWA DLA LASU (KWADRAT PUSZCZY 2x2) ---
+                            # ========================================================================
+                            # Jeśli rysujemy środek lasu (ID 12) i algorytm wykrył, że las jest gęsty:
+                            if bg_tile == "l" and edge_id == 12 and self.is_dense_forest(x, y):
+                                # Zamiast losować z listy, pobieramy JEDEN, IDEALNIE DOPASOWANY fragment
+                                # kwadratu 2x2 na podstawie współrzędnych x i y.
+                                # To gwarantuje, że wzór puszczy będzie spójny i rozciągnięty na cały obszar.
+                                full_set[12] = self.dense_forest_centers[(x % 2, y % 2)]
+                            else:
+                                # Standardowe wnętrze lasu (lub innego biomu) - losujemy warianty
+                                full_set[12] = self.centers.get(bg_tile, self.grass_variants)
+                            # ========================================================================
+                                
                             self.draw_custom_overlay(screen, x, y, pos, full_set, edge_id)
 
-                # ================= WARSTWA 2: OBIEKTY =================
+                # ================= WARSTWA 2: OBIEKTY NA MAPIE =================
                 if obj_tile == " ": continue 
                 
+                # Drogi
                 if obj_tile == "_":
                     if bg_tile != "W":
                         road_img = self.get_road_tile(world, x, y)
                         if road_img: screen.blit(road_img, pos)
+                # Budynki/Statyczne
                 elif obj_tile in ["S", "&", "R"]:
                     if obj_tile == "S": screen.blit(self.temple_img, pos) 
                     elif obj_tile == "&": screen.blit(self.temple2_img, pos) 
                     elif obj_tile == "R": 
                         if hasattr(self, 'ruins_img'): screen.blit(self.ruins_img, pos)
+                # Skarby (ze zmianą tła pod skarberm p/.)
                 elif obj_tile == "$":
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
+                # Debugowanie Fundamentów
                 elif obj_tile == "#":
                     is_left = (x == 0 or world.map[y][x-1] != "#")
                     is_top = (y == 0 or world.map[y-1][x] != "#")
                     if is_left and is_top:
                         big_rect = pygame.Rect(pos[0], pos[1], TILE_SIZE * 2, TILE_SIZE * 2)
                         pygame.draw.rect(screen, (255, 255, 255), big_rect, 4)
+                # Pułapki
                 elif obj_tile == "X":
                     trap_color = (200, 0, 0)
                     offset = 6
                     pygame.draw.line(screen, trap_color, (pos[0] + offset, pos[1] + offset), (pos[0] + TILE_SIZE - offset, pos[1] + TILE_SIZE - offset), 3)
                     pygame.draw.line(screen, trap_color, (pos[0] + TILE_SIZE - offset, pos[1] + offset), (pos[0] + offset, pos[1] + TILE_SIZE - offset), 3)
+                # Inne z terrain_images (T, t, O z load_additional_tiles)
                 elif obj_tile in self.terrain_images:
                     screen.blit(self.terrain_images[obj_tile], pos)
 
