@@ -126,9 +126,6 @@ class ControlsHandler:
                                     if rect.collidepoint(mx, my) and i < len(display_units):
                                         self.world.inspected_unit = display_units[i]
                                         break
-                        
-                        if not self.world.inspected_unit:
-                            self.world.inspected_unit = self.world.get_unit_at_pixel(mx, my)
 
                 # Wywołanie logiki kliknięć (tutaj self.handle_mouse_click to metoda TEJ klasy)
                 self.handle_mouse_click(mx, my, event.button)
@@ -140,6 +137,11 @@ class ControlsHandler:
     def handle_mouse_click(self, mx, my, button):
         if button != 1 and button != 3: return
         w = self.world 
+
+        # Zamknięcie okienka świątyni kliknięciem gdziekolwiek
+        if w.screen == "temple_event":
+            w.screen = "map"
+            return
 
         # --- NOWE: OKIENKO WALKI ZBIERA KLIKNIĘCIA ---
         if w.screen == "combat_setup":
@@ -173,23 +175,17 @@ class ControlsHandler:
         if w.screen == "trap_info":
             w.handle_trap_info_click(mx, my)
             return
-
-        # 1. PRIORYTET: Ekrany specjalne
-        if w.screen == "trap_info":
-            w.handle_trap_info_click(mx, my)
-            return
         
         if w.screen == "court":
             w.court.handle_court_click(mx, my)
             return
 
+        # 2. Jeśli jesteśmy na mapie, używamy poprawionej logiki
         if w.screen == "map":
-            if self.handle_ui_click(mx, my): return 
+            if self.handle_ui_click(mx, my, button): return # Przekazujemy button!
+            if self.handle_map_logic_combined(mx, my, button): return 
             
-            # --- ZMIANA: Zatrzymujemy kliknięcie, jeśli wykonano akcję budowy ---
-            if self.handle_map_logic_combined(mx, my, button): 
-                return 
-            
+            # Prawym przyciskiem tylko info, lewym zaznaczenie
             self.handle_map_click(mx, my, button) 
             return
 
@@ -200,66 +196,86 @@ class ControlsHandler:
 
         if not w.selected_castle: return   # teraz blokuje tylko resztę
         
-        # ==========================================================
+       # ==========================================================
         # 3. OBSŁUGA PRZYCISKU POWRÓT (Zintegrowana z animacją)
         # ==========================================================
 
-        # Ustalamy, który prostokąt sprawdzamy (specjalny dla Dworu lub standardowy)
-        back_rect = pygame.Rect(650, 530, 120, 40) if w.screen == "court" else w.back_button
-        
-        if back_rect.collidepoint(mx, my):
-            if getattr(self, 'back_anim_timer', 0) == 0:
-                if w.screen == "recruitment":
-                    w.back_destination = "garrison"
-                elif w.screen == "peasants":
-                    w.back_destination = "castle"
-                elif w.screen in ["forge", "hospital", "school", "workshop", "court", "garrison"]:
-                    w.back_destination = "castle"
-                elif w.screen == "castle":
-                    w.back_destination = "map"
-                
-                w.back_anim_timer = pygame.time.get_ticks()
-                print(f"Start animacji. Cel: {w.back_destination}")
+        # KLUCZOWA ZMIANA: Wyłączamy stary, lewy-dolny przycisk dla Strażnicy!
+        if w.screen != "Strażnica":
+            back_rect = pygame.Rect(650, 530, 120, 40) if w.screen == "court" else getattr(w, 'back_button', pygame.Rect(0,0,0,0))
+            
+            if isinstance(back_rect, pygame.Rect) and back_rect.collidepoint(mx, my):
+                if getattr(self, 'back_anim_timer', 0) == 0:
+                    if w.screen == "recruitment":
+                        w.back_destination = "garrison"
+                    elif w.screen == "peasants":
+                        w.back_destination = "castle"
+                    elif w.screen in ["forge", "hospital", "school", "workshop", "court", "garrison"]:
+                        w.back_destination = "castle"
+                    elif w.screen == "castle":
+                        w.back_destination = "map"
+                    
+                    w.back_anim_timer = pygame.time.get_ticks()
+                    print(f"Start animacji. Cel: {w.back_destination}")
+                return # Przerywamy dalsze sprawdzanie
 
-            return # Zawsze przerywamy dalsze kliknięcia, jeśli trafiliśmy w POWRÓT
-            
-        # 4. LOGIKA GŁÓWNEGO MENU ZAMKU / STRAŻNICY
+        # 4. LOGIKA GŁÓWNEGO MENU ZAMKU
         if w.screen == "castle":
-            if w.selected_castle and w.selected_castle.building_type == "Strażnica":
-                if hasattr(self, 'garrison_button') and w.garrison_button.collidepoint(mx, my):
-                    w.screen = "garrison"
-                return 
-            
             w.handle_castle_click(mx, my)
             return
 
-        # 5. LOGIKA POD-EKRANÓW (Tylko te, które mają PRAWDZIWĄ mechanikę)
+        # 5. LOGIKA POD-EKRANÓW
         if w.screen == "recruitment":
-            w.recruitment_manager.handle_click(mx, my) # Obsługa kliknięć z nowego modułu
+            w.recruitment_manager.handle_click(mx, my)
             return
         
+        # ==========================================================
+        # 5.1 EKRAN ZAMKU: STARY GARNIZON
+        # ==========================================================
         elif w.screen == "garrison":
-            # Sprawdzamy, czy to Rect ZANIM wywołamy collidepoint
+            # Stare wypuszczanie wojsk w prawym dolnym rogu (jeśli go używasz w zamku)
             is_release = False
             if hasattr(w, 'release_tower') and isinstance(w.release_tower, pygame.Rect):
                 if w.release_tower.collidepoint(mx, my):
                     is_release = True
             if is_release:
-                print("Akcja: Wypuszczanie zaznaczonych jednostek na mapę")
                 w.release_selected_units()
                 return
 
-            # 2. Przycisk ZBURZ / ZNISZCZ (Tylko dla Strażnicy)
-            if hasattr(self, 'destroy_button') and w.destroy_button.collidepoint(mx, my):
-                if w.selected_castle and w.selected_castle.building_type == "Strażnica":
-                    print("Akcja: Burzenie Strażnicy")
-                    w.destroy_straznica(w.selected_castle)
-                    return
-
-            # 3. Jeśli nie przyciski akcji, to sprawdzamy kliknięcie w kafelki jednostek
             w.handle_garrison_click(mx, my, button)
             return
 
+        # ==========================================================
+        # 5.2 EKRAN STRAŻNICY (NOWY INTERFEJS)
+        # ==========================================================
+        elif w.screen == "Strażnica":
+            # Używamy NOWYCH zmiennych (tych ze środka ekranu z renderer.py)
+            
+            # 1. Przycisk POWRÓT (na czerwonym prostokącie z renderer.py)
+            if hasattr(w, 'back_btn') and w.back_btn.collidepoint(mx, my):
+                w.screen = "map"
+                w.selected_castle = None
+                return
+            
+            # 2. Przycisk WYPUŚĆ (na czerwonym prostokącie)
+            if hasattr(w, 'release_btn') and w.release_btn.collidepoint(mx, my):
+                w.release_selected_units()
+                return
+            
+            # 3. Przycisk ZNISZCZ (na czerwonym prostokącie)
+            if hasattr(w, 'destroy_btn') and w.destroy_btn.collidepoint(mx, my):
+                w.destroy_straznica(w.selected_castle)
+                w.screen = "map"
+                w.selected_castle = None
+                return
+            
+            # 4. Sloty na wojsko
+            if hasattr(w, 'handle_straznica_click'):
+                w.handle_straznica_click(mx, my, button)
+            else:
+                w.handle_garrison_click(mx, my, button)
+            return
+        
         # 6. BLOKADA DLA RESZTY (Forge, Hospital, School, Workshop, Court, Peasants)
         # Skoro mają tylko tekst i powrót (który obsłużyliśmy wyżej), 
         # po prostu blokujemy kliknięcia, żeby nie "przebijały" na mapę.
@@ -321,15 +337,28 @@ class ControlsHandler:
         tile_x = (mx + self.world.camera_x) // TILE_SIZE
         tile_y = (my + self.world.camera_y) // TILE_SIZE
 
-        # --- PRAWY PRZYCISK (Podgląd statystyk jednostki) ---
+       # --- PRAWY PRZYCISK: TYLKO INFORMACJA (O pojedynczych jednostkach) ---
         if button == 3:
             target_unit = self.world.get_unit_at(tile_x, tile_y) 
             if target_unit:
-                self.world.inspected_unit = target_unit
-            return 
+                # Sprawdzamy czy to armia (czy ma kogoś w garnizonie)
+                garrison = getattr(target_unit, 'garrison', [])
+                has_passengers = any(p is not None for p in garrison)
+                
+                # Jeśli to armia, NIC NIE RÓB (nie zaznaczaj, nie otwieraj info)
+                if has_passengers:
+                    print("To jest armia! Statystyki sprawdzaj w dolnym panelu.")
+                else:
+                    # Jeśli to pojedyncza jednostka, pokazujemy statystyki
+                    self.world.inspected_unit = target_unit
+            return # Zwracamy, żeby nie zaznaczyć jednostki lewym przyciskiem
 
        # --- LEWY PRZYCISK ---
         if button == 1:
+            # 0. TRYB PODZIAŁU ARMII (Najwyższy priorytet na mapie)
+            if hasattr(self.world, 'units_to_split') and len(self.world.units_to_split) > 0:
+                self.world.execute_army_split(tile_x, tile_y)
+                return
             # 1. Sprawdzamy, czy kliknęliśmy w jakąś naszą jednostkę
             target_unit = self.world.get_unit_at(tile_x, tile_y)
             
@@ -339,25 +368,53 @@ class ControlsHandler:
                 if self.world.selected_unit and target_unit != self.world.selected_unit and getattr(self.world, 'merge_mode', False):
                     u = self.world.selected_unit
                     
-                    # Drugi klik -> Wyruszamy na połączenie
+                    # --- 1. DRUGI KLIK -> Wyruszamy na połączenie ---
                     if tile_x == getattr(u, 'target_x', None) and tile_y == getattr(u, 'target_y', None):
                         print("Wyruszam do połączenia armii!")
                         u.move_along_path(self.world)
                         return 
                         
-                    # Pierwszy klik -> Wyznaczenie trasy do kolegi
+                    # --- 2. PIERWSZY KLIK -> Wyznaczenie trasy do kolegi ---
                     u.target_x, u.target_y = tile_x, tile_y
+                    
+                    # Szukamy standardowej trasy
                     u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
                     
+                    # Jeśli nie ma trasy (bo algorytm uważa, że na pole sojusznika nie da się wejść):
                     if not u.planned_path:
-                        u.target_x = u.target_y = None
-                        print("BŁĄD: Nie można dojść do sojusznika!")
+                        # A) Jeśli jesteśmy bezpośrednio obok niego - trasa to po prostu wejście w niego
+                        if abs(u.x - tile_x) <= 1 and abs(u.y - tile_y) <= 1:
+                            u.planned_path = [(tile_x, tile_y)]
+                            print("Jesteś obok. Kliknij jeszcze raz, aby połączyć.")
+                        # B) Jeśli jest daleko, szukamy trasy na pole OBOK sojusznika
+                        else:
+                            sasiedzi = [
+                                (tile_x-1, tile_y), (tile_x+1, tile_y), (tile_x, tile_y-1), (tile_x, tile_y+1),
+                                (tile_x-1, tile_y-1), (tile_x+1, tile_y+1), (tile_x-1, tile_y+1), (tile_x+1, tile_y-1)
+                            ]
+                            najlepsza_trasa = None
+                            
+                            for nx, ny in sasiedzi:
+                                if 0 <= nx < len(self.world.map[0]) and 0 <= ny < len(self.world.map):
+                                    t = self.world.pathfinder.find_path(u, nx, ny)
+                                    if t is not None:
+                                        if najlepsza_trasa is None or len(t) < len(najlepsza_trasa):
+                                            najlepsza_trasa = t
+                                            
+                            if najlepsza_trasa is not None:
+                                # Doklejamy "ręcznie" ostatni krok - wskoczenie w pole sojusznika
+                                u.planned_path = najlepsza_trasa + [(tile_x, tile_y)]
+                                print("Trasa wyznaczona obok. Kliknij jeszcze raz, aby połączyć.")
+                            else:
+                                u.target_x = u.target_y = None
+                                print("BŁĄD: Nie można dojść do sojusznika!")
                     else:
-                        print("Trasa wyznaczona. Kliknij jeszcze raz, aby połączyć.")
+                        print("Trasa wyznaczona bezpośrednio. Kliknij jeszcze raz, aby połączyć.")
                     return
 
                 # B. SCENARIUSZ: Przycisk POŁĄCZ JEST WYŁĄCZONY (albo klikamy tę samą jednostkę) -> ZAZNACZAMY JĄ
                 self.world.selected_unit = target_unit
+                self.world.units_to_split = [] # <--- NOWOŚĆ: Resetowanie krzyżyków!
                 target_unit.target_x = target_unit.target_y = None
                 target_unit.planned_path = []
                 self.world.merge_mode = False # Na wszelki wypadek resetujemy tryb
@@ -383,30 +440,45 @@ class ControlsHandler:
                     u.target_x = u.target_y = None
                     print("Nie można tam dojść!")
                 return
-
-           # 3. WEJŚCIE DO MENU ZAMKU/STRAŻNICY (Z blokadą właściciela i rozmiarem)
+            # 3. WEJŚCIE DO MENU ZAMKU/STRAŻNICY (Z blokadą właściciela i rozmiarem)
             for castle in self.world.castles:
-                # Zamki i Twierdze zajmują 2x2, Strażnice 1x1
-                size = 2 if castle.building_type in ["Zamek", "Twierdza"] else 1
+                # Ubezpieczamy się przed spacjami w nazwie
+                b_type = str(getattr(castle, 'building_type', 'Zamek')).strip()
+                size = 2 if b_type in ["Zamek", "Twierdza"] else 1
                 
                 if castle.x <= tile_x < castle.x + size and castle.y <= tile_y < castle.y + size:
                     if not getattr(castle, 'destroyed', False):
                         
-                        # SPRAWDZENIE WŁAŚCICIELA (To serce naszej blokady tur)
+                        print(f"\n--- KLIKNIĘTO BUDYNEK ---")
+                        print(f"Typ: '{b_type}', W budowie?: {getattr(castle, 'under_construction', False)}")
+                        
+                        # ========================================================
+                        # --- NOWA BLOKADA: Z użyciem flagi under_construction ---
+                        # ========================================================
+                        if getattr(castle, 'under_construction', False):
+                            print(f"Blokada! {b_type} jest w trakcie budowy. Musisz poczekać na ukończenie!")
+                            return # Przerywamy całkowicie kliknięcie!
+                        # ========================================================
+
+                        # SPRAWDZENIE WŁAŚCICIELA 
                         current_player_obj = self.world.players[self.world.current_player]
-                        # W pliku controls.py, sekcja wejścia do zamku:
+                        
                         if castle.owner == current_player_obj:
                             self.world.selected_castle = castle
-                            self.world.screen = "castle"
                             
-                           # RESETOWANIE Z DODATKOWĄ PEWNOŚCIĄ
-                            print("DEBUG: Próbuję zresetować krzyżyk w rekrutacji...")
-                            
-                            # Używamy POPRAWNEJ nazwy: recruitment_manager
-                            if hasattr(self.world, 'recruitment_manager'):
-                                self.world.recruitment_manager.selected_patent_index = None
-                                print("DEBUG: Zresetowano przez recruitment_manager!")
-
+                            # --- ROZDZIELENIE EKRANÓW JUŻ NA MAPIE ---
+                            if b_type == "Strażnica":
+                                self.world.screen = "Strażnica"
+                                print("Sukces: Otwieram menu Strażnicy!")
+                                return
+                            else:
+                                self.world.screen = "castle"
+                                if hasattr(self.world, 'recruitment_manager'):
+                                    self.world.recruitment_manager.selected_patent_index = None
+                                print("Sukces: Otwieram menu Zamku!")
+                                return
+                        else:
+                            print("Odmowa: To nie jest Twój budynek!")     
     def handle_ui_click(self, mx, my, button=1):
         w = self.world
         
@@ -456,12 +528,24 @@ class ControlsHandler:
                 if len(display_units) >= 2:
                     if hasattr(w, 'army_slot_rects'):
                         for i, rect in enumerate(w.army_slot_rects):
-                            if rect.collidepoint(mx, my):
-                                print(f"Kliknięto jednostkę w armii: {display_units[i].type}")
-                                return True 
+                            if i < len(display_units) and rect.collidepoint(mx, my):
+                                clicked_u = display_units[i]
+                                
+                                if button == 1:
+                                    # LEWY PRZYCISK: Zaznaczanie do podziału
+                                    if not hasattr(w, 'units_to_split'): w.units_to_split = []
+                                    if clicked_u in w.units_to_split:
+                                        w.units_to_split.remove(clicked_u)
+                                    else:
+                                        w.units_to_split.append(clicked_u)
+                                elif button == 3:
+                                    # PRAWY PRZYCISK: Pokaż statystyki jednostki
+                                    w.inspected_unit = clicked_u
+                                    
+                                return True
                     
                     if mx < 800: 
-                        return True 
+                        return True
 
         return False # Zezwól na kliknięcie w mapę
     
@@ -611,6 +695,85 @@ class ControlsHandler:
         gx = (mx + self.world.camera_x) // TILE_SIZE
         gy = (my + self.world.camera_y) // TILE_SIZE
 
+        # Zabezpieczenie przed kliknięciem poza granice mapy (TO ROZWIĄZUJE PROBLEM)
+        if gy < 0 or gy >= len(self.world.map) or gx < 0 or gx >= len(self.world.map[0]):
+            return False
+
+        # =========================================================
+        # INTERAKCJA ZE ŚWIĄTYNIĄ I MIEJSCEM KULTU
+        # =========================================================
+        if self.world.map[gy][gx] in ["S", "&"]: 
+            unit = self.world.selected_unit
+            if unit:
+                dx = abs(unit.x - gx)
+                dy = abs(unit.y - gy)
+                
+                # --- Sytuacja A: Jednostka stoi obok ---
+                if dx <= 1 and dy <= 1:
+                    # NOWOŚĆ: Obliczanie kosztu wejścia
+                    koszt_wejscia = 4 if dx == 1 and dy == 1 else 3
+                    
+                    if unit.move_points >= koszt_wejscia:
+                        unit.move_points -= koszt_wejscia # Zabieramy punkty!
+                        self.world.visit_temple(unit, gx, gy)
+                    else:
+                        print(f"Za mało punktów ruchu, aby wejść! Wymagane: {koszt_wejscia}, Posiadane: {unit.move_points}")
+                    
+                    # Czyścimy ścieżkę niezależnie od tego, czy weszliśmy czy zabrakło nam MP
+                    unit.planned_path = []
+                    unit.target_x = None
+                    unit.target_y = None
+                    return True
+                    
+                # --- Sytuacja B: Wyznaczamy marsz i automatycznie odbieramy w tej samej turze ---
+                else:
+                    # DRUGI KLIK - Potwierdzenie marszu
+                    if gx == getattr(unit, 'target_x', None) and gy == getattr(unit, 'target_y', None):
+                        unit.move_along_path(self.world)
+                        
+                        # Sprawdzamy nową pozycję OD RAZU po dojściu
+                        new_dx = abs(unit.x - gx)
+                        new_dy = abs(unit.y - gy)
+                        
+                        if new_dx <= 1 and new_dy <= 1:
+                            koszt_wejscia = 4 if new_dx == 1 and new_dy == 1 else 3
+                            
+                            if unit.move_points >= koszt_wejscia:
+                                unit.move_points -= koszt_wejscia
+                                self.world.visit_temple(unit, gx, gy)
+                            else:
+                                print(f"Doszedłeś pod drzwi, ale brakło sił na wejście! Wymagane: {koszt_wejscia}")
+                                
+                            unit.planned_path = []
+                            unit.target_x = None
+                            unit.target_y = None
+                        return True
+
+                    # PIERWSZY KLIK - Trasa
+                    sasiedzi = [(gx-1, gy), (gx+1, gy), (gx, gy-1), (gx, gy+1)]
+                    najlepsza_trasa = None
+                    
+                    for nx, ny in sasiedzi:
+                        if 0 <= nx < len(self.world.map[0]) and 0 <= ny < len(self.world.map):
+                            # Korzystamy z Pathfindera
+                            if hasattr(self.world, 'pathfinder') and hasattr(self.world.pathfinder, 'is_walkable'):
+                                if self.world.pathfinder.is_walkable(nx, ny, unit):
+                                    path = self.world.pathfinder.find_path(unit, nx, ny)
+                                    if path and (najlepsza_trasa is None or len(path) < len(najlepsza_trasa)):
+                                        najlepsza_trasa = path
+                                        
+                    if najlepsza_trasa is not None:
+                        unit.target_x, unit.target_y = gx, gy
+                        unit.planned_path = najlepsza_trasa + [(gx, gy)] # Rysuje X na świątyni
+                        print(f"Podchodzę do świątyni...")
+                    else:
+                        unit.target_x = None
+                        unit.target_y = None
+                        unit.planned_path = []
+                        print("Brak dojścia do świątyni!")
+                        
+            return True # Przerywamy dalsze kliknięcia
+        
         # 1. Tryby specjalne (Budowa dróg / pułapek)
         if getattr(self.world, 'trap_build_mode', False):
             self.world.execute_trap_build(gx, gy)
@@ -732,13 +895,23 @@ class ControlsHandler:
                 size, size
             )
             
+            # NAJPIERW sprawdzamy czy myszka trafiła w ten budynek
             if rect.collidepoint(mx, my) and not getattr(castle, 'destroyed', False):
+                
+                # --- BLOKADA W DRUGIEJ FUNKCJI ---
+                # DOPIERO TERAZ sprawdzamy czy TEN kliknięty budynek jest w budowie
+                if getattr(castle, 'under_construction', False):
+                    print(f"Zablokowano wejście (handle_castle_entry)! Budynek w budowie.")
+                    return False # Przerywamy wejście do budynku
+                # ---------------------------------
+                
                 self.world.selected_castle = castle
                 self.world.selected_unit = None
                 # Wybór odpowiedniego ekranu
                 self.world.screen = "Strażnica" if b_type == "Strażnica" else "castle"
                 print(f"Wejście do: {b_type} na {castle.x},{castle.y}")
                 return True
+                
         return False
    
     def check_unit_info(self, mx, my):

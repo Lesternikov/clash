@@ -60,6 +60,20 @@ class Unit:
         self.current_frame = 0
         self.animation_speed = 0.1
 
+    def get_effective_move_points(self):
+        """Oblicza ruch armii na podstawie najsłabszej jednostki."""
+        min_mp = self.move_points
+        # Zakładamy, że lista 'garrison' zawiera obiekty jednostek (pasażerów)
+        for u in self.garrison:
+            if u is not None:
+                min_mp = min(min_mp, u.move_points)
+        return min_mp
+
+    def has_fatigue_paralysis(self):
+        """Sprawdza, czy ktokolwiek w armii ma 100 zmęczenia."""
+        if getattr(self, 'fatigue', 0) >= 100: return True
+        return any(u and getattr(u, 'fatigue', 0) >= 100 for u in self.garrison)
+
     def load_unit_sprites(self):
         sprites = []
         # Pobieramy ID koloru gracza
@@ -217,6 +231,23 @@ class Unit:
         if tile == "#":
             return self.type == "highlander"
         return tile == "."
+
+    def get_effective_move_points(self):
+        """Zwraca punkty ruchu najsłabszej jednostki w oddziale."""
+        min_mp = self.move_points
+        if hasattr(self, 'garrison'):
+            for u in self.garrison:
+                if u is not None:
+                    min_mp = min(min_mp, getattr(u, 'move_points', min_mp))
+        return min_mp
+
+    def has_fatigue_paralysis(self):
+        """Sprawdza, czy ktoś w armii padł ze zmęczenia (100)."""
+        if getattr(self, 'fatigue', 0) >= 100: return True
+        if hasattr(self, 'garrison'):
+            for u in self.garrison:
+                if u is not None and getattr(u, 'fatigue', 0) >= 100: return True
+        return False
 
 class GoldTransport:
     def __init__(self, x, y, owner, gold):

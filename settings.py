@@ -41,7 +41,7 @@ UNIT_NAMES = {
     "PEAS": "Chłopi", # <-- tutaj brakowało przecinka
     "SPECK": "Generał Kobieta",
     "SPECM": "Generał Mężczyzna",
-    "GOLD": "Złoto"
+    "GOLD": "Złoto",
 }
 NAME_TO_CODE = {name: code for code, name in UNIT_NAMES.items()}
 COLOR_TO_ID = {
@@ -423,7 +423,9 @@ UNIT_STATS = {
         równych przeciwników zarów-
         no w powietrzu, jak i na ziemi.""" },
 
-    "Generał":{"hp":100,"moves":36}
+    "Generał":{"hp":100,"moves":36},
+
+    "Złoto":{"hp":100,"moves":36},
    }
 
 TERRAIN_TYPES = {

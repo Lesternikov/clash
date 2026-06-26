@@ -137,7 +137,7 @@ class Castle:
         self.happiness = max(0, min(100, self.happiness))
     
     def grow_population(self):
-        growth = int(self.peasants * (self.happiness / 100) * 0.02)
+        growth = int(self.peasants * (self.happiness / 100) * 0.15)
         self.peasants += max(1, growth)
     
 

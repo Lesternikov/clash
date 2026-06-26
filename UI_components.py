@@ -28,13 +28,12 @@ class UnitInfoWindow:
         # Ścieżki do posągów (zgodnie z Twoim mapowaniem pliku)
         exp_szmata_path = os.path.join("assets", "minimum", "INFO_S32", "INFO_S32_6.png") # Szmata (0-2)
         exp_braz_path   = os.path.join("assets", "minimum", "INFO_S32", "INFO_S32_7.png") # Brąz (3-5)
-        exp_srebro_path = os.path.join("assets", "minimum", "INFO_S32", "INFO_S32_0.png") # Srebro (6-8)
         exp_zloto_path  = os.path.join("assets", "minimum", "INFO_S32", "INFO_S32_8.png") # Złoto (9-12)
         
         # Ładujemy posągi używając load_scaled
         self.icon_exp_tier0 = load_scaled(exp_szmata_path)
         self.icon_exp_tier1 = load_scaled(exp_braz_path)
-        self.icon_exp_tier2 = load_scaled(exp_srebro_path)
+        self.icon_exp_tier2 = None
         self.icon_exp_tier3 = load_scaled(exp_zloto_path)
         
        # === MIECZYKI POSTĘPU DOŚWIADCZENIA ===
@@ -161,16 +160,17 @@ class UnitInfoWindow:
             current_pos = (x + int(8 * s), y + int(7 * s))
             screen.blit(portrait_img, current_pos)
 
-        # ==========================================
+       # ==========================================
         # 4. RYSOWANIE POSĄGU I MIECZYKÓW
         # ==========================================
         # Bazowa pozycja posągu (prawy dolny róg statsów)
         statue_x = x + int(150 * s)
         statue_y = y + int(65 * s)
         
-        # A. Rysujemy posąg
+        # A. Rysujemy posąg (Tylko jeśli to nie srebro, bo srebro to tło!)
         current_exp_icon = self.get_experience_icon(exp_val)
-        screen.blit(current_exp_icon, (statue_x, statue_y))
+        if current_exp_icon:
+            screen.blit(current_exp_icon, (statue_x, statue_y))
 
         # B. Rysujemy mieczyki postępu (logika +1 oraz limit dla max lvl)
         if self.icon_mieczyk:

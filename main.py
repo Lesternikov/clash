@@ -1,25 +1,34 @@
 import pygame
 import sys
+import os
+
+# --- 1. BEZPIECZNE USTAWIANIE FOLDERU ROBOCZEGO ---
+if getattr(sys, 'frozen', False):
+    # Jeśli uruchomione jako skompilowany plik .exe
+    os.chdir(os.path.dirname(sys.executable))
+else:
+    # Jeśli uruchomione jako zwykły plik .py
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Importy z Twoich plików muszą być po ustawieniu ścieżki (jeśli cokolwiek ładują)!
 from world import World
 from player import Player
 from controls import ControlsHandler
 from renderer import Renderer
 from pathfinding import Pathfinder
 from map_graphics import MapGraphics
-pygame.init()
-screen = pygame.display.set_mode((1024, 768))
-pygame.display.set_caption("Clash Reverse")
-clock = pygame.time.Clock()
 
 if __name__ == "__main__":
-    # cała logika startowa tutaj
+    # --- 2. INICJALIZACJA (Tylko JEDEN RAZ!) ---
     pygame.init()
     screen = pygame.display.set_mode((1026, 766))
-    # itd.
+    pygame.display.set_caption("Clash Reverse")
+    clock = pygame.time.Clock()
 
-# --- INICJALIZACJA GRY ---
-# 1. Tworzysz świat
-world = World()
+    # --- INICJALIZACJA GRY ---
+    # 1. Tworzysz świat
+    world = World()
+
 # 2. Tworzysz grafikę i WSTRZYKUJESZ do niej świat
 gfx = MapGraphics(world)
 # 2. Tworzysz renderer i dajesz mu dostęp do świata

@@ -20,6 +20,7 @@ class RecruitmentManager:
 
         # ZWRÓĆ UWAGĘ NA TĘ LINIJKĘ: dodaliśmy 'w' i 'h' na końcu nawiasu!
         def add_btn(nazwa, plik, plik_p, x, y, w, h):
+            print(f"Magia! Przycisk {nazwa} ładuje się z: {os.path.abspath(plik)}")
             img = pygame.transform.scale(pygame.image.load(plik).convert_alpha(), (w, h))
             img_p = pygame.transform.scale(pygame.image.load(plik_p).convert_alpha(), (w, h))
             self.custom_buttons[nazwa] = {
@@ -62,7 +63,7 @@ class RecruitmentManager:
             
             "gold_chest": (512, 676),       
             
-            "btn_1": pygame.Rect(60, 600, 140, 60),  # KUP PATENT
+            "btn_1": pygame.Rect(60, 60, 140, 60),  # KUP PATENT
             "btn_2": pygame.Rect(280, 600, 140, 60), # INFO
             "btn_3": pygame.Rect(600, 600, 140, 60), # START PRODUKCJI
             "btn_4": pygame.Rect(60, 60, 140, 60),

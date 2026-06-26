@@ -114,10 +114,24 @@ class BuildingsMixin:
                 if slot and slot.type == "Budowniczy")
 
             if builders_count > 0:
-                castle.work_done    += builders_count
-                castle.mury_percent  = min(
-                    100, int((castle.work_done / castle.total_work_needed) * 100))
-                print(f"Budowa {castle.building_type}: {castle.mury_percent}% murów.")
+                castle.work_done += builders_count 
+                if castle.total_work_needed > 0:
+                    castle.mury_percent = min(100, int((castle.work_done / castle.total_work_needed) * 100))
+                
+                # ======================================================
+                # NOWOŚĆ: Precyzyjne aktualizowanie etapu budowy (0, 1, 2, 3) 
+                # dla silnika graficznego rysującego mapę!
+                # ======================================================
+                if castle.mury_percent < 25:
+                    castle.build_stage = 0
+                elif castle.mury_percent < 50:
+                    castle.build_stage = 1
+                elif castle.mury_percent < 75:
+                    castle.build_stage = 2
+                else:
+                    castle.build_stage = 3
+                
+                print(f"Budowa {castle.building_type}: Pracuje {builders_count} budowniczych. Ukończono {castle.mury_percent}% (Etap {castle.build_stage}).")
 
             if castle.work_done >= castle.total_work_needed:
                 castle.under_construction = False
@@ -272,20 +286,33 @@ class BuildingsMixin:
                 print("BŁĄD: Zamek/Twierdza wymaga fundamentów (#)!")
                 return False
         else:
-            # Strażnica (size 1) - Naprawione odwołanie do pathfindera
-            if self.map[iy][ix] in [".", "p", "P", "s"] and \
+            if self.map[iy][ix] in [".", "p", "P", "s"," "] and \
                not getattr(self.pathfinder, 'is_area_occupied_by_foundation', lambda x,y: False)(ix, iy):
                 found_foundation = True
             else:
                 print(f"BŁĄD: Strażnica wymaga czystego terenu! Aktualnie jest tu: '{self.map[iy][ix]}'")
                 return False
 
-        new_castle = Castle(anchor_x, anchor_y, self.current_player,
-                            building_type=b_type)
+        # Właściciel
+        wlasciciel = builder.owner if builder else self.players[self.current_player]
+        new_castle = Castle(anchor_x, anchor_y, wlasciciel, building_type=b_type)
+        new_castle.owner = wlasciciel 
+
+        # ======================================================
+        # NOWOŚĆ: Ustalenie Prawidłowej ilości punktów pracy
+        # ======================================================
         new_castle.under_construction = True
-        new_castle.total_work_needed  = 12.0
+        new_castle.build_stage = 0
+        if b_type == "Strażnica":
+            new_castle.total_work_needed = 4.0
+        elif b_type == "Twierdza":
+            new_castle.total_work_needed = 12.0
+        else:
+            new_castle.total_work_needed = 12.0 # Standardowy Zamek
+            
         new_castle.work_done          = 0.0
         new_castle.mury_percent       = 0
+        # ======================================================
 
         army = self.get_unit_at(ix, iy)
         if army:
@@ -298,9 +325,9 @@ class BuildingsMixin:
             for dx in range(size):
                 self.map[anchor_y + dy][anchor_x + dx] = "P"
 
-        print(f"Rozpoczęto budowę {b_type}.")
+        print(f"Rozpoczęto budowę {b_type}. Wymagane punkty pracy: {new_castle.total_work_needed}")
         return True
-
+    
     def execute_build_action(self, button_index, army):
         if not army: return
         grid_x, grid_y = int(army.x), int(army.y)
@@ -358,15 +385,15 @@ class BuildingsMixin:
             return
 
         # 3. SKARB (Indeks 2)
-        elif button_index == 2:         
+        elif button_index == 2:
             if self.map[grid_y][grid_x] == "$":
-                army.owner.gold += 500
-                self.map[grid_y][grid_x] = "."
-                print("Skarb zebrany!")
+                # Wywołujemy funkcję, która pokaże UI i da złoto
+                self.trigger_treasure_ui(army, grid_x, grid_y)
+                print("Budowniczy kopie skarb!")
             else:
                 print("Tu nie ma żadnego skarbu.")
             
-            # Zawsze czyścimy i wracamy do 6 przycisków
+            # Zamykamy menu budowania
             self.road_build_mode = False
             self.trap_build_mode = False
             self.build_menu_open = False 

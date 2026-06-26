@@ -67,6 +67,22 @@ class Renderer:
             self.menu_bg_img = None
             self.menu_bottom_img = None
 
+        # --- ŁADOWANIE ZNACZNIKÓW WIELKOŚCI ARMII (2 do 10) ---
+        self.army_size_marks = {}
+        for i in range(2, 11):
+            # Plik MARKS_S32_7 to cyfra "2", MARKS_S32_8 to "3", itd.
+            file_idx = i + 5
+            sciezka = os.path.join("assets", "minimum", "MARKS_S32", f"MARKS_S32_{file_idx}.png")
+            try:
+                img = pygame.image.load(sciezka).convert_alpha()
+                # Zmniejszamy je lekko do 18x18 pikseli, żeby idealnie pasowały nad kafelkiem
+                self.army_size_marks[i] = pygame.transform.smoothscale(img, (12, 15))
+            except Exception as e:
+                print(f"Nie udało się załadować grafiki armii {i}: {e}")
+
+        self.mark_red = pygame.image.load("assets/minimum/MARKS_S32/MARKS_S32_4.png").convert_alpha()
+        self.mark_grey = pygame.image.load("assets/minimum/MARKS_S32/MARKS_S32_5.png").convert_alpha()
+
     def draw(self, screen):
         w = self.world
         # Stoper powrotu
@@ -91,10 +107,11 @@ class Renderer:
                 w.prod_anim_timer = 0
                 return
             
-        screen.fill((30, 30, 30))
+        if w.screen not in ["map", "Strażnica"]:
+            screen.fill((30, 30, 30))
 
         # Rysujemy mapę pod ekranami które tego wymagają
-        screens_with_bg = ["map", "trap_info", "unit_info", "forge", "workshop"]
+        screens_with_bg = ["map", "trap_info", "unit_info", "forge", "workshop", "Strażnica"]
         if w.screen in screens_with_bg:
             self.draw_map(screen)
 
@@ -103,10 +120,14 @@ class Renderer:
             self.draw_top_bar(screen)
             self.draw_ui(screen)
         
+        elif w.screen == "temple_event":
+            self.draw_map(screen) # Najpierw rysujemy mapę w tle
+            self.draw_temple_event(screen) # Na to nakładamy nasz pergamin
+
         elif w.screen == "combat_setup":
             self.draw_map(screen) # Zostawiamy mapę w tle
             w.combat_menu.draw(screen, w, self.gfx) # Rysujemy nowe okno walki na wierzchu!
-            
+
         # ---> DODAJ TEN BLOK <---
         elif w.screen == "combat_tactical":
             if hasattr(w, 'tactical_combat'):
@@ -123,12 +144,13 @@ class Renderer:
                 mx, my = pygame.mouse.get_pos()
                 self.draw_castle_menu(screen, mx, my)
 
-        # --- TUTAJ BYŁ BŁĄD. Zmienione wszystkie "b" na "w" ---
-        elif w.screen in ("garrison", "Strażnica"):
-            if w.selected_castle and getattr(w.selected_castle, 'building_type', "") == "Strażnica":
-                self.draw_garrison_only(screen)
-            else:
-                self.draw_garrison(screen)
+        # Rysowanie wnętrza budynków
+        elif w.screen == "Strażnica":
+            self.draw_watchtower_interior(screen, w)
+            
+        elif w.screen == "garrison":
+            # Ten blok obsługuje stary ekran zamku (ze wszystkimi budynkami)
+            self.draw_garrison(screen)
 
         elif w.screen == "recruitment":
             w.recruitment_manager.draw(screen)
@@ -179,8 +201,8 @@ class Renderer:
         for u in w.units:
             if u.x < 0 or u.y < 0:
                 continue
-            px = int(u.x) * TILE_SIZE - w.camera_x
-            py = int(u.y) * TILE_SIZE - w.camera_y
+            px = int(u.x * TILE_SIZE) - w.camera_x
+            py = int(u.y * TILE_SIZE) - w.camera_y
 
             owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
             pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
@@ -193,6 +215,26 @@ class Renderer:
 
             if u == w.selected_unit:
                 pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 2)
+
+            # ==========================================
+            # NOWOŚĆ: RYSOWANIE ZNACZNIKA ILOŚCI ARMII
+            # ==========================================
+            garrison = getattr(u, 'garrison', [])
+            pasażerowie = [pas for pas in garrison if pas is not None]
+            wielkosc_armii = len(pasażerowie) + 1 # Lider + to co ma w środku
+            
+            if wielkosc_armii >= 2:
+                # Ograniczamy indeks do max 10 (bo nie mamy grafik dla >10)
+                index_grafiki = min(wielkosc_armii, 10)
+                znacznik = getattr(self, 'army_size_marks', {}).get(index_grafiki)
+                
+                if znacznik:
+                    # Rysujemy znaczek nad prawym górnym rogiem jednostki
+                    screen.blit(znacznik, (px + TILE_SIZE - 12, py - 8))
+
+        # W funkcji draw_map, pod pętlą rysowania jednostek
+        if hasattr(w, 'units_to_split') and len(w.units_to_split) > 0:
+            self.draw_split_preview(screen)
 
         # Kropki planowanej trasy
         if w.selected_unit and w.selected_unit in w.units:
@@ -608,6 +650,102 @@ class Renderer:
             image = current_icons[img_index]
             scaled_img = pygame.transform.scale(image, (rect.width, rect.height))
             screen.blit(scaled_img, rect.topleft)
+
+    def draw_temple_event(self, screen):
+        w = self.world
+        
+        # 1. Ciemne tło
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        screen.blit(overlay, (0, 0))
+
+        # ==========================================
+        # 2. SKALOWANIE I SKLEJANIE PERGAMINU
+        # ==========================================
+        skala = 1.4  
+        
+        lw, lh = w.temple_scroll_l.get_size()
+        rw, rh = w.temple_scroll_r.get_size()
+        
+        new_lw, new_lh = int(lw * skala), int(lh * skala)
+        new_rw, new_rh = int(rw * skala), int(rh * skala)
+        
+        # Używamy zwykłego 'scale', by ostre krawędzie łączeń lepiej do siebie pasowały
+        scroll_l_scaled = pygame.transform.scale(w.temple_scroll_l, (new_lw, new_lh))
+        scroll_r_scaled = pygame.transform.scale(w.temple_scroll_r, (new_rw, new_rh))
+        
+        # ZAKŁADKA POZIOMA: Wsuwamy prawą część w lewą, by ukryć białą linię cięcia
+        zakladka_x = int(3 * skala) 
+        
+        total_w = new_lw + new_rw - zakladka_x
+        start_x = (screen.get_width() - total_w) // 2
+        start_y = (screen.get_height() - new_lh) // 2
+
+        # --- KOREKTA PIONOWA (Tego brakowało!) ---
+        # Ustawiamy wartość ujemną, żeby fizycznie "podnieść" prawą stronę do góry
+        # Zmień tę liczbę (np. -12, -15, -8), aż linie idealnie się zrównają
+        korekta_y_prawej = 8
+
+        # Rysujemy lewą stronę bez zmian
+        screen.blit(scroll_l_scaled, (start_x, start_y))
+        
+        # Rysujemy prawą stronę podniesioną o korektę i wsuniętą w lewą
+        screen.blit(scroll_r_scaled, (start_x + new_lw - zakladka_x, start_y + korekta_y_prawej))
+
+        # ==========================================
+        # 3. TYTUŁ NA GÓRZE
+        # ==========================================
+        tytul = getattr(w, 'temple_title', "Wydarzenie")
+        if hasattr(self, 'custom_font'):
+            self.custom_font.render(screen, tytul.upper(), start_x + (total_w // 2) - int(130 * skala), start_y + int(40 * skala), 
+                                    spacing=2, palette_name="golden", scale=1.8)
+
+        # ==========================================
+        # 4. OPIS GŁÓWNY (TERAZ JEST WYŻEJ)
+        # ==========================================
+        opis = getattr(w, 'temple_desc', "")
+        
+        # Zabezpieczenie (na wypadek listy)
+        if isinstance(opis, list):
+            import random
+            opis = random.choice(opis)
+            w.temple_desc = opis # Zapisujemy, żeby nie migotało!
+
+        # Zwiększamy nieco czcionkę do większego pergaminu
+        font_opis = pygame.font.SysFont("Arial", 22, bold=True)
+        kolor_tekstu = (150, 0, 0) if "niegodny" in tytul.lower() or "biada" in tytul.lower() else (0, 100, 0)
+
+        # System łamania długiego tekstu
+        slowa = opis.split(' ')
+        linie = []
+        aktualna_linia = ""
+        for slowo in slowa:
+            if font_opis.size(aktualna_linia + slowo + " ")[0] < total_w - 120: # Marginesy proporcjonalne
+                aktualna_linia += slowo + " "
+            else:
+                linie.append(aktualna_linia)
+                aktualna_linia = slowo + " "
+        linie.append(aktualna_linia)
+
+        # Zaczynamy rysować tekst zaraz pod tytułem
+        y_offset = start_y + int(70 * skala) 
+        for linia in linie:
+            txt_surf = font_opis.render(linia, True, kolor_tekstu)
+            screen.blit(txt_surf, (start_x + (total_w - txt_surf.get_width()) // 2, y_offset))
+            y_offset += 28 # Odstęp między wierszami tekstu
+
+        # ==========================================
+        # 5. GRAFIKA (TERAZ JEST NA DOLE, POD TEKSTEM)
+        # ==========================================
+        effect_img = getattr(w, 'temple_current_effect', None)
+        if effect_img:
+            # Powiększamy grafikę o 50%, żeby nie zginęła na wielkim pergaminie
+            img_w, img_h = effect_img.get_size()
+            img_scaled = pygame.transform.smoothscale(effect_img, (int(img_w * 1.5), int(img_h * 1.5)))
+            i_w, i_h = img_scaled.get_size()
+            
+            # Rysujemy ją pod tekstem (wykorzystujemy y_offset z pętli tekstu + mały odstęp)
+            screen.blit(img_scaled, (start_x + (total_w - i_w) // 2, y_offset + 15))
             
     def draw_army_panel(self, screen):
         u = self.world.selected_unit
@@ -636,8 +774,8 @@ class Renderer:
             
             for i, unit in enumerate(display_units):
                 # Obliczamy pozycję ikony (każdy slot w MARKS ma 32x32 px)
-                col = i % 12 # Pasek ma 12 slotów
-                row = i // 12
+                col = i % 10 # Pasek ma 12 slotów
+                row = i // 10
                 
                 slot_x = panel_x + (col * 32)
                 slot_y = panel_y + (row * 32)
@@ -655,6 +793,17 @@ class Renderer:
                     img_x = slot_x + (32 - unit_img.get_width()) // 2
                     img_y = slot_y + (32 - unit_img.get_height()) // 2
                     screen.blit(unit_img, (img_x, img_y))
+            # ==========================================
+                # ZNACZNIKI ZAZNACZENIA W PANELU
+                # ==========================================
+                if hasattr(self.world, 'units_to_split') and unit in self.world.units_to_split:
+                    # self.mark_grey = biały/szary (ma ruch)
+                    # self.mark_red = czerwony (brak ruchu)
+                    mark = self.mark_grey if unit.move_points >= 3 else self.mark_red
+                        
+                    # Skalujemy na mały 16x16, żeby nie zasłonił całego portretu
+                    small_mark = pygame.transform.smoothscale(mark, (16, 16))
+                    screen.blit(small_mark, (slot_x + 8, slot_y + 8))
 
     def draw_ui(self, screen):
 
@@ -729,6 +878,16 @@ class Renderer:
                         screen.blit(hp_shadow, (txt_x + 1, txt_y + 1)) # Cień
                         screen.blit(hp_txt, (txt_x, txt_y))            # Właściwy tekst
                         
+                        # ===================================================
+                        # NOWOŚĆ: ZNACZNIKI ZAZNACZENIA W PANELU ARMII
+                        # ===================================================
+                        if hasattr(self.world, 'units_to_split') and unit in self.world.units_to_split:
+                            # Szary (biały) ma ruch, czerwony nie ma ruchu (minimum 2 PA do podziału)
+                            mark = self.mark_grey if unit.move_points >= 3  else self.mark_red
+                            
+                            # Rysujemy mały krzyżyk (16x16) w lewym górnym rogu slota
+                            small_mark = pygame.transform.smoothscale(mark, (20, 20))
+                            screen.blit(small_mark, (rect.x + 5, rect.y + 5))
 
         # 3. PRZYCISKI AKCJI (Zawsze widoczne na ekranie)
         # Wyciągnięte poza "if u:", więc będą widoczne od startu gry
@@ -794,9 +953,12 @@ class Renderer:
         if getattr(castle, 'destroyed', False):
             s_idx = 4
         elif getattr(castle, 'under_construction', False):
-            s_idx = 0 
+            # =========================================================
+            # TUTAJ ZMIANA: Zamiast sztywnego zera, pobieramy aktualny etap (0, 1, 2, 3)
+            # =========================================================
+            s_idx = getattr(castle, 'build_stage', 0)
         else:
-            s_idx = 3 
+            s_idx = 3
 
         if is_tower:
             img = w.tower_tiles.get(s_idx)
@@ -929,74 +1091,23 @@ class Renderer:
         screen.blit(stop_txt, (w.btn_trap_stop.centerx - stop_txt.get_width()//2, w.btn_trap_stop.centery - stop_txt.get_height()//2))
         screen.blit(dalej_txt, (w.btn_trap_dalej.centerx - dalej_txt.get_width()//2, w.btn_trap_dalej.centery - dalej_txt.get_height()//2))
     
-    def draw_garrison_only(self, screen):
-        w = self.world
-        castle = w.selected_castle
-        if not castle:
-            w.screen = "map" 
-            return
-
-        screen.fill((30, 30, 35)) 
-        font = pygame.font.SysFont(None, 32)
-        
-        title = font.render(f"GARNIZON: {castle.building_type.upper()}", True, (200, 200, 200))
-        screen.blit(title, (screen.get_width()//2 - title.get_width()//2, 50))
-
-        start_x = 150
-        start_y = 200
-        gap = 20
-        slot_size = 120
-
-        for i in range(10): 
-            col = i % 5
-            row = i // 5
-            slot_rect = pygame.Rect(150 + col * 140, 200 + row * 140, 120, 120)
-            
-            pygame.draw.rect(screen, (50, 50, 60), slot_rect)
-            pygame.draw.rect(screen, (100, 100, 120), slot_rect, 2)
-            
-            if i < len(castle.garrison) and castle.garrison[i]:
-                unit = castle.garrison[i]
-                
-                # --- NOWOŚĆ: Animowany szary Sprite zamiast tekstu ---
-                frame = (pygame.time.get_ticks() // 150) % 8
-                if hasattr(unit, 'sprites') and unit.sprites:
-                    # Pobieramy obecną klatkę animacji i odbarwiamy ją na szaro
-                    gray_img = pygame.transform.grayscale(unit.sprites[frame])
-                    
-                    # Rysujemy idealnie na środku slotu
-                    screen.blit(gray_img, (slot_rect.centerx - gray_img.get_width()//2, 
-                                           slot_rect.centery - gray_img.get_height()//2))
-                else:
-                    # Fallback w razie braku grafik
-                    u_txt = font.render(unit.type[:5], True, (255, 255, 255))
-                    screen.blit(u_txt, (slot_rect.centerx - u_txt.get_width()//2, 
-                                        slot_rect.centery - u_txt.get_height()//2))
-
-                # Ramka dla zaznaczonych jednostek
-                if unit in w.selected_units:
-                    pygame.draw.rect(screen, (0, 255, 0), slot_rect, 4)
-
-        self.draw_building_footer(screen)
-
-        w.release_tower = pygame.Rect(screen.get_width()//2 - 80, 650, 160, 45)
-        self.draw_button(screen, "RELEASE", w.release_tower)
-        
-        w.destroy_button = pygame.Rect(screen.get_width()//2 + 90, 650, 160, 45)
-        pygame.draw.rect(screen, (150, 0, 0), w.destroy_button)
-        txt = font.render("ZNISZCZ", True, (255, 255, 255))
-        screen.blit(txt, (w.destroy_button.centerx - txt.get_width()//2, 
-                          w.destroy_button.centery - txt.get_height()//2))
-
     def draw_building_footer(self, screen):
         w = self.world
         
+        # =========================================================
+        # KLUCZOWA ZMIANA: Jeśli jesteśmy w Strażnicy, całkowicie 
+        # wychodzimy z tej funkcji, żeby nie rysować starych przycisków!
+        # =========================================================
+        if w.screen == "Strażnica":
+            return
+        # =========================================================
+
         if w.screen == "castle":
             # Tylko zamek ma graficzny przycisk z arkusza Z_IKO
             self.draw_button(screen, "", w.back_button_castle, style="castle")
 
-        elif w.screen in ["garrison", "Strażnica", "peasants","school","hospital","forge","workshop"]:
-            # ZMIANA: używamy stylu "garrison_back"
+        elif w.screen in ["garrison", "peasants", "school", "hospital", "forge", "workshop"]:
+            # ZMIANA: usunięto "Strażnica" z listy, bo obsługujemy ją wyżej
             btn_rect = getattr(w, 'back_button_garrison', w.back_button_bldg)
             self.draw_button(screen, "", btn_rect, style="garrison_back")
             
@@ -1004,9 +1115,10 @@ class Renderer:
             # Reszta budynków używa standardowego stylu "bldg"
             self.draw_button(screen, "", w.back_button_bldg, style="bldg")
 
+        # Ten warunek zostawiamy bez zmian, bo on rysuje przycisk "ZBURZ"
         if w.selected_castle and getattr(w.selected_castle, 'building_type', "") == "Strażnica":
             self.draw_button(screen, "ZBURZ", w.destroy_button, (100, 40, 40))
-            
+
     def draw_build_system(self, screen):
         w = self.world
         if w.selected_unit and w.selected_unit.type == "Budowniczy":
@@ -1080,65 +1192,6 @@ class Renderer:
                 screen.blit(img, (pos_x + offset_x, pos_y + offset_y))
 
     # -------------------------------------------------------
-    # RYSOWANIE TRASY — STOPY zamiast kropek
-    # -------------------------------------------------------
-
-    def draw_path_dots(self, screen, unit, path):
-        w = self.world
-
-        # ZMIANA: Sprawdzamy i ładujemy przez w.pathfinder
-        if getattr(w.pathfinder.__class__, '_step_imgs', None) is None:
-            if hasattr(w.pathfinder, '_load_steps'):
-                w.pathfinder._load_steps()
-
-        # Zabezpieczone pobieranie słowników z obrazkami
-        step_imgs = getattr(w.pathfinder.__class__, '_step_imgs', {})
-        black_imgs = step_imgs.get("black", {}) if step_imgs else {}
-        red_imgs   = step_imgs.get("red", {}) if step_imgs else {}
-
-        current_x, current_y = unit.x, unit.y
-        accumulated_cost = 0
-
-        for px, py in path:
-            dx = px - current_x
-            dy = py - current_y
-
-            # Koszt kroku
-            tile_char = w.map[py][px]
-            base_cost = TERRAIN_TYPES.get(tile_char, {}).get("cost", 4)
-            move_mod  = 1.41 if (dx != 0 and dy != 0) else 1.0
-            accumulated_cost += base_cost * move_mod
-
-            # Pozycja na ekranie — środek kafla
-            screen_x = px * TILE_SIZE + TILE_SIZE // 2 - w.camera_x
-            screen_y = py * TILE_SIZE + TILE_SIZE // 2 - w.camera_y
-
-            # Poza ekranem — pomijamy
-            margin = TILE_SIZE * 2
-            if not (-margin < screen_x < SCREEN_WIDTH  + margin and
-                    -margin < screen_y < SCREEN_HEIGHT + margin):
-                current_x, current_y = px, py
-                continue
-
-            # Kierunek → normalizujemy do -1/0/1
-            direction = ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
-
-            in_range = accumulated_cost <= unit.move_points
-            img      = (black_imgs if in_range else red_imgs).get(direction)
-
-            if img:
-                blit_x = screen_x - img.get_width()  // 2
-                blit_y = screen_y - img.get_height() // 2
-                screen.blit(img, (blit_x, blit_y))
-            else:
-                # Fallback: stare kółka (w razie braku grafiki dla danego kierunku)
-                color = (0, 0, 0) if in_range else (255, 0, 0)
-                pygame.draw.circle(screen, (255, 255, 255), (screen_x, screen_y), 5)
-                pygame.draw.circle(screen, color,           (screen_x, screen_y), 4)
-
-            current_x, current_y = px, py
-
-    # -------------------------------------------------------
     # RYSOWANIE BUDYNKÓW (teksty opisowe)
     # -------------------------------------------------------
 
@@ -1195,6 +1248,7 @@ class Renderer:
         self.draw_building_template(screen, "Szkoła", lines, config=cfg)
 
     def draw_building_template(self, screen, title, lines, config=None):
+
         # Domyślne wartości
         c = {
             "pos_tytul": (450, 135), "pos_tekst": (150, 220),
@@ -1219,6 +1273,146 @@ class Renderer:
             curr_y += int(35 * c["scale_tekst"])
 
         self.draw_building_footer(screen)
+
+    def draw_watchtower_interior(self, screen, world):
+        castle = world.selected_castle
+        if not castle: return
+
+        # 1. Konfiguracja
+        skala_tla = 1.4
+        przesunięcie_x = 0
+        przesunięcie_y = 0
+
+        start_x = 24
+        start_y = 61
+        odstep_x = 62
+        odstep_y = 110
+        slot_w, slot_h = 70, 100
+
+        # 2. Ładowanie tła (poprawione!)
+        if not hasattr(self, 'tower_bg_img'):
+            try:
+                sciezka = os.path.join("assets", "minimum", "KEEP_S32", "KEEP_S32_0.png")
+                # Wczytujemy do zmiennej tymczasowej 'temp_img'
+                temp_img = pygame.image.load(sciezka).convert_alpha()
+                
+                # UŻYWAMY 'temp_img' DO OBLICZEŃ, A NIE 'img'
+                nw = int(temp_img.get_width() * skala_tla)
+                nh = int(temp_img.get_height() * skala_tla)
+                
+                # Zapisujemy do self.tower_bg_img
+                self.tower_bg_img = pygame.transform.smoothscale(temp_img, (nw, nh))
+                print(f"SUKCES: Załadowano tło strażnicy z: {sciezka}")
+                
+            except Exception as e:
+                print(f"BŁĄD: Nie można załadować tła: {e}")
+                self.tower_bg_img = pygame.Surface((560, 450), pygame.SRCALPHA)
+                self.tower_bg_img.fill((40, 40, 40, 200)) # Półprzezroczyste szare tło
+
+        bg_x = (screen.get_width() - self.tower_bg_img.get_width()) // 2 + przesunięcie_x
+        bg_y = (screen.get_height() - self.tower_bg_img.get_height()) // 2 + przesunięcie_y
+        
+        # Rysujemy okno strażnicy
+        screen.blit(self.tower_bg_img, (bg_x, bg_y))
+
+        # 3. Sloty i jednostki
+        world.garrison_slot_rects = []
+        for i in range(10):
+            row = i // 5
+            col = i % 5
+            rect = pygame.Rect(bg_x + start_x + col * odstep_x, bg_y + start_y + row * odstep_y, slot_w, slot_h)
+            world.garrison_slot_rects.append(rect)
+
+            # Rysowanie jednostek
+            if i < len(castle.garrison) and castle.garrison[i]:
+                unit = castle.garrison[i]
+                img = None
+                if hasattr(unit, 'walk_frames') and unit.walk_frames: img = unit.walk_frames[0]
+                elif hasattr(unit, 'sprites') and unit.sprites: img = unit.sprites[0]
+
+                if img:
+                    u_scale = min(slot_w / img.get_width(), slot_h / img.get_height()) * 0.95
+                    nw, nh = int(img.get_width() * u_scale), int(img.get_height() * u_scale)
+                    img_scaled = pygame.transform.smoothscale(img, (nw, nh))
+                    screen.blit(img_scaled, (rect.x + (slot_w - nw)//2, rect.y + (slot_h - nh)//2))
+                
+                if unit in world.selected_units:
+                    pygame.draw.rect(screen, (255, 215, 0), rect, 3)
+                    
+        # 1. Ładowanie przycisków (dodaj to do sekcji ładowania tła)
+        if not hasattr(self, 'tower_btns'):
+            self.tower_btns = {}
+            for i in [1, 2, 4]: # 1:powrot, 2:wypusc, 4:zniszcz
+                path = os.path.join("assets", "minimum", "KEEP_S32", f"KEEP_S32_{i}.png")
+                self.tower_btns[i] = pygame.image.load(path).convert_alpha()
+
+        # 2. Definicja współrzędnych (Względne do środka ekranu lub rogu)
+        # Podaję przykładowe koordynaty, dostosuj je wg uznania:
+        btn_w, btn_h = 116, 58 
+        # Przycisk "Powrót" (strzałka w lewo)
+        world.back_btn = pygame.Rect(bg_x + 2, bg_y + 280, btn_w, btn_h)
+        # Przycisk "Wypuść" (strzałka w prawo/ikona)
+        world.release_btn = pygame.Rect(bg_x + 245, bg_y + 280, btn_w, btn_h)
+        # Przycisk "Zniszcz" (ikona z przekreśleniem)
+        world.destroy_btn = pygame.Rect(bg_x + 20, bg_y + 30, 27, 27)
+
+        # 3. Rysowanie przycisków
+        screen.blit(pygame.transform.smoothscale(self.tower_btns[1], (btn_w, btn_h)), world.back_btn.topleft)
+        screen.blit(pygame.transform.smoothscale(self.tower_btns[2], (btn_w, btn_h)), world.release_btn.topleft)
+        screen.blit(pygame.transform.smoothscale(self.tower_btns[4], (27, 27)), world.destroy_btn.topleft)
+        # Używamy getattr, żeby uniknąć błędu, jeśli prostokąt jeszcze nie istnieje
+        for rect_name in ['back_btn', 'release_btn', 'destroy_btn']:
+            rect = getattr(world, rect_name, None)
+            if isinstance(rect, pygame.Rect):
+                pygame.draw.rect(screen, (255, 0, 0), rect, 2)
+
+    def draw_split_preview(self, screen):
+        w = self.world
+        leader = w.selected_unit
+        if not leader: return
+        
+        if not hasattr(self, 'mark_split'):
+            try: 
+                self.mark_split = pygame.image.load("assets/minimum/MARKS_S32/MARKS_S32_40.png").convert_alpha()
+            except: 
+                self.mark_split = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                self.mark_split.fill((0, 255, 0, 100))
+                
+        walkable_chars = [".", "l", "g", "p", "_", "#", "$", " "]
+        
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0: continue
+                tx, ty = leader.x + dx, leader.y + dy
+                
+                if 0 <= tx < len(w.map[0]) and 0 <= ty < len(w.map):
+                    tile_char = w.map[ty][tx]
+                    if tile_char in walkable_chars:
+                        
+                        # --- 1. BLOKADA WCHODZENIA NA INNE JEDNOSTKI ---
+                        # Rozdzielenie to wyrzucenie na puste pole. Jeśli ktoś tu stoi, nie pokazujemy ludzika!
+                        zajete = any(other.x == tx and other.y == ty for other in w.units)
+                        if zajete:
+                            continue
+
+                        # --- 2. INTELIGENTNE SPRAWDZANIE KOSZTU ---
+                        base_cost = TERRAIN_TYPES.get(tile_char, {}).get("cost", 4)
+                        move_mod = 1.5 if (dx != 0 and dy != 0) else 1.0 
+                        koszt_podzialu = int(base_cost * move_mod)
+                        
+                        can_enter = True
+                        if hasattr(w, 'units_to_split'):
+                            for u in w.units_to_split:
+                                # Jeśli wybrana jednostka ma mniej PA niż potrzeba, blokujemy strzałkę
+                                if u.move_points < koszt_podzialu:
+                                    can_enter = False
+                                    break
+                                    
+                        # Rysujemy ludzika TYLKO jeśli starczy punktów ruchu!
+                        if can_enter:
+                            px = tx * TILE_SIZE - w.camera_x
+                            py = ty * TILE_SIZE - w.camera_y
+                            screen.blit(self.mark_split, (px, py))
 
 if __name__ == "__main__":
         import subprocess, sys, os

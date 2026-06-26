@@ -15,6 +15,7 @@ from garrison_graphics import GarrisonGraphics
 from recruitment import RecruitmentManager
 from peasant_menu import PeasantMenu
 from court_graphics import CourtGraphics
+from loot_manager import LootManager
 @property
 def back_button(self):
     if self.screen == "castle":
@@ -28,6 +29,7 @@ class World(BuildingsMixin):
         # ====================================================
         self.screen = "map"
         self.turn = 1
+        self.visited_temples = set()
         self.current_player = 0
         
         self.selected_castle = None
@@ -89,6 +91,8 @@ class World(BuildingsMixin):
         self.font_small = pygame.font.SysFont(None, 20)
         self.modal_font = pygame.font.SysFont(None, 32)
         self.btn_font = pygame.font.SysFont(None, 28, bold=True)
+        self.font_title = pygame.font.SysFont("Times New Roman", 40, bold=True) # <--- DODAJ TĘ LINIJKĘ
+        self.font_main = pygame.font.SysFont("Arial", 26)  # <--- DODAJ TĘ LINIJKĘ
 
         # ====================================================
         # 3. INTERFEJS I PRZYCISKI
@@ -106,8 +110,6 @@ class World(BuildingsMixin):
         self.back_destination   = "map"
         
         try:
-            self.back_img_castle_normal  = pygame.transform.scale(pygame.image.load("assets/back_castlen.png").convert_alpha(), (130, 74))
-            self.back_img_castle_pressed = pygame.transform.scale(pygame.image.load("assets/back_castlec.png").convert_alpha(), (130, 74))
             self.back_img_bldg_normal    = pygame.transform.scale(pygame.image.load("assets/back_normal.png").convert_alpha(),  (150, 80))
             self.back_img_bldg_pressed   = pygame.transform.scale(pygame.image.load("assets/back_clicked.png").convert_alpha(), (150, 80))
             # >>> NOWE: GRAFIKI TYLKO DLA GARNIZONU <<<
@@ -194,27 +196,22 @@ class World(BuildingsMixin):
         except Exception as e:
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
 
-        # Inicjalizacja Graczy
+        # Inicjalizacja Graczy z przypisaniem frakcji
         num_players = 2 
         player_data = [
-            ("Don Marek", (200, 0, 0), "red"),
-            ("Lech VI", (0, 0, 200), "blue"),
-            ("Mściwój", (0, 150, 0), "green"),
-            ("Biały Kieł", (220, 220, 220), "white"),
-            ("Złoty Pan", (200, 200, 0), "yellow")
+            ("Don Marek", (200, 0, 0), "red", "catholic"),  # Katolik
+            ("Lech VI", (0, 0, 200), "blue", "pagan"),      # Poganin
+            ("Mściwój", (0, 150, 0), "green", "pagan"),
+            ("Biały Kieł", (220, 220, 220), "white", "pagan"),
+            ("Złoty Pan", (200, 200, 0), "yellow", "catholic")
         ]
 
-        from player import Player
-        from player import Player
         for i in range(num_players):
-            name, color_rgb, color_name = player_data[i]
-            new_player = Player(i, name, color_rgb, color_name)
-            
-            # --- DODANE: Przypisanie frakcji na sztywno do testów ---
-            new_player.faction = "catholic" if i == 0 else "pagan" 
-            
+            name, color_rgb, color_name, faction = player_data[i]
+            # Przekazujemy frakcję prosto do nowej, czystej klasy Player
+            new_player = Player(i, name, color_rgb, color_name, faction)
             self.players.append(new_player)
-
+            
         # ==========================================
         # WYCINANIE GRAFIK Z_IKO_PCX.png (Spritesheet)
         # ==========================================
@@ -239,11 +236,40 @@ class World(BuildingsMixin):
                 z_iko_sheet.subsurface(pygame.Rect(509, 360, 123, 68))
             ]
             print("Wycinki z arkusza Z_IKO załadowane pomyślnie!")
-           
+        
         except Exception as e:
             print(f"Błąd wycinania z Z_IKO_PCX: {e}")
             self.title_bar_img = None
             self.menu_frames = []
+            
+        self.back_btn = pygame.Rect(0, 0, 0, 0)
+        self.release_btn = pygame.Rect(0, 0, 0, 0)
+        self.destroy_btn = pygame.Rect(0, 0, 0, 0)
+        # ==========================================
+        # GRAFIKI ŚWIĄTYNI (Wydarzenie)
+        # ==========================================
+       
+        self.loot_manager = LootManager()
+        try:
+            # Upewnij się, że ścieżki do plików są poprawne!
+            self.temple_scroll_l = pygame.image.load("assets/minimum/TEMPLE_S32/TEMPLE_S32_22.png").convert_alpha()
+            self.temple_scroll_r = pygame.image.load("assets/minimum/TEMPLE_S32/TEMPLE_S32_23.png").convert_alpha()
+            self.temple_hands = pygame.image.load("assets/minimum/TEMPLE_S32/TEMPLE_S32_24.png").convert_alpha()
+            self.temple_lightning = pygame.image.load("assets/minimum/TEMPLE_S32/TEMPLE_S32_0.png").convert_alpha() # [cite: image_1.png]
+            self.temple_chest = pygame.image.load("assets/minimum/TEMPLE_S32/TEMPLE_S32_16.png").convert_alpha()
+
+        except Exception as e:
+            print(f"Błąd ładowania grafik świątyni: {e}")
+            # Puste powierzchnie awaryjne w razie braku plików
+            self.temple_scroll_l = pygame.Surface((100, 200))
+            self.temple_scroll_r = pygame.Surface((100, 200))
+            self.temple_hands = pygame.Surface((50, 50))
+            # Awaryjna błyskawica
+            self.temple_lightning = pygame.Surface((50, 50)) # [cite: image_1.png]
+            self.temple_lightning.fill((0, 0, 255)) # Niebieska plama jako failsafe [cite: image_1.png]
+
+        # Nowa zmienna do przechowywania efektu dla renderera
+        self.temple_current_effect = None
 
         # --- IZOLACJA WIĘZIEŃ DLA KAŻDEGO GRACZA (ZAPOBIEGA BLEEDINGOWI) ---
         self.court_states = {}
@@ -264,6 +290,7 @@ class World(BuildingsMixin):
         if self.players:
             self.court.prison_slots = self.court_states[self.players[0].id]["slots"]
             self.court.selected_prison_action = self.court_states[self.players[0].id]["action"]
+        self.units_to_split = [] # Tu trafiają jednostki zaznaczone kliknięciem w panelu
    
     def setup_starting_units(self):
         """Rozdaje graczom początkowe wojsko pod ich zamkami."""
@@ -295,8 +322,6 @@ class World(BuildingsMixin):
                 
                 generals_created.append(general)
                 
-            
-
     def add_player(self, player):
         self.players.append(player)
 
@@ -334,14 +359,24 @@ class World(BuildingsMixin):
             self.court.prison_slots = self.court_states[new_player.id]["slots"]
             self.court.selected_prison_action = self.court_states[new_player.id]["action"]
         
-        # resetujemy UI i flagi dla nowego gracza
-        self.reset_units()
+        # ZMIANA: Przekazujemy gracza kończącego turę!
+        self.reset_units(old_player)
+        # ================================================
         self.active_dropdown = None 
         self.build_menu_open = False 
         self.selected_castle = None
         self.selected_unit = None
         self.screen = "map"
         
+      # =========================================================
+        # ---> DODAJ TE 4 LINIJKI: Twardy reset trybów budowy <---
+        # =========================================================
+        self.road_build_mode = False
+        self.trap_build_mode = False
+        self.active_builder_army = None
+        self.active_builder_unit = None
+        # =========================================================
+
         # ---> KLUCZOWA POPRAWKA 3: Twardy reset krzyżyków w koszarach! <---
         self.selected_units.clear()
 
@@ -355,9 +390,18 @@ class World(BuildingsMixin):
                     if hasattr(castle, 'next_turn'):
                         castle.next_turn() 
                     
-                    # ---> KLUCZOWA POPRAWKA 2: Przetwarzanie leczenia i szkolenia <---
+                   # ---> KLUCZOWA POPRAWKA 2: Przetwarzanie leczenia i szkolenia <---
                     for u in getattr(castle, 'garrison', []):
                         if u:
+                            # ================================================
+                            # NOWOŚĆ: Odpoczynek w zamku zdejmuje 20 zmęczenia
+                            # ================================================
+                            u.fatigue = max(0, getattr(u, 'fatigue', 0) - 20)
+                            base_moves = getattr(u, 'moves', 5)
+                            u.move_points = base_moves
+                            u.turn_start_mp = base_moves
+                            # ================================================
+
                             # Przetwarzanie Leczenia (Szpital - Serduszka)
                             if getattr(u, 'healing_turns', 0) > 0:
                                 u.healing_turns -= 1
@@ -388,6 +432,20 @@ class World(BuildingsMixin):
         if unit.move_points < cost:
             print(f"DEBUG: Jednostka {unit.type} nie ma MP ({unit.move_points} < {cost}).")
             return False
+        # ========================================================
+        # WLEP TUTAJ LOGIKĘ ZMĘCZENIA (Pkt 3)
+        # ========================================================
+        # Sprawdzamy czy ktokolwiek w armii nie jest sparaliżowany
+        if unit.has_fatigue_paralysis():
+            print("Armia nie może się ruszyć - ktoś jest skrajnie wyczerpany!")
+            return False
+            
+        # Obliczamy ruch armii na podstawie najsłabszego ogniwa
+        effective_mp = unit.get_effective_move_points()
+        if effective_mp < cost:
+            print("Armia nie może się ruszyć - ogranicza ją najsłabszy członek!")
+            return False
+        # ========================================================
 
         nx, ny = unit.x + dx, unit.y + dy
 
@@ -395,35 +453,87 @@ class World(BuildingsMixin):
         if not (0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map)):
             return False
 
-        # 3. INTERAKCJA Z ZAMKIEM (Obszar 2x2 dla Zamków, 1x1 dla Strażnic)
+       # 3. INTERAKCJA Z ZAMKIEM (Obszar 2x2 dla Zamków, 1x1 dla Strażnic)
         for castle in self.castles:
-            size = 2 if castle.building_type in ["Zamek", "Twierdza"] else 1
+            size = 2 if getattr(castle, 'building_type', 'Zamek') in ["Zamek", "Twierdza"] else 1
             if castle.x <= nx < castle.x + size and castle.y <= ny < castle.y + size:
                 if getattr(castle, 'destroyed', False):
-                    return False
+                    continue
 
-                # Jeśli zamek jest wrogi -> PRZEJMUJEMY
-                if castle.owner != unit.owner:
-                    print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color}!")
-                    castle.owner = unit.owner
-                    # Czyścimy garnizon wroga
-                    castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
-                    # Przerywamy wrogą produkcję
-                    castle.production_enabled = False
-                    castle.production_unit_type = None
+                # ==========================================
+                # --- ZAMEK SOJUSZNIKA ---
+                # ==========================================
+                if castle.owner == unit.owner:
+                    # BLOKADA WEJŚCIA: Jeśli trwa budowa, sojusznik nie może wejść!
+                    if getattr(castle, 'under_construction', False):
+                        print("Plac budowy - sojusznicy nie mogą wchodzić dopóki nie zostanie ukończony!")
+                        return False # Zatrzymujemy jednostkę bez pobierania punktów ruchu
+                        
+                    # Jeśli to gotowy zamek - wchodzimy normalnie
+                    unit.move_points -= cost 
+                    if self.enter_castle(unit, castle):
+                        return True
+                    else:
+                        unit.move_points += cost
+                        print("Brak miejsca w garnizonie! Armia zostaje przed zamkiem.")
+                        return False
 
-                # =========================================================
-                # Próba wejścia do garnizonu (ROZPAKOWANIE ARMII)
-                # =========================================================
-                unit.move_points -= cost # Odejmujemy koszt za wejście
-                
-                if self.enter_castle(unit, castle):
-                    return True # Sukces, armia rozpakowana w zamku!
+                # ==========================================
+                # --- ZAMEK WROGA ---
+                # ==========================================
                 else:
-                    unit.move_points += cost # Brak miejsca, oddajemy punkty
-                    print("Brak miejsca w garnizonie! Armia zostaje przed zamkiem.")
-                    return False
+                    if getattr(castle, 'under_construction', False):
+                        print("Wróg atakuje plac budowy!")
+                        # Wyciągamy obrońców (budowniczych) z zamku by stanęli do walki
+                        defenders = [u for u in castle.garrison if u is not None]
+                        if defenders:
+                            def_leader = defenders[0]
+                            def_leader.x, def_leader.y = nx, ny
+                            def_leader.garrison = [None] * 10
+                            for i, d in enumerate(defenders[1:]):
+                                if i < 10: def_leader.garrison[i] = d
+                            
+                            self.combat_attacker = unit
+                            self.combat_defender = def_leader
+                            self.combat_nx = nx
+                            self.combat_ny = ny
+                            self.combat_cost = cost
+                            self.screen = "combat_setup"
+                            self.center_camera_on(nx, ny)
+                            
+                            # Flaga oznaczająca, że tocząca się bitwa dotyczy tego placu budowy!
+                            self.combat_target_castle = castle
+                            return False
+                        else:
+                            # Pusty plac budowy - niszczymy od razu!
+                            print("Zniszczono pusty plac budowy wroga!")
+                            castle.destroyed = True
+                            if castle in self.castles:
+                                self.castles.remove(castle)
+                            
+                            # Zmazujemy literę "P" z mapy
+                            for dy in range(size):
+                                for dx in range(size):
+                                    self.map[castle.y + dy][castle.x + dx] = "."
 
+                            unit.x, unit.y = nx, ny
+                            unit.move_points -= cost
+                            return True
+                    else:
+                        # Normalne zdobycie gotowego zamku
+                        print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color_name}!")
+                        castle.owner = unit.owner
+                        castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
+                        castle.production_enabled = False
+                        castle.production_unit_type = None
+                        
+                        unit.move_points -= cost
+                        if self.enter_castle(unit, castle):
+                            return True
+                        else:
+                            unit.move_points += cost
+                            return False
+                        
         # 4. TEREN
         walkable_chars = [".", "l", "g", "p", "_", "#", "$","x", " "] 
         map_char = self.map[ny][nx]
@@ -483,14 +593,43 @@ class World(BuildingsMixin):
         # 8. FINALIZACJA RUCHU
         unit.x, unit.y = nx, ny
         unit.move_points -= cost
+        
+        # --- NOWOŚĆ: Zużywamy PA wszystkim w armii! ---
+        if hasattr(unit, 'garrison'):
+            for pas in unit.garrison:
+                if pas is not None:
+                    pas.move_points -= cost
         return True
     
-    def reset_units(self):
+    def reset_units(self, old_player=None):
+        # Funkcja wewnętrzna resetująca pojedynczego żołnierza
+        def _reset_single(u_obj):
+            if old_player and u_obj.owner == old_player:
+                start_mp = getattr(u_obj, 'turn_start_mp', getattr(u_obj, 'moves', 5))
+                if u_obj.move_points >= start_mp:
+                    u_obj.fatigue = max(0, getattr(u_obj, 'fatigue', 0) - 20)
+                elif u_obj.move_points < 5:
+                    u_obj.fatigue = min(100, getattr(u_obj, 'fatigue', 0) + 10)
+            
+            base_moves = getattr(u_obj, 'moves', 5)
+            fatigue = getattr(u_obj, 'fatigue', 0)
+            if fatigue >= 100: new_mp = 0
+            elif fatigue >= 90: new_mp = int(base_moves * 0.5)
+            elif fatigue >= 80: new_mp = int(base_moves * 0.75)
+            else: new_mp = base_moves
+            
+            u_obj.move_points = new_mp
+            u_obj.turn_start_mp = new_mp
+
+        # Pętla przez wszystkie jednostki i ich pasażerów
         for u in self.units:
             if u.x < 0:
                 continue
-            # Pobieramy maksymalną wartość ruchu przypisaną do jednostki (awaryjnie 5)
-            u.move_points = getattr(u, 'moves', 5)
+            _reset_single(u)
+            if hasattr(u, 'garrison'):
+                for pas in u.garrison:
+                    if pas is not None:
+                        _reset_single(pas)
 
     def select_unit(self, x, y):
         for u in self.units:
@@ -592,9 +731,9 @@ class World(BuildingsMixin):
         # ================= BACK =================
         if hasattr(self, 'back_button_garrison') and self.back_button_garrison.collidepoint(mx, my):
             self.selected_units.clear() 
+            # --- ZMIANA: Zamek ZAWSZE wraca na dziedziniec ---
             self.screen = "castle"
             
-            # --- POPRAWIONA NAZWA ---
             if hasattr(self, 'recruitment_manager'):
                 self.recruitment_manager.selected_patent_index = None
             return
@@ -673,6 +812,51 @@ class World(BuildingsMixin):
                 else:
                     print("Maksymalna wielkość armii (10) osiągnięta! Nie możesz zaznaczyć więcej.")
 
+    def handle_straznica_click(self, mx, my, button):
+        castle = self.selected_castle
+        if not castle:
+            return
+
+        # Ta funkcja NIE SPRAWDZA przycisków Powrotu/Wypuść.
+        # Obsługuje wyłącznie kafelki jednostek w Strażnicy!
+
+        # ================= SELEKCJA JEDNOSTEK W SLOTACH =================
+        # Pobieramy prostokąty wygenerowane w renderer.py
+        rects = getattr(self, 'garrison_slot_rects', [])
+        index = None
+        for i, rect in enumerate(rects):
+            if rect.collidepoint(mx, my):
+                index = i
+                break
+                
+        if index is None or index >= len(castle.garrison):
+            return
+
+        unit = castle.garrison[index]
+
+        # --- PRAWY PRZYCISK: Statystyki ---
+        if button == 3: 
+            if unit is not None:
+                self.inspected_unit = unit  
+            else:
+                self.inspected_unit = None
+            return
+
+        # --- LEWY PRZYCISK: Zaznaczanie ---
+        if button == 1:
+            self.inspected_unit = None
+            if unit is None:
+                return
+
+            if unit in self.selected_units:
+                self.selected_units.remove(unit)
+            else:
+                # Sztywny limit 10 jednostek do armii!
+                if len(self.selected_units) < 10:
+                    self.selected_units.append(unit)
+                else:
+                    print("Maksymalna wielkość armii (10) osiągnięta! Nie możesz zaznaczyć więcej.")
+    
     def get_unit_at(self, x, y):
         for unit in self.units:
             # Ignoruj jednostki, które są w trakcie budowy!
@@ -939,46 +1123,48 @@ class World(BuildingsMixin):
         return False
     
     def merge_units(self, moving_unit, target_unit, cost):
-        """Łączy jednostkę ruchomą z docelową bez duplikowania liderów."""
-        
-        # 1. Przygotowujemy listę jednostek do dodania (ruchomy lider + jego ewentualny garnizon)
+        """Łączy dwie armie w jedną, zachowując indywidualne punkty ruchu."""
+        # 1. Przygotowanie listy: Lider + jego garnizon
         to_add = [moving_unit]
         if hasattr(moving_unit, 'garrison') and moving_unit.garrison:
             to_add.extend([u for u in moving_unit.garrison if u is not None])
-            # Czyścimy stary garnizon wędrowca, bo teraz staje się on zwykłym żołnierzem
-            moving_unit.garrison = [None] * 10 
 
-        # 2. Upewniamy się, że jednostka docelowa (target) ma miejsce w środku
+        # 2. NAPRAWA: Zabezpieczenie przed pustą listą [] (Dzięki temu łączy armie!)
         if not hasattr(target_unit, 'garrison') or not target_unit.garrison:
             target_unit.garrison = [None] * 10
             
         free_slots = [i for i, slot in enumerate(target_unit.garrison) if slot is None]
         
         if len(to_add) > len(free_slots):
-            print(f"Brak miejsca! Próbujesz dodać {len(to_add)} oddziałów, a masz {len(free_slots)} wolnych slotów.")
+            print(f"Brak miejsca! Próbujesz dodać {len(to_add)} jedn., a masz tylko {len(free_slots)} slotów.")
             self.merge_mode = False
-            return False
+            return False 
 
-        # 3. Przenosimy jednostki do środka target_unit
-        for i, unit_to_hide in enumerate(to_add):
-            slot_idx = free_slots[i]
-            target_unit.garrison[slot_idx] = unit_to_hide
+        # 3. Jeśli jest miejsce - przenosimy jednostki
+        for unit_to_add in to_add:
+            slot_idx = free_slots.pop(0) 
+            target_unit.garrison[slot_idx] = unit_to_add
             
-            # Jednostka wchodząca do środka znika z mapy głównej
-            unit_to_hide.x, unit_to_hide.y = -1, -1
-            if unit_to_hide in self.units:
-                self.units.remove(unit_to_hide)
-            if unit_to_hide.owner and unit_to_hide in unit_to_hide.owner.units:
-                unit_to_hide.owner.units.remove(unit_to_hide)
+            unit_to_add.x, unit_to_add.y = -1, -1
+            if unit_to_add in self.units:
+                self.units.remove(unit_to_add)
+            if unit_to_add.owner and unit_to_add in unit_to_add.owner.units:
+                unit_to_add.owner.units.remove(unit_to_add)
 
-        # 4. Finalizacja
+        # 4. Czyścimy starego lidera
+        if hasattr(moving_unit, 'garrison'):
+            moving_unit.garrison = [None] * 10 
+
+        # 5. NAPRAWA: ZABIERAMY TYLKO KOSZT RUCHU (Nie wyrównujemy wszystkim w dół!)
+        # Świeże jednostki zachowają swoje PA, będą miały szare krzyżyki i dadzą się odłączyć!
+        for u in to_add:
+            u.move_points = max(0, u.move_points - cost)
+
         self.merge_mode = False
-        self.selected_unit = target_unit # Kamera zostaje na "nowej" armii
-        target_unit.move_points = min(target_unit.move_points, moving_unit.move_points - cost)
-        
-        print(f"Połączono! Liderem jest {target_unit.type}. W środku: {10 - target_unit.garrison.count(None)} oddziałów.")
+        self.selected_unit = target_unit 
+        print("Połączono pomyślnie armie!")
         return True
-    
+
     def center_camera_on(self, tx, ty):
         """Centruje kamerę na podanych współrzędnych kafelka."""
         from settings import SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE
@@ -1088,6 +1274,363 @@ class World(BuildingsMixin):
             self.units.remove(unit)
         if unit.owner and unit in unit.owner.units:
             unit.owner.units.remove(unit)
+
+    # world.py -> update the visit_temple function
+
+    def visit_temple(self, unit, gx, gy):
+        # 1. SPRAWDZAMY LIMIT: Czy ktoś już tu był?
+        if (gx, gy) in self.visited_temples:
+            self.temple_title = "Pusta Świątynia"
+            self.temple_desc = "Ołtarz jest pusty. Ktoś już zabrał stąd dary."
+            self.temple_current_effect = None # Pusty pergamin
+            self.screen = "temple_event"
+            return 
+
+        # 2. ZAPISUJEMY ŚWIĄTYNIĘ JAKO ODWIEDZONĄ
+        self.visited_temples.add((gx, gy))
+        
+        loot = self.loot_manager.get_temple_loot() 
+        temple_type = self.map[gy][gx]
+        player = self.players[self.current_player]
+        
+        # Logika sprawdzenia frakcji
+        is_worthy = (temple_type == "S" and player.faction == "catholic") or \
+                    (temple_type == "&" and player.faction == "pagan")
+
+        if is_worthy:
+            self.temple_title = loot["title"]
+            
+            if isinstance(loot["desc"], list):
+                import random
+                self.temple_desc = random.choice(loot["desc"])
+            else:
+                self.temple_desc = loot["desc"]
+                
+            self.temple_current_effect = loot["img"]
+            img_id = loot.get("img_id")
+            
+            # --- ZBIERAMY CAŁY ODDZIAŁ DO KUPY ---
+            army = [unit]
+            if hasattr(unit, 'garrison') and unit.garrison:
+                army.extend([u for u in unit.garrison if u is not None])
+
+            # --- APLIKUJEMY EFEKTY ---
+            if img_id == 1:
+                wylosowane = self.spawn_temple_army(player, gx, gy)
+                if wylosowane:
+                    nazwy = ", ".join(wylosowane)
+                    self.temple_desc += f" Dołączają do Ciebie: {nazwy}!"
+                    
+            # ID 13, 14, 15 to Nagrody Pieniężne
+            elif img_id in [13, 14, 15]:
+                import re
+                liczby = [int(n) for n in re.findall(r'\d+', self.temple_desc)]
+                ilosc_zlota = max(liczby) if liczby else 100
+                
+                print(f"[DEBUG ŚWIĄTYNIA] Znalezione liczby: {liczby}. Wybrano: {ilosc_zlota}")
+                self.spawn_gold_chunks(player, gx, gy, ilosc_zlota)
+
+            if img_id in [2, 3, 4, 8, 12]:
+                for u in army:
+                    u.hp = getattr(u, 'max_hp', 100) 
+                    
+            if img_id in [3, 8, 11, 26]:
+                for u in army:
+                    u.fatigue = 0 
+                    u.move_points = getattr(u, 'moves', 5) 
+            
+            if img_id in [5, 6]:
+                for u in army:
+                    u.experience = min(12, getattr(u, 'experience', 0) + 3) 
+            elif img_id == 10:
+                for u in army:
+                    u.experience = min(12, getattr(u, 'experience', 0) + 2)
+
+            if img_id in [7, 9]:
+                for u in army:
+                    u.morale = min(10, getattr(u, 'morale', 5) + 2) 
+                    
+            if img_id == 19:
+                for u in army:
+                    u.morale = max(0, getattr(u, 'morale', 5) - 2)
+            elif img_id == 20:
+                for u in army:
+                    u.morale = 0
+            elif img_id == 21: 
+                for u in army:
+                    u.morale = max(0, getattr(u, 'morale', 5) - 1)
+                    u.fatigue = min(100, getattr(u, 'fatigue', 0) + 50) 
+        else:
+            # --- GRACZ JEST NIEGODNY (ZŁA FRAKCJA) ---
+            self.temple_title = "Jesteś Niegodny"
+            self.temple_desc = "Głupcze! Jak śmiałeś zakłócać spokój boski. Świętokradcy zostali ukarani."
+            self.temple_current_effect = getattr(self, 'temple_lightning', None)
+            
+            # Kara dla innowiercy! Zabiera połowę HP liderowi
+            unit.hp = max(1, unit.hp // 2)
+
+        # =========================================================
+        # 3. ZAWSZE OTWIERAMY EKRAN ŚWIĄTYNI NA KONIEC!
+        # =========================================================
+        self.screen = "temple_event"
+    def trigger_treasure_ui(self, unit, gx, gy):
+        loot = self.loot_manager.get_digging_loot()
+        
+        # --- DEBUG ---
+        print(f"\n[DEBUG KOPANIA] Wylosowano skarb: {loot.get('title')}, ID: {loot.get('img_id')}")
+        
+        self.temple_title = loot["title"]
+        if isinstance(loot["desc"], list):
+            import random
+            self.temple_desc = random.choice(loot["desc"])
+        else:
+            self.temple_desc = loot["desc"]
+            
+        self.temple_current_effect = loot["img"]
+        
+        # 1. Usuwamy skarb z mapy
+        self.map[gy][gx] = "."
+        
+       # 2. GENEROWANIE ZŁOTA NA MAPIE (dla skarbu ID 15, 16)
+        if loot.get("img_id") in [15, 16]: 
+            import re
+            # Zbieramy wszystkie liczby z tekstu i wybieramy najwyższą!
+            liczby = [int(n) for n in re.findall(r'\d+', self.temple_desc)]
+            ilosc_zlota = max(liczby) if liczby else 100
+            
+            print(f"[DEBUG KOPANIA] Znalezione liczby: {liczby}. Wybrano: {ilosc_zlota}")
+            self.spawn_gold_chunks(unit.owner, gx, gy, ilosc_zlota)
+
+        # 3. Otwieramy ekran
+        self.screen = "temple_event"
+
+    # --- NOWA FUNKCJA POMOCNICZA DO RODZENIA JEDNOSTEK ---
+    def _spawn_unit_near(self, unit_name, owner, start_x, start_y):
+        sasiedzi = [(start_x, start_y), (start_x-1, start_y), (start_x+1, start_y), 
+                    (start_x, start_y-1), (start_x, start_y+1), (start_x-1, start_y-1), 
+                    (start_x+1, start_y+1), (start_x-1, start_y+1), (start_x+1, start_y-1)]
+        
+        try:
+            from unit import Unit 
+        except ImportError as e:
+            print(f"[DEBUG SPAWN] Błąd importu klasy Unit: {e}")
+            return False
+            
+        for nx, ny in sasiedzi:
+            if 0 <= nx < len(self.map[0]) and 0 <= ny < len(self.map):
+                # POPRAWKA: Akceptujemy kropkę, podkreślnik i spację jako wolny teren!
+                znak_mapy = self.map[ny][nx]
+                if znak_mapy in [".", "_", " ","B", "b", "p", "P", "s", "l", "g", "G"]:
+                    czy_zajete = any(u.x == nx and u.y == ny for u in self.units)
+                    if not czy_zajete:
+                        try:
+                            # Tworzymy jednostkę
+                            nowa_jednostka = Unit(unit_name, nx, ny, owner)
+                            self.units.append(nowa_jednostka)
+                            print(f"[DEBUG SPAWN] Sukces! [{unit_name}] pojawiło się na ({nx}, {ny})!")
+                            
+                            # ========================================================
+                            # TUTAJ BYŁ BŁĄD: Zwracamy obiekt zamiast słowa "True"!
+                            # ========================================================
+                            return nowa_jednostka 
+                        except Exception as e:
+                            print(f"[DEBUG SPAWN] Błąd podczas tworzenia jednostki {unit_name}: {e}")
+                            return False
+                            
+        print(f"[DEBUG SPAWN] Brak wolnego miejsca dla [{unit_name}] wokół ({start_x}, {start_y})!")
+        return None
+        
+    def spawn_gold_chunks(self, owner, start_x, start_y, total_gold):
+        print(f"\n--- [SYSTEM ZŁOTA] Pakowanie {total_gold} sztuk ---")
+        
+        chunks = []
+        while total_gold > 0:
+            chunk_val = min(total_gold, 100)
+            chunks.append(chunk_val)
+            total_gold -= chunk_val
+            
+        if not chunks:
+            return
+            
+        print(f"Utworzono paczki: {chunks}")
+            
+        # 1. Tworzymy TYLKO JEDNĄ jednostkę fizycznie na mapie
+        lider = self._spawn_unit_near("Złoto", owner, start_x, start_y)
+        if lider:
+            lider.hp = chunks[0]
+            lider.max_hp = chunks[0]
+            lider.garrison = [None] * 10
+            
+            # 2. Resztę ładujemy do garnizonu
+            from unit import Unit
+            for i, chunk_val in enumerate(chunks[1:]):
+                if i < 10:
+                    dodatkowe_zloto = Unit("Złoto", -1, -1, owner)
+                    dodatkowe_zloto.hp = chunk_val
+                    dodatkowe_zloto.max_hp = chunk_val
+                    
+                    lider.garrison[i] = dodatkowe_zloto
+                    
+                    if dodatkowe_zloto not in self.units:
+                        self.units.append(dodatkowe_zloto)
+                    if owner and dodatkowe_zloto not in owner.units:
+                        owner.units.append(dodatkowe_zloto)
+                        
+            pasazerowie = sum(1 for u in lider.garrison if u is not None)
+            print(f"SUKCES! Stos na mapie (HP: {lider.hp}). Wewnątrz dodatkowe paczki: {pasazerowie}\n")
+        else:
+            print("BŁĄD: Brak miejsca na mapie!")
+
+    def spawn_temple_army(self, owner, start_x, start_y):
+        import random
+        allowed_units = ["Skorpion", "Szkielet", "Troll", "Cyklop", "Ważka"]
+        
+        count = random.randint(1, 5)
+        chosen_troops = []
+        counts = {u: 0 for u in allowed_units}
+        
+        for _ in range(count):
+            available = [u for u in allowed_units if counts[u] < 3]
+            if not available: 
+                break
+            choice = random.choice(available)
+            chosen_troops.append(choice)
+            counts[choice] += 1
+            
+        print(f"Bogowie zsyłają oddział: {chosen_troops}")
+        
+        # 1. Pierwszy wylosowany potwór staje się LIDEREM na mapie
+        lider_name = chosen_troops[0]
+        lider = self._spawn_unit_near(lider_name, owner, start_x, start_y)
+        
+        if lider:
+            # Upewniamy się, że lider ma pusty garnizon na 10 miejsc
+            if not hasattr(lider, 'garrison') or not lider.garrison:
+                lider.garrison = [None] * 10
+            
+            # 2. Resztę potworów tworzymy jako prawdziwe obiekty Unit i chowamy do garnizonu
+            from unit import Unit
+            for i, potwor_name in enumerate(chosen_troops[1:]):
+                if i < 10:
+                    # Tworzymy jednostkę "poza mapą" (-1, -1), bo siedzi w środku lidera
+                    nowy_potwor = Unit(potwor_name, -1, -1, owner)
+                    lider.garrison[i] = nowy_potwor
+                    
+                    # Rejestrujemy jednostki w świecie (by gra je widziała w bitwie)
+                    if nowy_potwor not in self.units:
+                        self.units.append(nowy_potwor)
+                    if owner and nowy_potwor not in owner.units:
+                        owner.units.append(nowy_potwor)
+                        
+        return chosen_troops # Zwracamy listę, żeby pokazać ją na ekranie gry!
+
+    def split_unit_from_army(self, unit, target_slot_index):
+            """Wyjmuje jednostkę z garnizonu lidera i stawia na mapie."""
+            if unit in self.selected_unit.garrison:
+                self.selected_unit.garrison[target_slot_index] = None
+                unit.x, unit.y = self.selected_unit.x, self.selected_unit.y # Stawiamy obok lidera
+                self.add_unit(unit)
+                print(f"Rozdzielono: {unit.type} wyszedł z armii!")
+
+    def execute_army_split(self, tx, ty):
+        origin = self.selected_unit
+        if not origin or not hasattr(self, 'units_to_split') or not self.units_to_split: 
+            return
+            
+        dx = abs(origin.x - tx)
+        dy = abs(origin.y - ty)
+        
+        if dx > 1 or dy > 1:
+            print("Możesz rozdzielić armię tylko na sąsiednie pole!")
+            return
+            
+        # ========================================================
+        # NOWOŚĆ: Dynamiczny koszt zależny od terenu!
+        # ========================================================
+        tile_char = self.map[ty][tx]
+        base_cost = TERRAIN_TYPES.get(tile_char, {}).get("cost", 4)
+        move_mod = 1.5 if (dx != 0 and dy != 0) else 1.0 # Mnożnik *1.5 dla skosów
+        koszt_podzialu = int(base_cost * move_mod)
+        
+        target_army = self.get_unit_at(tx, ty)
+        if target_army:
+            print("Pole zajęte! Aby dodać jednostki do tej armii, użyj przycisku Połącz.")
+            return
+
+        # Zabraniamy odłączenia, jeśli brakuje PA (według nowego kosztu!)
+        for u in self.units_to_split:
+            if u.move_points < koszt_podzialu:
+                print(f"Jednostka {u.type} jest zbyt zmęczona (wymaga {koszt_podzialu} PA).")
+                return
+
+        if target_army:
+            free_slots = [i for i, slot in enumerate(target_army.garrison) if slot is None]
+            if len(self.units_to_split) > len(free_slots):
+                print("Brak miejsca w docelowej armii sojusznika!")
+                return
+
+        # ========================================================
+        # ROZDZIELENIE: Dowódcę też można zabrać!
+        # ========================================================
+        # Zbieramy wszystkie jednostki na tym polu
+        all_origin_units = [origin] + [u for u in getattr(origin, 'garrison', []) if u is not None]
+        staying_units = [u for u in all_origin_units if u not in self.units_to_split]
+        leaving_units = self.units_to_split[:] # Kopia wychodzących
+
+        # --- A. OGARNIANIE POLA STARTOWEGO (Tych co zostają) ---
+        if not staying_units:
+            # Cała armia poszła, pole zostaje puste
+            if origin in self.units: self.units.remove(origin)
+            if origin.owner and origin in origin.owner.units: origin.owner.units.remove(origin)
+        else:
+            # Jeśli ktoś zostaje, pierwsza jednostka awansuje na Nowego Lidera
+            new_origin_leader = staying_units[0]
+            new_origin_leader.x, new_origin_leader.y = origin.x, origin.y
+            new_origin_leader.garrison = [None] * 10
+            for i, u in enumerate(staying_units[1:]):
+                if i < 10: new_origin_leader.garrison[i] = u
+            
+            # Rejestracja zmiany w świecie gry (Tylko jeśli lider faktycznie się zmienił)
+            if new_origin_leader != origin:
+                if origin in self.units: self.units.remove(origin)
+                if origin.owner and origin in origin.owner.units: origin.owner.units.remove(origin)
+                
+                if new_origin_leader not in self.units: self.units.append(new_origin_leader)
+                if new_origin_leader.owner and new_origin_leader not in new_origin_leader.owner.units:
+                    new_origin_leader.owner.units.append(new_origin_leader)
+            
+            self.selected_unit = new_origin_leader # Utrzymujemy podgląd na starym polu
+
+        # --- B. OGARNIANIE POLA DOCELOWEGO (Tych co idą) ---
+        for u in leaving_units:
+            u.move_points -= koszt_podzialu
+            u.x, u.y = -1, -1 # Domyślnie znikają w garnizonie
+            
+        if target_army:
+            # Dołączają do sojusznika
+            free_slots = [i for i, slot in enumerate(target_army.garrison) if slot is None]
+            for i, u in enumerate(leaving_units):
+                target_army.garrison[free_slots[i]] = u
+            print(f"Jednostki ({len(leaving_units)}) dołączyły do sojusznika obok!")
+        else:
+            # Tworzą nową armię na pustym kafelku
+            new_target_leader = leaving_units[0]
+            new_target_leader.x, new_target_leader.y = tx, ty
+            new_target_leader.garrison = [None] * 10
+            for i, u in enumerate(leaving_units[1:]):
+                if i < 10: new_target_leader.garrison[i] = u
+                
+            if new_target_leader not in self.units: self.units.append(new_target_leader)
+            if new_target_leader.owner and new_target_leader not in new_target_leader.owner.units:
+                new_target_leader.owner.units.append(new_target_leader)
+            print("Utworzono nowy oddział na mapie.")
+
+        # --- ZAKOŃCZENIE ---
+        self.units_to_split.clear()
+        
+        # Jeśli całe pole startowe opustoszało, przenosimy "kamerę/podgląd" na nową armię
+        if not staying_units:
+            self.selected_unit = target_army if target_army else leaving_units[0]
 
 # --- URUCHOMIENIE ---
 # generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")

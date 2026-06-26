@@ -275,17 +275,17 @@ class Pathfinder:
             return False
 
         # =======================================================
-        # Omijanie jednostek wroga
+        # Omijanie WSZYSTKICH jednostek (wrogów i sojuszników)
         # =======================================================
         if unit is not None:
             for other in w.units:
                 if other.x == x and other.y == y and other != unit:
-                    if other.owner != unit.owner:
-                        # ZEZWALAMY NA WEJŚCIE TYLKO JEŚLI TO JEST CEL NASZEGO MARSZU (ATAK)
-                        if dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
-                            pass 
-                        else:
-                            return False # W każdym innym wypadku traktujemy wroga jak mur!
+                    # ZEZWALAMY NA WEJŚCIE TYLKO JEŚLI TO JEST OSTATECZNY CEL MARSZU
+                    # (pozwala to na atak wroga lub wywołanie łączenia własnych oddziałów)
+                    if dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
+                        pass 
+                    else:
+                        return False # Każda inna jednostka w połowie drogi działa jak mur!
                             
         return True
   
@@ -382,11 +382,6 @@ class Pathfinder:
     # -------------------------------------------------------
  
     def draw_path_dots(self, screen, unit, path):
-        """
-        Rysuje stopy wzdłuż trasy.
-        Każdy kafel dobiera grafikę sprawdzając wektor wejścia (skąd przyszliśmy)
-        i wektor wyjścia (gdzie idziemy w następnym kroku).
-        """
         w = self.world
 
         if Pathfinder._step_imgs is None:
@@ -396,56 +391,38 @@ class Pathfinder:
         current_x, current_y = unit.x, unit.y
         accumulated_cost = 0
 
-        # Dodajemy pozycję startową żeby poprawnie wyliczyć wejście na pierwszy kafel
+        # === POPRAWKA: Pobieramy limit najsłabszej jednostki! ===
+        limit_mp = unit.get_effective_move_points() if hasattr(unit, 'get_effective_move_points') else unit.move_points
+
         full = [(unit.x, unit.y)] + list(path)
 
         for i in range(1, len(full)):
             px, py = full[i]
             prev_x, prev_y = full[i-1]
 
-            # 1. Kierunek WEJŚCIA na obecny kafel
             in_dx = px - prev_x
             in_dy = py - prev_y
             in_dir = ((in_dx > 0) - (in_dx < 0), (in_dy > 0) - (in_dy < 0))
 
-            # 2. Kierunek WYJŚCIA z obecnego kafla na następny
             if i < len(full) - 1:
                 next_x, next_y = full[i+1]
                 out_dx = next_x - px
                 out_dy = next_y - py
                 out_dir = ((out_dx > 0) - (out_dx < 0), (out_dy > 0) - (out_dy < 0))
             else:
-                # Jeśli to ostatni kafel trasy, kontynuujemy wizualnie ten sam kierunek
                 out_dir = in_dir
 
-            # 3. Koszt ruchu
             tile_char = w.map[py][px]
             base_cost = TERRAIN_TYPES.get(tile_char, {}).get("cost", 4)
             move_mod  = 1.41 if (in_dx != 0 and in_dy != 0) else 1.0
             accumulated_cost += base_cost * move_mod
 
-            in_range = accumulated_cost <= unit.move_points
-            pairs    = imgs["black"]        if in_range else imgs["red"]
-            singles  = imgs["black_single"] if in_range else imgs["red_single"]
-
-            # 4. Klucz słownika: (wejście_x, wejście_y, wyjście_x, wyjście_y)
-            key = (in_dir[0], in_dir[1], out_dir[0], out_dir[1])
-            img = pairs.get(key)
+            # === POPRAWKA: Sprawdzamy limit_mp zamiast unit.move_points! ===
+            in_range = accumulated_cost <= limit_mp
             
-            # Jeśli z jakiegoś powodu brakuje takiej kombinacji w słowniku, użyj prostej stopy
-            if img is None:
-                img = singles.get(in_dir)
-
-            #========================
-
-            in_range = accumulated_cost <= unit.move_points
-            
-            # --- NOWA LOGIKA WYBORU GRAFIKI ---
             if i == len(full) - 1:
-                # Jeśli to OSTATNI kafel trasy, rysujemy X
                 img = imgs["marks"][64] if in_range else imgs["marks"][129]
             else:
-                # Jeśli to środek trasy, rysujemy stopy
                 pairs   = imgs["black"]        if in_range else imgs["red"]
                 singles = imgs["black_single"] if in_range else imgs["red_single"]
                 
@@ -454,9 +431,7 @@ class Pathfinder:
                 
                 if img is None:
                     img = singles.get(in_dir)
-            # ----------------------------------
 
-            # 5. Rysowanie
             screen_x = px * TILE_SIZE + TILE_SIZE // 2 - w.camera_x
             screen_y = py * TILE_SIZE + TILE_SIZE // 2 - w.camera_y
 
@@ -470,7 +445,6 @@ class Pathfinder:
                 blit_y = screen_y - img.get_height() // 2
                 screen.blit(img, (blit_x, blit_y))
             else:
-                # Ostateczny fallback: kółko
                 color = (0, 0, 0) if in_range else (255, 0, 0)
                 pygame.draw.circle(screen, (255,255,255), (screen_x, screen_y), 5)
                 pygame.draw.circle(screen, color,         (screen_x, screen_y), 4)

@@ -672,9 +672,6 @@ class MapGraphics:
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
-<<<<<<< HEAD
-                
-=======
                 # Debugowanie Fundamentów
                 elif obj_tile == "#":
                     is_left = (x == 0 or world.map[y][x-1] != "#")
@@ -683,7 +680,6 @@ class MapGraphics:
                         big_rect = pygame.Rect(pos[0], pos[1], TILE_SIZE * 2, TILE_SIZE * 2)
                         pygame.draw.rect(screen, (255, 255, 255), big_rect, 4)
                 # Pułapki
->>>>>>> 95f1d77ebdefce09b76920517c24602edd22c236
                 elif obj_tile == "X":
                     trap_color = (200, 0, 0)
                     offset = 6

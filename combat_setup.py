@@ -197,6 +197,21 @@ class CombatSetupMenu:
         attacker_survived = resolve_auto_combat(attacker, defender, world)
         
         if attacker_survived:
+            # ---> NOWOŚĆ: Niszczenie placu budowy po przegranej obrońców <---
+            target_castle = getattr(world, 'combat_target_castle', None)
+            if target_castle and getattr(target_castle, 'under_construction', False):
+                print("Plac budowy został zrównany z ziemią przez zwycięskiego agresora!")
+                target_castle.destroyed = True
+                if target_castle in world.castles:
+                    world.castles.remove(target_castle)
+                
+                # Zmazujemy litery "P" z mapy
+                size = 2 if getattr(target_castle, 'building_type', 'Zamek') in ["Zamek", "Twierdza"] else 1
+                for dy in range(size):
+                    for dx in range(size):
+                        world.map[target_castle.y + dy][target_castle.x + dx] = "."
+                world.combat_target_castle = None # Reset
+                
             attacker.x, attacker.y = world.combat_nx, world.combat_ny
             attacker.move_points -= world.combat_cost
             world.check_unit_castle_entry(attacker)
