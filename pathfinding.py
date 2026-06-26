@@ -206,27 +206,28 @@ class Pathfinder:
         objects = load_fac_objects(fac_file)
         castle_places = objects.get("zamek_place", [])
         
-        # ZMIENIONY SETUP:
-        # Przypisujemy pierwsze 5 zamków (indeksy 0, 1, 2, 3, 4) do pięciu graczy (0, 1, 2, 3, 4)
-        setup_poczatkowy = {
-            0: 0, # Zamek "Rock" dla Gracza 0 (Don Marek)
-            1: 1, # Zamek "Sarturia" dla Gracza 1 (Lech VI)
-            2: 2, # Zamek "Totaweon" dla Gracza 2 (Mściwój)
-            3: 3, # Zamek "Stone Ring" dla Gracza 3 (Biały Kieł)
-            4: 4  # Zamek "Dragmounth" dla Gracza 4 (Złoty Pan)
+        # 1. WSZYSTKIE miejsca z pliku .FAC traktujemy jako puste fundamenty
+        w.castle_locations = []
+        for x, y in castle_places:
+            w.castle_locations.append((int(x), int(y)))
+
+        # 2. RĘCZNE USTAWIENIE STARTOWYCH ZAMKÓW NA MAPIE
+        # Format -> ID Gracza : (x, y)
+        startowe_zamki = {
+            0: (14, 20),  # Czerwony (Don Marek)
+            1: (90, 8),  # Niebieski (Lech VI) - prawy górny róg (do poprawki)
+            2: (47, 80),  # Zielony (Mściwój) - dół środek (do poprawki)
+            3: (90, 72),  # Biały (Biały Kieł) - prawy dół (do poprawki)
+            4: (60, 46)   # Żółty (Złoty Pan) - środek prawo (do poprawki)
         } 
 
         w.castles = []
-        for i, (x, y) in enumerate(castle_places):
-            ix, iy = int(x), int(y)
-            if i in setup_poczatkowy:
-                owner_id = setup_poczatkowy[i]
-                c = Castle(ix, iy, w.players[owner_id])
+        for owner_id, (cx, cy) in startowe_zamki.items():
+            # Upewniamy się, że gracz o danym ID został załadowany w world.py
+            if owner_id < len(w.players):
+                c = Castle(cx, cy, w.players[owner_id])
                 c.gold = 250 # Ilość startowego złota w zamku
                 w.castles.append(c)
-            else:
-                # Pozostałe miejsca na zamki z pliku .FAC (puste tereny pod budowę)
-                w.castle_locations.append((ix, iy))
                 
     # -------------------------------------------------------
     # POMOCNICZE

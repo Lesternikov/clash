@@ -1,5 +1,5 @@
 import re
-
+#przeróbka brzydkich grafik
 def generuj_palete_z_plikow(plik_zrodla, plik_celu, plik_wynikowy):
     wzorzec_koloru = r"\(\s*\d+,\s*\d+,\s*\d+,\s*\d+\s*\)"
     paleta = {}

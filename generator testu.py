@@ -1,5 +1,5 @@
 import random
-
+# z grafiki przerabia na dwie mapy podstawę i budynki
 # Rozmiar mapy (zgodny z Twoim world.py)
 W, H = 100, 100
 

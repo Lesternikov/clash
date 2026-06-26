@@ -1,6 +1,6 @@
 import pygame
 import sys
-
+#idealnie sprawdza kolory w grafice
 # ============================================================
 # USTAWIENIA - Wpisz nazwy swoich plików
 # ============================================================
