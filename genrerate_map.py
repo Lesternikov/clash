@@ -1,5 +1,5 @@
 import re
-
+#generator mapy poczynając od trawy
 def generate_full_map(fac_path, output_path):
     size = 100
     # Tworzymy czystą mapę (sama trawa)

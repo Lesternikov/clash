@@ -1,5 +1,5 @@
 from PIL import Image
-
+#zczytuje ze zdjęcia wszystkie kolory i nadaje im litery.
 def convert_with_strict_palette(image_path, output_path):
     img = Image.open(image_path).convert('RGB')
     width, height = img.size

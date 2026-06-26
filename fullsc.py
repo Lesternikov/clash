@@ -1,6 +1,6 @@
 import pygame
 import sys
-
+#zamienia brzydkie grafiki w ładne - system kolorów
 # ============================================================
 # USTAWIENIA 
 # ============================================================

@@ -1,6 +1,6 @@
 import pygame
 import sys
-
+#sprawdza jedną linijkę w grafice
 # ============================================================
 # USTAWIENIA - Wpisz plik, który chcesz badać
 # ============================================================
