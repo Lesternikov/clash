@@ -39,40 +39,101 @@ class BuildingsMixin:
                 self.castle_locations.append((ix, iy))
 
     def load_castle_and_tower(self):
-        base_folder = r"assets\zamekczerwony\BUILDIN1_S32_"
+        """
+        Ładuje dynamicznie grafiki zamków według poprawionych numerów.
+        Zawiera system fallback, który w razie błędu koloru rysuje czerwony zamek zamiast kwadratu.
+        """
+        import os  
+        
+        base_folder = os.path.join("assets", "minimum", "BUILDIN1_S32")
         TARGET_SIZE = (32, 32)
 
-        self.castle_tiles = {0: [], 1: [], 2: [], 3: [], 4: []}
-        for stage in range(4):
-            for i in range(4):
-                file_num = 225 + (stage * 4) + i
-                try:
-                    img = pygame.image.load(f"{base_folder}{file_num}.png").convert_alpha()
-                    img = pygame.transform.scale(img, TARGET_SIZE)
-                    self.castle_tiles[stage].append(img)
-                except:
-                    print(f"Brak pliku zamku: {file_num}")
+        self.castle_color_frames = {
+            "blue": {
+                0: [189, 190, 191, 192],
+                1: [193, 194, 195, 196],
+                2: [197, 198, 199, 200],
+                3: [205, 206, 207, 208],
+                4: [185, 186, 187, 188]
+            },
+            "red": {
+                0: [225, 226, 227, 228],
+                1: [229, 230, 231, 232],
+                2: [233, 234, 235, 236],
+                3: [237, 238, 239, 240],
+                4: [221, 222, 223, 224]
+            },
+            "yellow": {
+                0: [261, 262, 263, 264],
+                1: [265, 266, 267, 268],
+                2: [269, 270, 271, 272],
+                3: [281, 282, 283, 284],
+                4: [257, 258, 259, 260]
+            },
+            "white": {
+                0: [297, 298, 299, 300],
+                1: [301, 302, 303, 304],
+                2: [305, 306, 307, 308],
+                3: [321, 322, 323, 324],
+                4: [293, 294, 295, 296]
+            },
+            "green": {
+                0: [369, 370, 371, 372],
+                1: [373, 374, 375, 376],
+                2: [377, 378, 379, 380],
+                3: [397, 398, 399, 400],
+                4: [365, 366, 367, 368]
+            }
+            
+            
+        }
 
-        for i in range(4):
-            try:
-                img = pygame.image.load(f"{base_folder}{257 + i}.png").convert_alpha()
-                self.castle_tiles[4].append(pygame.transform.scale(img, TARGET_SIZE))
-            except:
-                pass
+        self.castle_tiles_by_color = {}
 
+        for color, stages in self.castle_color_frames.items():
+            self.castle_tiles_by_color[color] = {0: [], 1: [], 2: [], 3: [], 4: []}
+            
+            for stage_idx, file_numbers in stages.items():
+                for num in file_numbers:
+                    file_name = f"BUILDIN1_S32_{num}.png"
+                    full_path = os.path.join(base_folder, file_name)
+                    try:
+                        img = pygame.image.load(full_path).convert_alpha()
+                        img = pygame.transform.scale(img, TARGET_SIZE)
+                        self.castle_tiles_by_color[color][stage_idx].append(img)
+                    except:
+                        # Jeśli brakuje konkretnego pliku, gra nie wywali błędu
+                        dummy = pygame.Surface(TARGET_SIZE, pygame.SRCALPHA)
+                        dummy.fill((200, 0, 0, 150))
+                        self.castle_tiles_by_color[color][stage_idx].append(dummy)
+
+        # --- TUTAJ JEST ROZWIĄZANIE DLA RENDERERA ---
+        # Tworzymy bezpieczne aliasy na wypadek, gdyby renderer pytał o kolor 
+        # pisany Wielką Literą (np. "Red", "Blue") lub gdyby go nie znalazł
+        self.castle_tiles_by_color["Red"]    = self.castle_tiles_by_color["red"]
+        self.castle_tiles_by_color["Blue"]   = self.castle_tiles_by_color["blue"]
+        self.castle_tiles_by_color["Yellow"] = self.castle_tiles_by_color["yellow"]
+        self.castle_tiles_by_color["White"]  = self.castle_tiles_by_color["white"]
+        self.castle_tiles_by_color["Green"]  = self.castle_tiles_by_color["green"]
+
+        # Wieże
         self.tower_tiles = {}
         for i in range(4):
+            file_name = f"BUILDIN1_S32_{i}.png"
+            full_path = os.path.join(base_folder, file_name)
             try:
-                img = pygame.image.load(f"{base_folder}{i}.png").convert_alpha()
+                img = pygame.image.load(full_path).convert_alpha()
                 self.tower_tiles[i] = pygame.transform.scale(img, TARGET_SIZE)
             except:
-                print(f"Brak pliku strażnicy: {i}")
+                print(f"Brak pliku strażnicy: {file_name}")
 
         try:
-            img = pygame.image.load(f"{base_folder}8.png").convert_alpha()
+            file_name = "BUILDIN1_S32_8.png"
+            full_path = os.path.join(base_folder, file_name)
+            img = pygame.image.load(full_path).convert_alpha()
             self.tower_tiles[4] = pygame.transform.scale(img, TARGET_SIZE)
         except:
-            print("Brak pliku zniszczonej strażnicy (8.png)")
+            print("Brak pliku zniszczonej strażnicy (BUILDIN1_S32_8.png)")
 
     def demolish_castle(self, castle):
         if not castle:

@@ -206,19 +206,26 @@ class Pathfinder:
         objects = load_fac_objects(fac_file)
         castle_places = objects.get("zamek_place", [])
         
-        # WYMUSZONY SETUP TESTOWY:
-        # Zamki 0 i 1 należą do gracza 0. Zamki 2 i 3 należą do gracza 1.
-        test_setup = {0: 0, 1: 0, 2: 1, 3: 1} 
+        # ZMIENIONY SETUP:
+        # Przypisujemy pierwsze 5 zamków (indeksy 0, 1, 2, 3, 4) do pięciu graczy (0, 1, 2, 3, 4)
+        setup_poczatkowy = {
+            0: 0, # Zamek "Rock" dla Gracza 0 (Don Marek)
+            1: 1, # Zamek "Sarturia" dla Gracza 1 (Lech VI)
+            2: 2, # Zamek "Totaweon" dla Gracza 2 (Mściwój)
+            3: 3, # Zamek "Stone Ring" dla Gracza 3 (Biały Kieł)
+            4: 4  # Zamek "Dragmounth" dla Gracza 4 (Złoty Pan)
+        } 
 
         w.castles = []
         for i, (x, y) in enumerate(castle_places):
             ix, iy = int(x), int(y)
-            if i in test_setup:
-                owner_id = test_setup[i]
+            if i in setup_poczatkowy:
+                owner_id = setup_poczatkowy[i]
                 c = Castle(ix, iy, w.players[owner_id])
-                c.gold = 2000 if i % 2 == 0 else 1000 # Różne kwoty dla testu
+                c.gold = 250 # Ilość startowego złota w zamku
                 w.castles.append(c)
             else:
+                # Pozostałe miejsca na zamki z pliku .FAC (puste tereny pod budowę)
                 w.castle_locations.append((ix, iy))
                 
     # -------------------------------------------------------

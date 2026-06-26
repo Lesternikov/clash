@@ -197,7 +197,7 @@ class World(BuildingsMixin):
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
 
         # Inicjalizacja Graczy z przypisaniem frakcji
-        num_players = 2 
+        num_players = 5 
         player_data = [
             ("Don Marek", (200, 0, 0), "red", "catholic"),  # Katolik
             ("Lech VI", (0, 0, 200), "blue", "pagan"),      # Poganin
@@ -1697,5 +1697,5 @@ if __name__ == "__main__":
         #for other in self.units[:]:
 
 
-        jakieś losowe słowa
+
     
