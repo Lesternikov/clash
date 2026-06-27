@@ -228,7 +228,51 @@ class Pathfinder:
                 c = Castle(cx, cy, w.players[owner_id])
                 c.gold = 250 # Ilość startowego złota w zamku
                 w.castles.append(c)
-                
+
+        # === INTELIGENTNE SZUKANIE PORTÓW Z MAPY ("R") ===
+        w.ports = []
+        zajete_porty = set() 
+        
+        for y in range(len(w.map)):
+            for x in range(len(w.map[y])):
+                if w.map[y][x] == "R" and (x, y) not in zajete_porty:
+                    
+                    # --- PUNKTOWY SKANER WODY ---
+                    woda_boki = 0  # Punkty za wodę po bokach (oś X)
+                    woda_dol = 0   # Punkty za wodę na dole (oś Y)
+
+                    # Sprawdzamy DÓŁ (pod portem, czyli Y rośnie)
+                    if y + 2 < len(w.bg_map):
+                        if w.bg_map[y+2][x] in ['W', 'B', 'w', 'b', 'p']: woda_dol += 1
+                        if x + 1 < len(w.bg_map[0]) and w.bg_map[y+2][x+1] in ['W', 'B', 'w', 'b', 'p']: woda_dol += 1
+
+                    # Sprawdzamy BOKI (prawo i lewo, czyli X rośnie lub maleje)
+                    if x + 2 < len(w.bg_map[0]): # Prawa strona
+                        if w.bg_map[y][x+2] in ['W', 'B', 'w', 'b', 'p']: woda_boki += 1
+                        if y + 1 < len(w.bg_map) and w.bg_map[y+1][x+2] in ['W', 'B', 'w', 'b', 'p']: woda_boki += 1
+                    if x - 1 >= 0: # Lewa strona
+                        if w.bg_map[y][x-1] in ['W', 'B', 'w', 'b', 'p']: woda_boki += 1
+                        if y + 1 < len(w.bg_map) and w.bg_map[y+1][x-1] in ['W', 'B', 'w', 'b', 'p']: woda_boki += 1
+
+                    # Jeśli jest więcej wody z boku niż na dole, port jest poziomy (2).
+                    orientacja = 2 if woda_boki > woda_dol else 1
+                    
+                    port = {
+                        "x": x, 
+                        "y": y, 
+                        "has_ship": False, 
+                        "orientation": orientacja,
+                        "garrison": [],   
+                        "cooldown": 0     
+                    }
+                    w.ports.append(port)
+                    
+                    # Wylewamy beton na 4 kratki w pamięci gry
+                    for dy in range(2):
+                        for dx in range(2):
+                            if y + dy < len(w.map) and x + dx < len(w.map[0]):
+                                w.map[y + dy][x + dx] = "R"
+                                zajete_porty.add((x + dx, y + dy))
     # -------------------------------------------------------
     # POMOCNICZE
     # -------------------------------------------------------
@@ -280,7 +324,11 @@ class Pathfinder:
  
         unwalkable = ["S", "&", "R", "W", "G", "B", "M"]
         if obj_tile != " " and obj_tile in unwalkable:
-            return False
+            # === NOWOŚĆ: Pozwalamy "kliknąć" w port, żeby odebrać wojsko! ===
+            if obj_tile == "R" and dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
+                pass # Algorytm pozwala zarysować czarną stopę na porcie
+            else:
+                return False
 
         # =======================================================
         # Omijanie WSZYSTKICH jednostek (wrogów i sojuszników)

@@ -218,45 +218,43 @@ class BuildingsMixin:
         return False
 
     def destroy_straznica(self, castle):
-
-        """Niszczy strażnicę, tworzy jedną armię z jej załogi i zostawia ruiny."""
-        from unit import Unit  # Import lokalny, żeby uniknąć problemów
+        """Niszczy strażnicę, wyrzuca załogę (bez klonowania) i zostawia ruiny 'r'."""
+        from unit import Unit 
         
-        # 1. Sprawdzamy czy w środku ktoś jest
         units_in_garrison = [u for u in castle.garrison if u is not None]
         
         if units_in_garrison:
             print("Ewakuacja: Formowanie armii z garnizonu...")
-            
-            # Szukamy miejsca wokół strażnicy dla JEDNEJ armii
             spawn_pos = self.find_free_space_around(castle.x, castle.y)
             if spawn_pos:
                 nx, ny = spawn_pos
                 
-                # Tworzymy nową jednostkę-matkę (lidera armii)
-                # Jako typ bierzemy typ pierwszej jednostki z garnizonu
-                leader_type = units_in_garrison[0].type
-                new_army = Unit(leader_type, nx, ny, castle.owner)
-                new_army.garrison = [None] * 10
+                # ROZWIĄZANIE KLONOWANIA: Nie tworzymy nowej jednostki! 
+                # Bierzemy pierwszego, istniejącego żołnierza z garnizonu na "Lidera".
+                lider = units_in_garrison[0]
+                lider.x, lider.y = nx, ny
+                lider.garrison = [None] * 10
                 
-                # Przepisujemy jednostki ze slotów strażnicy do slotów nowej armii
-                for i, u in enumerate(units_in_garrison):
+                # Resztę załogi pakujemy do jego plecaka (garnizonu)
+                for i, u in enumerate(units_in_garrison[1:]):
                     if i < 10:
-                        new_army.garrison[i] = u
+                        lider.garrison[i] = u
+                        u.x, u.y = -1, -1 # Pasażerowie znikają z mapy
                 
-                # Dodajemy nową armię do gry
-                self.units.append(new_army)
-                castle.owner.units.append(new_army)
+                # Dodajemy zjednoczoną armię do gry
+                self.units.append(lider)
+                if hasattr(lider, 'owner') and lider.owner:
+                    lider.owner.units.append(lider)
                 print(f"Armia ewakuowana na pole {nx, ny}")
             else:
                 print("Brak miejsca wokół! Garnizon zginął w gruzach.")
 
-        # 2. Usuwamy budynek i zostawiamy ruiny
+        # Usuwamy budynek i zostawiamy ruiny
         if castle in self.castles:
             self.castles.remove(castle)
         
-        # Zmieniamy kafel na 'R' (Ruiny)
-        self.map[castle.y][castle.x] = "R"
+        # ZMIANA: Zmieniamy kafel na małe 'r' (Ruiny), aby duże 'R' zostało dla PORTU!
+        self.map[castle.y][castle.x] = "r"
         
         self.selected_castle = None
         self.screen = "map"

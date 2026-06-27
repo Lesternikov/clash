@@ -1,8 +1,0 @@
-find_free_space_around
-new_building.available_modules = config["modules"]
-execute_disband_army
-handle_army_slot_click
-execute_menu_command
-draw_trap_preview
-selected_recruit_unit
-

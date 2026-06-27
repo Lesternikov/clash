@@ -85,6 +85,10 @@ class Renderer:
 
     def draw(self, screen):
         w = self.world
+        # Rysowanie okienka portu (na samym wierzchu)
+        if getattr(w, 'inspected_port', None):
+            self.draw_port_ui(screen)
+
         # Stoper powrotu
         if getattr(w, 'back_anim_timer', 0) > 0:
             elapsed = pygame.time.get_ticks() - w.back_anim_timer
@@ -195,6 +199,8 @@ class Renderer:
         # Zamki
         for castle in w.castles:
             self.draw_castle_on_map(screen, castle)
+
+        self.draw_ports_on_map(screen)
 
         # Jednostki
         unit_font = pygame.font.SysFont(None, 24)
@@ -972,6 +978,38 @@ class Renderer:
                     dx, dy = offsets[i]
                     screen.blit(tiles[i], (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
      
+    def draw_ports_on_map(self, screen):
+        w = self.world
+        if not hasattr(w, 'ports'): return
+
+        for port in w.ports:
+            px = int(port["x"] * TILE_SIZE) - w.camera_x
+            py = int(port["y"] * TILE_SIZE) - w.camera_y
+            
+            # Pomiń rysowanie, jeśli port jest poza ekranem
+            if px < -100 or px > screen.get_width() + 100 or py < -100 or py > screen.get_height() + 100:
+                continue
+
+            orient = port.get("orientation", 1)
+            # Zauważ: pobieramy kafelki ze świata gry (w.port_tiles)
+            base_tiles = getattr(w, 'port_tiles', {}).get(f"pos{orient}_base", [])
+            ship_tiles = getattr(w, 'port_tiles', {}).get(f"pos{orient}_ship", [])
+            
+            # 4 kafelki układające się w blok 2x2
+            offsets = [(0,0), (1,0), (0,1), (1,1)]
+            
+            if len(base_tiles) == 4:
+                for i in range(4):
+                    dx, dy = offsets[i]
+                    
+                    # Jeśli port ma statek, a my rysujemy DOLNĄ (wodną) połowę (czyli indeks 2 lub 3)
+                    if port.get("has_ship", False) and i >= 2 and len(ship_tiles) >= 2:
+                        img = ship_tiles[i - 2] # Wybiera obrazek statku
+                    else:
+                        img = base_tiles[i]     # Zwykła woda lub ląd
+                        
+                    screen.blit(img, (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
+
     def draw_unit_stats_table(self, screen, x, y, unit_name, stats_source):
         w = self.world
         
@@ -1387,6 +1425,7 @@ class Renderer:
                 
                 if 0 <= tx < len(w.map[0]) and 0 <= ty < len(w.map):
                     tile_char = w.map[ty][tx]
+                    
                     if tile_char in walkable_chars:
                         
                         # --- 1. BLOKADA WCHODZENIA NA INNE JEDNOSTKI ---
@@ -1413,6 +1452,63 @@ class Renderer:
                             px = tx * TILE_SIZE - w.camera_x
                             py = ty * TILE_SIZE - w.camera_y
                             screen.blit(self.mark_split, (px, py))
+
+    def draw_port_ui(self, screen):
+        w = self.world
+        port = getattr(w, 'inspected_port', None)
+        if not port: return
+        
+        # 1. Ładowanie obrazków (wykona się tylko raz)
+        if not hasattr(self, 'port_ui_empty'):
+            try:
+                self.port_ui_empty = pygame.image.load("assets/PORT_S32_0.png").convert_alpha()
+                self.port_ui_full = pygame.image.load("assets/PORT_S32_1.png").convert_alpha()
+            except Exception as e:
+                print(f"Błąd ładowania UI Portu: {e}")
+                return
+                
+        # 2. Wybór grafiki (Statek obecny vs Pusty port)
+        img = self.port_ui_full if port["has_ship"] else self.port_ui_empty
+        
+        # Opcjonalne skalowanie, jeśli obrazek jest za mały
+        skala = 1.5
+        nw, nh = int(img.get_width() * skala), int(img.get_height() * skala)
+        img_scaled = pygame.transform.smoothscale(img, (nw, nh))
+        
+        x = (screen.get_width() - nw) // 2
+        y = (screen.get_height() - nh) // 2
+        
+        # Przyciemnienie tła i rysowanie panelu
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        screen.blit(overlay, (0, 0))
+        screen.blit(img_scaled, (x, y))
+        
+        # 3. Jeśli są jednostki, wypisujemy je!
+        if port["has_ship"] and port["garrison"]:
+            # Grupujemy jednostki żeby wypisać "x2 Lekka Piechota" zamiast wypisywać każdą osobno
+            zestawienie = {}
+            for u in port["garrison"]:
+                zestawienie[u.type] = zestawienie.get(u.type, 0) + 1
+                
+            font = pygame.font.SysFont("Arial", 22, bold=True)
+            start_x = x + 60
+            start_y = y + 100
+            
+            for i, (typ_jednostki, ilosc) in enumerate(zestawienie.items()):
+                kolor_gracza = port["garrison"][0].owner.color_name
+                ikona = self.gfx.get_unit_image(typ_jednostki, kolor_gracza)
+                
+                if ikona:
+                    ikona_scaled = pygame.transform.scale(ikona, (32, 32))
+                    screen.blit(ikona_scaled, (start_x, start_y + i * 45))
+                    
+                txt = font.render(f"x{ilosc}  {typ_jednostki}", True, (240, 240, 200))
+                txt_cien = font.render(f"x{ilosc}  {typ_jednostki}", True, (0, 0, 0))
+                
+                screen.blit(txt_cien, (start_x + 45, start_y + i * 45 + 5))
+                screen.blit(txt, (start_x + 44, start_y + i * 45 + 4))
+                
 
 if __name__ == "__main__":
         import subprocess, sys, os

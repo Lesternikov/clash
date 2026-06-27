@@ -108,7 +108,14 @@ class MapGraphics:
                 self.terrain_images[key] = pygame.transform.scale(self.terrain_images[key], (TILE_SIZE, TILE_SIZE))
         except Exception as e:
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
-
+        # --- DODAJ TO: Rejestrujemy ruiny pod małym 'r' ---
+            ruins_path = os.path.join("assets", "zamekczerwony", "BUILDIN1_S32_8.png")
+            if os.path.exists(ruins_path):
+                img_r = pygame.image.load(ruins_path).convert_alpha()
+                self.terrain_images["r"] = pygame.transform.scale(img_r, (TILE_SIZE, TILE_SIZE))
+                
+        except Exception as e:
+            print(f"Błąd ładowania dodatkowych kafelków: {e}")
     def load_all_assets(self):
         path_base = os.path.join("assets", "BACKGR3_S32")
         
@@ -662,11 +669,10 @@ class MapGraphics:
                         road_img = self.get_road_tile(world, x, y)
                         if road_img: screen.blit(road_img, pos)
                 # Budynki/Statyczne
-                elif obj_tile in ["S", "&", "R"]:
+                elif obj_tile in ["S", "&"]:
                     if obj_tile == "S": screen.blit(self.temple_img, pos) 
                     elif obj_tile == "&": screen.blit(self.temple2_img, pos) 
-                    elif obj_tile == "R": 
-                        if hasattr(self, 'ruins_img'): screen.blit(self.ruins_img, pos)
+
                 # Skarby (ze zmianą tła pod skarberm p/.)
                 elif obj_tile == "$":
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."

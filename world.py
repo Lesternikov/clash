@@ -44,7 +44,7 @@ class World(BuildingsMixin):
         self.peasant_groups = []
         self.gold_transports = []
         self.players = []
-
+        self.ports = []
         self.camera_x = 0
         self.camera_y = 0
 
@@ -267,6 +267,29 @@ class World(BuildingsMixin):
             # Awaryjna błyskawica
             self.temple_lightning = pygame.Surface((50, 50)) # [cite: image_1.png]
             self.temple_lightning.fill((0, 0, 255)) # Niebieska plama jako failsafe [cite: image_1.png]
+        # ==========================================
+        # ŁADOWANIE GRAFIK PORTU (12 plików)
+        # ==========================================
+        self.port_tiles = {}
+        # Wpisz tu poprawne numery z końcówek plików BACKGR3_S32_***.png
+        port_gfx = {
+            "pos1_base": ["718", "719", "718", "719"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
+            "pos1_ship": ["718", "719"],               # Statki dla Pozycji 1 (Lewy Dół, Prawy Dół)
+            "pos2_base": ["722", "723", "724", "725"], # Baza Pozycji 2 
+            "pos2_ship": ["726", "727"]                # <--- Wpisz tu poprawne numery statków dla portu nr 2!
+        }
+        
+        for key, numbers in port_gfx.items():
+            self.port_tiles[key] = []
+            for num in numbers:
+                # Upewnij się, że ścieżka pasuje do Twojego folderu (np. "assets" lub "assets/minimum/...")
+                path = os.path.join("assets", "BACKGR3_S32", f"BACKGR3_S32_{num}.png") 
+                try:
+                    img = pygame.image.load(path).convert_alpha()
+                    img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+                    self.port_tiles[key].append(img)
+                except Exception as e:
+                    print(f"Błąd portu (plik {num}): {e}")
 
         # Nowa zmienna do przechowywania efektu dla renderera
         self.temple_current_effect = None
@@ -291,7 +314,95 @@ class World(BuildingsMixin):
             self.court.prison_slots = self.court_states[self.players[0].id]["slots"]
             self.court.selected_prison_action = self.court_states[self.players[0].id]["action"]
         self.units_to_split = [] # Tu trafiają jednostki zaznaczone kliknięciem w panelu
-   
+    
+    def spawn_port_reinforcements(self, port):
+        """Generuje statek i losowe jednostki w porcie."""
+        import random
+        from unit import Unit
+        
+        mozliwe_jednostki = [
+            "Posp. ruszenie", "Lekka piechota", "Ciężka piechota", "Pikinier", 
+            "Halbardnik", "Lekka jazda", "Rycerstwo", "Dragon", "Łucznik", 
+            "Kusznik", "Leśnik", "Góral", "Budowniczy"
+        ]
+        ilosc = random.randint(3, 5)
+        
+        # Szukamy gracza, który ma zamek najbliżej tego portu, by przypisać mu jednostki
+        najblizszy_gracz = self.players[0]
+        min_dystans = 9999
+        for c in self.castles:
+            dystans = abs(c.x - port["x"]) + abs(c.y - port["y"])
+            if dystans < min_dystans:
+                min_dystans = dystans
+                najblizszy_gracz = c.owner
+        
+        port["garrison"] = []
+        for _ in range(ilosc):
+            typ = random.choice(mozliwe_jednostki)
+            # Upewnij się, że nazwy z listy dokładnie pokrywają się z kluczami w UNIT_STATS!
+            jednostka = Unit(typ, port["x"], port["y"], najblizszy_gracz)
+            port["garrison"].append(jednostka)
+            
+        port["has_ship"] = True
+        print(f"Statek przywiózł {ilosc} jednostek do portu!")
+
+    def update_ports_turn(self):
+        """Aktualizuje liczniki portów (wywołuj co turę, np. gdy Gracz 0 zaczyna turę)."""
+        for port in self.ports:
+            if port["cooldown"] > 0:
+                port["cooldown"] -= 1
+                if port["cooldown"] == 0:
+                    self.spawn_port_reinforcements(port)
+
+    def unload_port(self, port, triggering_unit):
+        """Wyrzuca wojska z portu i tworzy nową armię na mapie przed portem."""
+        print("Wojska zeszły ze statku na ląd!")
+        
+        # 1. Szukamy wolnego pola PRZED portem
+        wolne_pole = None
+        walkable_tiles = [".", "l", "g", "p", "_"] # Dozwolone lądy do desantu
+        
+        for dx in range(-1, 3):
+            for dy in range(-1, 3):
+                px, py = port["x"] + dx, port["y"] + dy
+                if 0 <= py < len(self.map) and 0 <= px < len(self.map[0]):
+                    # Jeśli to wolny teren (np. trawa/droga) i nie ma tam innej jednostki
+                    if self.map[py][px] in walkable_tiles:
+                        if not any(u.x == px and u.y == py for u in self.units):
+                            wolne_pole = (px, py)
+                            break
+            if wolne_pole: break
+            
+        # Jeśli nie ma wolnego miejsca wokół portu (wszystko zastawione), rzucamy ich pod nogi odbierającego
+        if not wolne_pole:
+            wolne_pole = (triggering_unit.x, triggering_unit.y)
+            
+        # 2. Wyznaczamy Lidera z pierwszego żołnierza z portu
+        lider = port["garrison"][0]
+        lider.x, lider.y = wolne_pole[0], wolne_pole[1]
+        lider.garrison = [None] * 10
+        
+        # 3. Ładujemy resztę do jego garnizonu
+        for i, u in enumerate(port["garrison"][1:]):
+            if i < 10:
+                lider.garrison[i] = u
+                u.x, u.y = -1, -1 # Są pasażerami, nie ma ich na mapie
+                
+        # 4. Dodajemy całkowicie nową armię na mapę
+        self.units.append(lider)
+        if hasattr(lider, 'owner') and lider.owner:
+            lider.owner.units.append(lider)
+            
+        # 5. Czyścimy port i uruchamiamy licznik do kolejnego statku (10 tur)
+        port["garrison"] = []
+        port["has_ship"] = False
+        port["cooldown"] = 10
+        
+        # 6. Czyścimy trasę jednostce, która przyszła (zadanie wykonane)
+        triggering_unit.planned_path = []
+        triggering_unit.target_x = None
+        triggering_unit.target_y = None
+
     def setup_starting_units(self):
         """Rozdaje graczom początkowe wojsko pod ich zamkami."""
         generals_created = [] # Zbieramy generałów, żeby jednego od razu uwięzić do testów
@@ -551,7 +662,43 @@ class World(BuildingsMixin):
                 unit.x, unit.y = nx, ny
                 print("Wdepnięto w pułapkę!")
                 return True # Zwracamy True, żeby jednostka "stanęła" na polu
-
+         # ==========================================
+        # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
+        # ==========================================
+        if self.map[ny][nx] == "X":
+            print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
+            
+            # 1. Usuwamy jednostkę z gry (ginie)
+            if unit in self.units: 
+                self.units.remove(unit)
+            if unit in unit.owner.units: 
+                unit.owner.units.remove(unit)
+            if self.selected_unit == unit: 
+                self.selected_unit = None
+                
+            #2. Usuwamy pułapkę z mapy i przywracamy oryginalne tło
+            original_bg = getattr(self, 'trap_backgrounds', {}).get((nx, ny), ".")
+            self.map[ny][nx] = original_bg
+            
+            # 3. Zwracamy True, bo ruch się wykonał (choć jednostka go nie przeżyła)
+            return True
+        
+        # ==========================================
+        # 4.6. INTERAKCJA Z PORTEM (Odbieranie wojska)
+        # ==========================================
+        if self.map[ny][nx] == "R":
+            # Szukamy, w który dokładnie port weszliśmy
+            target_port = next((p for p in getattr(self, 'ports', []) if p["x"] <= nx <= p["x"]+1 and p["y"] <= ny <= p["y"]+1), None)
+            
+            if target_port:
+                if target_port.get("has_ship") and target_port.get("garrison"):
+                    self.unload_port(target_port, unit)
+                else:
+                    print("Port jest pusty, statek jeszcze nie przypłynął.")
+            
+            # WAŻNE: Zwracamy False, by nasza jednostka nie weszła do wody/portu,
+            # tylko bezpiecznie zatrzymała się na brzegu!
+            return False
         # 6. WALKA I ŁĄCZENIE
         for other in self.units[:]:
             if other.x == nx and other.y == ny:
@@ -1632,6 +1779,37 @@ class World(BuildingsMixin):
         if not staying_units:
             self.selected_unit = target_army if target_army else leaving_units[0]
 
+    def find_free_space_around(self, start_x, start_y, radius=1):
+        """
+        Przeszukuje kratki w określonym promieniu wokół podanych współrzędnych 
+        i zwraca pierwszą wolną kratkę (x, y), na której można postawić jednostkę.
+        """
+        # Kafelki, na których jednostki mogą stać (trawa, las, góry, piasek, droga)
+        walkable_tiles = [".", "l", "g", "p", "_", "P", "G", "B"] 
+        
+        # Szukamy dookoła w zadanym promieniu (np. od -1 do 1, tworząc kwadrat 3x3)
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                px = start_x + dx
+                py = start_y + dy
+                
+                # Zabezpieczenie przed wyjściem poza mapę
+                if 0 <= py < len(self.map) and 0 <= px < len(self.map[0]):
+                    
+                    # Sprawdzamy czy to odpowiedni teren (nie woda, nie góra)
+                    if self.pathfinder.get_bg_tile_at(px, py) in walkable_tiles or self.map[py][px] in walkable_tiles:
+                        # Upewniamy się, że to pole nie jest budynkiem (S, &, zamek itp)
+                        unwalkable_objs = ["S", "&", "R", "#", "PORT_WALL"]
+                        if self.map[py][px] not in unwalkable_objs:
+                            
+                            # Sprawdzamy czy nie stoi tam już jakaś inna jednostka
+                            if not any(u.x == px and u.y == py for u in self.units):
+                                return (px, py) # Znaleziono wolne pole!
+                                
+        # Jeśli wszystko dookoła jest absolutnie zajęte lub zablokowane,
+        # awaryjnie wyrzucamy jednostkę dokładnie w miejscu zniszczenia.
+        return (start_x, start_y)
+
 # --- URUCHOMIENIE ---
 # generuj_las_precyzyjny("final_map1.txt", "mapa_tlo.png", "mapa_finalna_z_lasem.png")
 
@@ -1672,26 +1850,7 @@ if __name__ == "__main__":
         #        print(f"DEBUG: Blokada! Teren na ({nx}, {ny}) jest nieprzejezdny.")
        #         return False
 
-        # ==========================================
-        # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
-        # ==========================================
-      #  if self.map[ny][nx] == "X":
-     #       print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
-            
-            # 1. Usuwamy jednostkę z gry (ginie)
-    #        if unit in self.units: 
-   #             self.units.remove(unit)
-  #          if unit in unit.owner.units: 
- #               unit.owner.units.remove(unit)
-#            if self.selected_unit == unit: 
-            #    self.selected_unit = None
-                
-            # 2. Usuwamy pułapkę z mapy i przywracamy oryginalne tło
-           # original_bg = getattr(self, 'trap_backgrounds', {}).get((nx, ny), ".")
-          #  self.map[ny][nx] = original_bg
-            
-            # 3. Zwracamy True, bo ruch się wykonał (choć jednostka go nie przeżyła)
-         #   return True
+       
 
         # 5. WALKA 
         #for other in self.units[:]:
