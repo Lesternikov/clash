@@ -1854,3 +1854,7 @@ if __name__ == "__main__":
 
         # 5. WALKA 
         #for other in self.units[:]:
+
+
+
+    

@@ -40,7 +40,7 @@ UNIT_NAMES = {
     "SMOK": "Smok",
     "PEAS": "Chłopi", # <-- tutaj brakowało przecinka
     "SPECK": "Generał Kobieta",
-    "SPECM": "Generał Mężczyzna",
+    "SPECM": "Generał",
     "GOLD": "Złoto",
 }
 NAME_TO_CODE = {name: code for code, name in UNIT_NAMES.items()}

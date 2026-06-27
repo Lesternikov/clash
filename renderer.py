@@ -944,39 +944,39 @@ class Renderer:
         self.draw_building_footer(screen)
   
     def draw_castle_on_map(self, screen, castle):
+        """
+        Rysuje zamek na mapie świata z uwzględnieniem koloru gracza i stanu zniszczenia.
+        Używa bezpiecznego pobierania z w.castle_tiles_by_color.
+        """
         w = self.world
-        TILE_SIZE = 32
-        px = int(castle.x * TILE_SIZE) - w.camera_x
-        py = int(castle.y * TILE_SIZE) - w.camera_y
         
-        # Optymalizacja
-        screen_w, screen_h = screen.get_size()
-        if px < -100 or px > screen_w + 100 or py < -100 or py > screen_h + 100:
-            return
-
-        is_tower = getattr(castle, 'building_type', 'Zamek') == "Strażnica"
+        # 1. Obliczamy pozycję na ekranie względem kamery
+        px = castle.x * TILE_SIZE - w.camera_x
+        py = castle.y * TILE_SIZE - w.camera_y
         
+        # 2. Ustalamy stan (etap) zamku (0-3 sprawny, 4 zniszczony)
+        s_idx = 3  # Domyślny, pełny zamek
         if getattr(castle, 'destroyed', False):
             s_idx = 4
-        elif getattr(castle, 'under_construction', False):
-            # =========================================================
-            # TUTAJ ZMIANA: Zamiast sztywnego zera, pobieramy aktualny etap (0, 1, 2, 3)
-            # =========================================================
-            s_idx = getattr(castle, 'build_stage', 0)
+            
+        # 3. Pobieramy kolor właściciela zamku (w małych literach)
+        raw_color = castle.owner.color_name if getattr(castle, 'owner', None) else "red"
+        color = str(raw_color).lower()
+        
+        # 4. Bezpiecznie wyciągamy kafelki (w razie błędu fallback na czerwony zamek)
+        color_dict = w.castle_tiles_by_color.get(color, w.castle_tiles_by_color.get("red", {}))
+        tiles = color_dict.get(s_idx, [])
+        
+        # 5. Rysujemy 4 kafelki tworzące zamek (wymiar 2x2)
+        if len(tiles) == 4:
+            offsets = [(0, 0), (1, 0), (0, 1), (1, 1)]
+            for i in range(4):
+                dx, dy = offsets[i]
+                screen.blit(tiles[i], (px + dx * TILE_SIZE, py + dy * TILE_SIZE))
         else:
-            s_idx = 3
-
-        if is_tower:
-            img = w.tower_tiles.get(s_idx)
-            if img:
-                screen.blit(img, (px, py))
-        else:
-            tiles = w.castle_tiles.get(s_idx, [])
-            if len(tiles) == 4:
-                offsets = [(0,0), (1,0), (0,1), (1,1)]
-                for i in range(4):
-                    dx, dy = offsets[i]
-                    screen.blit(tiles[i], (px + dx*TILE_SIZE, py + dy*TILE_SIZE))
+            # Całkowity failsafe: gdyby nawet czerwony się nie załadował, rysujemy kwadrat zastępczy
+            owner_color = getattr(castle.owner, 'color', (200, 0, 0)) if getattr(castle, 'owner', None) else (200, 0, 0)
+            pygame.draw.rect(screen, owner_color, (px, py, TILE_SIZE * 2, TILE_SIZE * 2))
      
     def draw_ports_on_map(self, screen):
         w = self.world

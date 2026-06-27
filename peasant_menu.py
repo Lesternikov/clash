@@ -128,7 +128,6 @@ class PeasantMenu:
             # Czerwony prostokąt błędu oznacza, że program nie znalazł w ogóle pliku
             pygame.draw.rect(screen, (255, 0, 0), rect)
 
-
     def draw(self, screen, w):
         """Główna funkcja rysująca wszystko w menu chłopów."""
         castle = w.selected_castle
