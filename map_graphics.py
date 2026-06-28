@@ -157,7 +157,6 @@ class MapGraphics:
         # ========================================================================
         # 2. INNE ASSETY (Woda, Krawędzie itp.)
         # ========================================================================
-        self.river_anim = self.load_river_animation()
         self.river_anim = self.load_river_animation() 
         self.sea_anim = self.load_sea_animation()
         self.load_sea_cliffs()
@@ -287,7 +286,7 @@ class MapGraphics:
         path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         frames = []
         for i in range(595, 603):
-            p = os.path.join(path_base, f"BACKGR3_S32_3.png")
+            p = os.path.join(path_base, f"BACKGR3_S32_{i}.png")
             if os.path.exists(p):
                 frames.append(self.load_single_img(p))
         if not frames:

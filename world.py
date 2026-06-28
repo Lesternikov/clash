@@ -273,17 +273,10 @@ class World(BuildingsMixin):
         self.port_tiles = {}
         # Wpisz tu poprawne numery z końcówek plików normal/BACKGR3_S32/_***.png
         port_gfx = {
-<<<<<<< HEAD
-            "pos1_base": ["716", "717", "718", "719"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
-            "pos1_ship": ["720", "721"],               # Statki dla Pozycji 1 (Lewy Dół, Prawy Dół)
-            "pos2_base": ["722", "723", "724", "725"], # Baza Pozycji 2 
-            "pos2_ship": ["726", "727"]                # <--- Wpisz tu poprawne numery statków dla portu nr 2!
-=======
             "pos1_base": ["716", "717", "720", "721"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
             "pos1_ship": ["718", "719"],               # Statki dla Pozycji 1 (Lewy Dół, Prawy Dół)
             "pos2_base": ["722", "723", "726", "727"], # Baza Pozycji 2 
             "pos2_ship": ["724", "725"]                # <--- Wpisz tu poprawne numery statków dla portu nr 2!
->>>>>>> 14f27ad45ba7ca4f89e13ec671c6c4b40b63ed96
         }
         
         for key, numbers in port_gfx.items():
@@ -664,29 +657,6 @@ class World(BuildingsMixin):
                             unit.move_points -= cost
                             return True
                     else:
-<<<<<<< HEAD
-                        # --- GOTOWY ZAMEK: PRZEJĘCIE ---
-                        defenders = sum(1 for u in castle.garrison if u is not None)
-
-                        if defenders == 0:
-                            # 1. Zmiana właściciela
-                            castle.owner = unit.owner
-                            
-                            # 2. AKTUALIZACJA GRAFIKI (Wywołanie nowej metody)
-                            self.update_castle_visuals(castle, unit.owner)
-                            
-                            # 3. Reszta logiki przejęcia
-                            castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
-                            castle.production_enabled = False
-                            castle.production_unit_type = None
-                            
-                            unit.move_points -= cost
-                            if self.enter_castle(unit, castle):
-                                return True
-                            else:
-                                unit.move_points += cost
-                                return False
-=======
                         # Normalne zdobycie gotowego zamku
                         print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color_name}!")
                         
@@ -705,7 +675,6 @@ class World(BuildingsMixin):
                         unit.move_points -= cost
                         if self.enter_castle(unit, castle):
                             return True
->>>>>>> 14f27ad45ba7ca4f89e13ec671c6c4b40b63ed96
                         else:
                             # Zamek jest broniony!
                             print(f"Zamek jest broniony przez {defenders} jednostek! Nie można przejąć bez walki.")
