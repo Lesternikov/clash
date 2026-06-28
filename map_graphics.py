@@ -37,17 +37,17 @@ class MapGraphics:
         # GRAFIKI PLACU BUDOWY
         # Używamy Twojej funkcji load_single_img, która automatycznie skaluje grafiki do 32x32 pikseli!
         self.build_grass = {
-            (0, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_707.png")),
-            (1, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_708.png")),
-            (0, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_709.png")),
-            (1, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_710.png"))
+            (0, 0): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_707.png")),
+            (1, 0): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_708.png")),
+            (0, 1): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_709.png")),
+            (1, 1): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_710.png"))
         }
         
         self.build_desert = {
-            (0, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_711.png")),
-            (1, 0): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_712.png")),
-            (0, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_713.png")),
-            (1, 1): self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_714.png"))
+            (0, 0): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_711.png")),
+            (1, 0): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_712.png")),
+            (0, 1): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_713.png")),
+            (1, 1): self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_714.png"))
         }
         
 
@@ -99,7 +99,7 @@ class MapGraphics:
         return images
 
     def load_additional_tiles(self):
-        base_bg_path = r"D:\clash reverse\assets\BACKGR3_S32_"
+        base_bg_path = r"D:\clash reverse\assets\normal\BACKGR3_S32_"
         try:
             self.terrain_images["$"] = pygame.image.load(f"{base_bg_path}752.png").convert_alpha()
             self.terrain_images["S"] = pygame.image.load(f"{base_bg_path}733.png").convert_alpha()
@@ -109,15 +109,19 @@ class MapGraphics:
         except Exception as e:
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
         # --- DODAJ TO: Rejestrujemy ruiny pod małym 'r' ---
-            ruins_path = os.path.join("assets", "zamekczerwony", "BUILDIN1_S32_8.png")
+            ruins_path = os.path.join("assets", "minimum", "BUILDIN1_S32", "BUILDIN1_S32_8.png")
             if os.path.exists(ruins_path):
                 img_r = pygame.image.load(ruins_path).convert_alpha()
                 self.terrain_images["r"] = pygame.transform.scale(img_r, (TILE_SIZE, TILE_SIZE))
-                
-        except Exception as e:
-            print(f"Błąd ładowania dodatkowych kafelków: {e}")
+
+        # --- DODAJ TO: Rejestrujemy nową grafikę pułapki ---
+            trap_path = os.path.join("assets", "minimum", "MARKS_S32", "MARKS_S32_6.png")
+            if os.path.exists(trap_path):
+                img_trap = pygame.image.load(trap_path).convert_alpha()
+                self.terrain_images["X"] = pygame.transform.scale(img_trap, (TILE_SIZE, TILE_SIZE))
+
     def load_all_assets(self):
-        path_base = os.path.join("assets", "BACKGR3_S32")
+        path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         
         # ========================================================================
         # 1. TRAWA (Warianty z wagami — czysta trawa dominuje)
@@ -165,8 +169,8 @@ class MapGraphics:
         # Definicja Bagna (?) G
         self.edges["G"] = self.load_edge_only_set(187)
         self.centers["G"] = [
-            self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_699.png")),
-            self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_700.png"))
+            self.load_single_img(os.path.join("assets","normal", "BACKGR3_S32","BACKGR3_S32_699.png")),
+            self.load_single_img(os.path.join("assets","normal", "BACKGR3_S32","BACKGR3_S32_700.png"))
         ]
         
         # Wysokie góry
@@ -176,11 +180,11 @@ class MapGraphics:
         
         # Pustynia p
         self.edges["p"] = self.load_edge_only_set(8) 
-        self.centers["p"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_4.png"))]
+        self.centers["p"] = [self.load_single_img(os.path.join("assets","normal", "BACKGR3_S32","BACKGR3_S32_4.png"))]
 
         # Inna Pustynia P
         self.edges["P"] = self.load_edge_only_set(32) 
-        self.centers["P"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32","BACKGR3_S32_44.png"))]
+        self.centers["P"] = [self.load_single_img(os.path.join("assets","normal", "BACKGR3_S32","BACKGR3_S32_44.png"))]
 
         # ========================================================================
         # 3. LAS (Autotiling Kontekstowy — Rzadki vs Gęsty)
@@ -189,52 +193,52 @@ class MapGraphics:
         self.edges["l"] = self.load_edge_only_set(45) 
         # Warianty autotilingu krawędzi (styki 45 stopni itp.)
         self.edges["l"][0] = [ 
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_48.png"), 
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_46.png"), 
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_80.png"), 
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_80.png"), 
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_50.png"), 
+            self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_48.png"), 
+            self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_46.png"), 
+            self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_80.png"), 
+            self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_80.png"), 
+            self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_50.png"), 
         ]
         
         # Standardowe wnętrze lasu (Rzadki las — używane na obrzeżach)
         self.centers["l"] = [
-            self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_49.png")
+            self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_49.png")
         ]
 
         self.dense_forest_centers = {
-            (0, 0): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_54.png"), # Lewy górny
-            (1, 0): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_55.png"), # Prawy górny
-            (0, 1): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_56.png"), # Lewy dolny
-            (1, 1): self.load_single_img("assets/BACKGR3_S32/BACKGR3_S32_57.png")  # Prawy dolny
+            (0, 0): self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_54.png"), # Lewy górny
+            (1, 0): self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_55.png"), # Prawy górny
+            (0, 1): self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_56.png"), # Lewy dolny
+            (1, 1): self.load_single_img("assets/normal/BACKGR3_S32/BACKGR3_S32_57.png")  # Prawy dolny
         }
         # ========================================================================
         
         # Bagno B
         self.edges["B"] = self.load_edge_only_set(24) 
-        self.centers["B"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32", "BACKGR3_S32_7.png"))]
+        self.centers["B"] = [self.load_single_img(os.path.join("assets","normal", "BACKGR3_S32", "BACKGR3_S32_7.png"))]
 
         # Góry trawiaste g
         self.mountain_grass_edges = self.load_edge_only_set(174) 
         self.mountain_desert_edges = self.load_edge_only_set(161) 
         self.mountain_swamp_edges = self.load_edge_only_set(199) 
-        self.centers["g"] = [self.load_single_img(os.path.join("assets","BACKGR3_S32", "BACKGR3_S32_173.png"))]
+        self.centers["g"] = [self.load_single_img(os.path.join("assets","normal", "BACKGR3_S32", "BACKGR3_S32_173.png"))]
         self.edges["g"] = self.mountain_grass_edges 
         
         # Świątynie
-        self.temple_img = self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_732.png"))
-        self.temple2_img = self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_737.png"))
+        self.temple_img = self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_732.png"))
+        self.temple2_img = self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_737.png"))
 
         # Skarby
         self.treasure_imgs = {
-            ".": self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_752.png")), 
-            "p": self.load_single_img(os.path.join("assets", "BACKGR3_S32", "BACKGR3_S32_755.png"))  
+            ".": self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_752.png")), 
+            "p": self.load_single_img(os.path.join("assets", "normal", "BACKGR3_S32", "BACKGR3_S32_755.png"))  
         }
         
         # Ruiny
-        self.ruins_img = self.load_single_img(os.path.join("assets", "zamekczerwony", "BUILDIN1_S32_8.png"))
+        self.ruins_img = self.load_single_img(os.path.join("assets", "minimum", "BUILDIN1_S32", "BUILDIN1_S32_8.png"))
 
     def load_edge_only_set(self, start_id):
-        path_base = os.path.join("assets", "BACKGR3_S32")
+        path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         imgs = []
         for i in range(start_id, start_id + 12):
             imgs.append(self.load_single_img(os.path.join(path_base, f"BACKGR3_S32_{i}.png")))
@@ -261,7 +265,7 @@ class MapGraphics:
             14: 9, 11: 8, 15: 10, 1: 12, 4: 11, 2: 14, 8: 13, 0: 5
         }
         terrain_starts = {".": 819, "B": 834, "p": 851}
-        path = os.path.join("assets", "BACKGR3_S32")
+        path = os.path.join("assets", "normal", "BACKGR3_S32")
 
         for terrain, start_id in terrain_starts.items():
             for mask, offset in road_template.items():
@@ -280,7 +284,7 @@ class MapGraphics:
         self.road_gfx["trans"]["poziom_trawa_lewo_pustynia_prawo"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_956.png"))
 
     def load_river_animation(self):
-        path_base = os.path.join("assets", "BACKGR3_S32")
+        path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         frames = []
         for i in range(595, 603):
             p = os.path.join(path_base, f"BACKGR3_S32_{i}.png")
@@ -291,7 +295,7 @@ class MapGraphics:
         return frames   
              
     def load_sea_animation(self):
-        path_base = os.path.join("assets", "BACKGR3_S32")
+        path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         frames = []
         for i in range(587, 595): 
             p = os.path.join(path_base, f"BACKGR3_S32_{i}.png")
@@ -304,7 +308,7 @@ class MapGraphics:
         return frames
 
     def load_sea_cliffs(self):
-        path_base = os.path.join("assets", "BACKGR3_S32")
+        path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         self.sea_cliffs_anim = {}
         mapping = {1: 1, 6: 6, 3: 3, 4: 4, 0: 0, 2: 2, 5: 5, 7: 7, 11: 11, 10: 10, 9: 9, 8: 8}
         start_id = 223
@@ -322,7 +326,7 @@ class MapGraphics:
             self.sea_cliffs_anim[edge_id] = frames
 
     def load_all_water_assets(self):
-        path_base = os.path.join("assets", "BACKGR3_S32")
+        path_base = os.path.join("assets", "normal", "BACKGR3_S32")
         fragments_S = { "TOP_L": 419, "BOT_L": 416, "MID_L": 417, "MID_R": 418, "TOP_R": 420, "BOT_R": 415, "TOP_C": 421, "BOT_C": 422 }
         for name, start_id in fragments_S.items():
             self.waterfall_gfx["S"][name] = [self.load_single_img(os.path.join(path_base, f"BACKGR3_S32_{start_id + (f * 16)}.png")) for f in range(8)]
@@ -661,39 +665,60 @@ class MapGraphics:
                             self.draw_custom_overlay(screen, x, y, pos, full_set, edge_id)
 
                 # ================= WARSTWA 2: OBIEKTY NA MAPIE =================
-                if obj_tile == " ": continue 
+                raw_obj_tile = world.map[y][x] # Prawdziwy obiekt z mapy, bez "oszukiwania"
+                if raw_obj_tile == " ": continue 
                 
                 # Drogi
-                if obj_tile == "_":
+                if raw_obj_tile == "_":
                     if bg_tile != "W":
                         road_img = self.get_road_tile(world, x, y)
                         if road_img: screen.blit(road_img, pos)
                 # Budynki/Statyczne
-                elif obj_tile in ["S", "&"]:
-                    if obj_tile == "S": screen.blit(self.temple_img, pos) 
-                    elif obj_tile == "&": screen.blit(self.temple2_img, pos) 
+                elif raw_obj_tile in ["S", "&"]:
+                    if raw_obj_tile == "S": screen.blit(self.temple_img, pos) 
+                    elif raw_obj_tile == "&": screen.blit(self.temple2_img, pos) 
 
                 # Skarby (ze zmianą tła pod skarberm p/.)
-                elif obj_tile == "$":
+                elif raw_obj_tile == "$":
                     logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
                     img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
                     screen.blit(img, pos)
                 # Debugowanie Fundamentów
-                elif obj_tile == "#":
+                elif raw_obj_tile == "#":
                     is_left = (x == 0 or world.map[y][x-1] != "#")
                     is_top = (y == 0 or world.map[y-1][x] != "#")
                     if is_left and is_top:
                         big_rect = pygame.Rect(pos[0], pos[1], TILE_SIZE * 2, TILE_SIZE * 2)
                         pygame.draw.rect(screen, (255, 255, 255), big_rect, 4)
-                # Pułapki
-                elif obj_tile == "X":
-                    trap_color = (200, 0, 0)
-                    offset = 6
-                    pygame.draw.line(screen, trap_color, (pos[0] + offset, pos[1] + offset), (pos[0] + TILE_SIZE - offset, pos[1] + TILE_SIZE - offset), 3)
-                    pygame.draw.line(screen, trap_color, (pos[0] + TILE_SIZE - offset, pos[1] + offset), (pos[0] + offset, pos[1] + TILE_SIZE - offset), 3)
-                # Inne z terrain_images (T, t, O z load_additional_tiles)
-                elif obj_tile in self.terrain_images:
-                    screen.blit(self.terrain_images[obj_tile], pos)
+
+                # =======================================================
+                # 1. PUŁAPKI (Widoczność i rysowanie tego co pod spodem)
+                # =======================================================
+                elif raw_obj_tile == "X":
+                    # --- NAJPIERW: Rysujemy tło pod pułapką (jeśli to była droga lub skarb) ---
+                    oryginalny_obiekt = getattr(world, 'trap_backgrounds', {}).get((x, y), ".")
+                    
+                    if oryginalny_obiekt == "_":
+                        # ZMIANA: Rysujemy teksturę drogi TYLKO na lądzie! (Na rzece most już jest narysowany pod spodem)
+                        if bg_tile not in ["W", "V", "M"]:
+                            road_img = self.get_road_tile(world, x, y)
+                            if road_img: screen.blit(road_img, pos)
+                            
+                    elif oryginalny_obiekt == "$":
+                        logical_bg = "p" if bg_tile in ["p", "P", "s"] else "."
+                        img = self.treasure_imgs.get(logical_bg, self.treasure_imgs["."])
+                        screen.blit(img, pos)
+
+                    # --- POTEM: Rysujemy właściwą pułapkę (jeśli widoczna) ---
+                    trap = getattr(world, 'traps', {}).get((x, y))
+                    if trap:
+                        current_player = world.players[world.current_player]
+                        if trap["owner"] == current_player or current_player in trap.get("detected_by", set()):
+                            if "X" in self.terrain_images:
+                                screen.blit(self.terrain_images["X"], pos)
+                            else: # Failsafe
+                                pygame.draw.line(screen, (200,0,0), (pos[0]+6, pos[1]+6), (pos[0]+26, pos[1]+26), 3)
+                                pygame.draw.line(screen, (200,0,0), (pos[0]+26, pos[1]+6), (pos[0]+6, pos[1]+26), 3)
 
     def draw_construction_sites(self, screen, world):
         """Rysuje kompletne place budowy zamków niezależnie od krawędzi ekranu"""

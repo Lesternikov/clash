@@ -55,7 +55,7 @@ class World(BuildingsMixin):
         self.menu_open = False
         self.active_dropdown = None
 
-        self.traps = []
+        self.traps = {}
         self.trap_backgrounds = {}    
         self.constructions = []
         self.build_clicked = {}  
@@ -185,7 +185,7 @@ class World(BuildingsMixin):
             self.icon_training = pygame.Surface((32, 32))
             self.icon_training.fill((255, 0, 255))
 
-        base_bg_path = r"assets\BACKGR3_S32_"
+        base_bg_path = r"assets/normal/BACKGR3_S32/BACKGR3_S32_"
         self.terrain_images = {}
         try:
             self.terrain_images["$"] = pygame.image.load(f"{base_bg_path}752.png").convert_alpha()
@@ -271,19 +271,19 @@ class World(BuildingsMixin):
         # ŁADOWANIE GRAFIK PORTU (12 plików)
         # ==========================================
         self.port_tiles = {}
-        # Wpisz tu poprawne numery z końcówek plików BACKGR3_S32_***.png
+        # Wpisz tu poprawne numery z końcówek plików normal/BACKGR3_S32/_***.png
         port_gfx = {
-            "pos1_base": ["718", "719", "718", "719"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
+            "pos1_base": ["716", "717", "720", "721"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
             "pos1_ship": ["718", "719"],               # Statki dla Pozycji 1 (Lewy Dół, Prawy Dół)
-            "pos2_base": ["722", "723", "724", "725"], # Baza Pozycji 2 
-            "pos2_ship": ["726", "727"]                # <--- Wpisz tu poprawne numery statków dla portu nr 2!
+            "pos2_base": ["722", "723", "726", "727"], # Baza Pozycji 2 
+            "pos2_ship": ["724", "725"]                # <--- Wpisz tu poprawne numery statków dla portu nr 2!
         }
         
         for key, numbers in port_gfx.items():
             self.port_tiles[key] = []
             for num in numbers:
                 # Upewnij się, że ścieżka pasuje do Twojego folderu (np. "assets" lub "assets/minimum/...")
-                path = os.path.join("assets", "BACKGR3_S32", f"BACKGR3_S32_{num}.png") 
+                path = os.path.join("assets", "normal", "BACKGR3_S32", f"BACKGR3_S32_{num}.png") 
                 try:
                     img = pygame.image.load(path).convert_alpha()
                     img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
@@ -316,89 +316,105 @@ class World(BuildingsMixin):
         self.units_to_split = [] # Tu trafiają jednostki zaznaczone kliknięciem w panelu
     
     def spawn_port_reinforcements(self, port):
-        """Generuje statek i losowe jednostki w porcie."""
+        """Generuje tylko INFORMACJĘ o liczbie jednostek w porcie."""
+        import random
+        ilosc = random.randint(3, 5)
+        
+        # Zamiast tworzyć wojsko, port po prostu zapamiętuje "ilość czekających skrzyń z posiłkami"
+        port["pending_count"] = ilosc
+        port["garrison"] = [] # Czyścimy stary system, jeśli gdzieś został
+        
+        port["has_ship"] = True
+        port["ship_timer"] = 1 # Statek będzie widoczny tylko przez 1 turę!
+        print(f"Statek przywiózł posiłki! W porcie czeka {ilosc} tajemniczych najemników.")
+
+    def update_ports_turn(self):
+        """Aktualizuje liczniki portów (WYWOŁAJ TO NA POCZĄTKU NOWEJ TURY)."""
+        if not hasattr(self, 'ports'): return
+        for port in self.ports:
+            if port.get("ship_timer", 0) > 0:
+                port["ship_timer"] -= 1
+                if port["ship_timer"] <= 0:
+                    port["has_ship"] = False
+                    print("Statek odpłynął, ale najemnicy czekają w porcie.")
+                    
+            if port.get("cooldown", 0) > 0:
+                port["cooldown"] -= 1
+                if port["cooldown"] <= 0:
+                    self.spawn_port_reinforcements(port)
+                    
+    def unload_port(self, port, triggering_unit):
+        print("Wojska odebrane na ląd! Rozpoczynam rekrutację...")
+        
         import random
         from unit import Unit
         
+        # =======================================================
+        # NOWOŚĆ: Losujemy jednostki DOPIERO TERAZ i od razu
+        # przypisujemy je do gracza, który ich odebrał!
+        # =======================================================
         mozliwe_jednostki = [
             "Posp. ruszenie", "Lekka piechota", "Ciężka piechota", "Pikinier", 
             "Halbardnik", "Lekka jazda", "Rycerstwo", "Dragon", "Łucznik", 
             "Kusznik", "Leśnik", "Góral", "Budowniczy"
         ]
-        ilosc = random.randint(3, 5)
         
-        # Szukamy gracza, który ma zamek najbliżej tego portu, by przypisać mu jednostki
-        najblizszy_gracz = self.players[0]
-        min_dystans = 9999
-        for c in self.castles:
-            dystans = abs(c.x - port["x"]) + abs(c.y - port["y"])
-            if dystans < min_dystans:
-                min_dystans = dystans
-                najblizszy_gracz = c.owner
-        
-        port["garrison"] = []
+        ilosc = port.get("pending_count", 0)
+        # Zabezpieczenie dla starych zapisów
+        if ilosc == 0 and port.get("garrison"): 
+            ilosc = len(port["garrison"])
+            
+        nowy_garnizon = []
         for _ in range(ilosc):
             typ = random.choice(mozliwe_jednostki)
-            # Upewnij się, że nazwy z listy dokładnie pokrywają się z kluczami w UNIT_STATS!
-            jednostka = Unit(typ, port["x"], port["y"], najblizszy_gracz)
-            port["garrison"].append(jednostka)
-            
-        port["has_ship"] = True
-        print(f"Statek przywiózł {ilosc} jednostek do portu!")
-
-    def update_ports_turn(self):
-        """Aktualizuje liczniki portów (wywołuj co turę, np. gdy Gracz 0 zaczyna turę)."""
-        for port in self.ports:
-            if port["cooldown"] > 0:
-                port["cooldown"] -= 1
-                if port["cooldown"] == 0:
-                    self.spawn_port_reinforcements(port)
-
-    def unload_port(self, port, triggering_unit):
-        """Wyrzuca wojska z portu i tworzy nową armię na mapie przed portem."""
-        print("Wojska zeszły ze statku na ląd!")
-        
-        # 1. Szukamy wolnego pola PRZED portem
+            # Tworzymy nową jednostkę już z poprawnym kolorem (triggering_unit.owner)
+            nowa_jednostka = Unit(typ, -1, -1, triggering_unit.owner)
+            nowy_garnizon.append(nowa_jednostka)
+                
+        # 1. INTELIGENTNE SZUKANIE WOLNEGO LĄDU PRZED PORTEM
         wolne_pole = None
-        walkable_tiles = [".", "l", "g", "p", "_"] # Dozwolone lądy do desantu
+        walkable_tiles = [".", "l", "g", "p", "_", "B", "P", "G"] 
         
-        for dx in range(-1, 3):
-            for dy in range(-1, 3):
-                px, py = port["x"] + dx, port["y"] + dy
-                if 0 <= py < len(self.map) and 0 <= px < len(self.map[0]):
-                    # Jeśli to wolny teren (np. trawa/droga) i nie ma tam innej jednostki
-                    if self.map[py][px] in walkable_tiles:
-                        if not any(u.x == px and u.y == py for u in self.units):
-                            wolne_pole = (px, py)
-                            break
+        for radius in range(1, 4):
+            for dy in range(-radius, radius + 2): 
+                for dx in range(-radius, radius + 2):
+                    px, py = port["x"] + dx, port["y"] + dy
+                    if 0 <= py < len(self.map) and 0 <= px < len(self.map[0]):
+                        obj_tile = self.map[py][px]
+                        bg_tile = self.bg_map[py][px] if hasattr(self, 'bg_map') else "."
+                        
+                        if obj_tile in walkable_tiles or bg_tile in walkable_tiles:
+                            if obj_tile not in ["W", "w", "M", "R", "S", "&", "#"] and bg_tile not in ["W", "w"]:
+                                if not any(u.x == px and u.y == py for u in self.units):
+                                    wolne_pole = (px, py)
+                                    break
+                if wolne_pole: break
             if wolne_pole: break
             
-        # Jeśli nie ma wolnego miejsca wokół portu (wszystko zastawione), rzucamy ich pod nogi odbierającego
         if not wolne_pole:
-            wolne_pole = (triggering_unit.x, triggering_unit.y)
+            print("Brzeg zapchany! Uruchamiam awaryjne szukanie miejsca...")
+            wolne_pole = self.find_free_space_around(port["x"], port["y"], radius=3)
             
-        # 2. Wyznaczamy Lidera z pierwszego żołnierza z portu
-        lider = port["garrison"][0]
+        # 2. Tworzenie nowej armii na bezpiecznym brzegu
+        lider = nowy_garnizon[0]
         lider.x, lider.y = wolne_pole[0], wolne_pole[1]
         lider.garrison = [None] * 10
         
-        # 3. Ładujemy resztę do jego garnizonu
-        for i, u in enumerate(port["garrison"][1:]):
+        for i, u in enumerate(nowy_garnizon[1:]):
             if i < 10:
                 lider.garrison[i] = u
-                u.x, u.y = -1, -1 # Są pasażerami, nie ma ich na mapie
                 
-        # 4. Dodajemy całkowicie nową armię na mapę
         self.units.append(lider)
         if hasattr(lider, 'owner') and lider.owner:
             lider.owner.units.append(lider)
             
-        # 5. Czyścimy port i uruchamiamy licznik do kolejnego statku (10 tur)
+        # 3. START ODLICZANIA 10 TUR!
+        port["pending_count"] = 0
         port["garrison"] = []
         port["has_ship"] = False
-        port["cooldown"] = 10
+        port["ship_timer"] = 0
+        port["cooldown"] = 10 
         
-        # 6. Czyścimy trasę jednostce, która przyszła (zadanie wykonane)
         triggering_unit.planned_path = []
         triggering_unit.target_x = None
         triggering_unit.target_y = None
@@ -406,7 +422,11 @@ class World(BuildingsMixin):
     def setup_starting_units(self):
         """Rozdaje graczom początkowe wojsko pod ich zamkami."""
         generals_created = [] # Zbieramy generałów, żeby jednego od razu uwięzić do testów
-        
+        # --- NOWOŚĆ: STARTOWY STATEK W PORCIE ---
+        if hasattr(self, 'ports'):
+            for port in self.ports:
+                self.spawn_port_reinforcements(port)
+
         for c in self.castles:
             if c.owner:
                 owner_obj = self.players[c.owner] if isinstance(c.owner, int) else c.owner
@@ -495,7 +515,7 @@ class World(BuildingsMixin):
         if self.current_player == 0:
             self.turn += 1
             self.process_construction() 
-
+            self.update_ports_turn() # <--- TEGO BRAKOWAŁO (Znika statek po 1 turze!)
             for castle in self.castles:
                 if not getattr(castle, 'destroyed', False):
                     if hasattr(castle, 'next_turn'):
@@ -527,6 +547,7 @@ class World(BuildingsMixin):
                                     # Złoty posąg to max 12 pkt doświadczenia
                                     u.experience = min(12, getattr(u, 'experience', 0) + 3) 
                                     print(f"[{castle.x},{castle.y}] Wyszkolono jednostkę: {u.type}")
+        self.check_trap_detection()
 
     def move_unit(self, unit, dx, dy, cost=1):
         """
@@ -633,6 +654,14 @@ class World(BuildingsMixin):
                     else:
                         # Normalne zdobycie gotowego zamku
                         print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color_name}!")
+                        
+                        # ========================================================
+                        # KLUCZOWA POPRAWKA: Zapamiętanie "Pierworodnego" twórcy
+                        # zanim zmienimy flagę na wieży!
+                        # ========================================================
+                        if not hasattr(castle, 'original_owner') or castle.original_owner is None:
+                            castle.original_owner = castle.owner
+                            
                         castle.owner = unit.owner
                         castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
                         castle.production_enabled = False
@@ -645,13 +674,105 @@ class World(BuildingsMixin):
                             unit.move_points += cost
                             return False
                         
-        # 4. TEREN
-        walkable_chars = [".", "l", "g", "p", "_", "#", "$","x", " "] 
+       # ==========================================
+        # 4. INTERAKCJA Z PORTEM (Odbieranie wojska)
+        # ==========================================
+        if self.map[ny][nx] == "R":
+            target_port = next((p for p in getattr(self, 'ports', []) if p["x"] <= nx <= p["x"]+1 and p["y"] <= ny <= p["y"]+1), None)
+            
+            if target_port:
+                # ZMIANA: Sprawdzamy nową zmienną z liczbą (oraz starą awaryjnie)
+                if target_port.get("pending_count", 0) > 0 or target_port.get("garrison"): 
+                    self.unload_port(target_port, unit)
+                else:
+                    print("Port jest pusty, czekamy na posiłki.")
+            
+            # Jednostka zostaje na brzegu
+            return False
+
+       # ==========================================
+        # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
+        # ==========================================
+        if self.map[ny][nx] == "X":
+            trap = getattr(self, 'traps', {}).get((nx, ny))
+            
+            if trap and trap["owner"] != unit.owner:
+                print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
+                
+                # Zbieramy całą armię (lider + pasażerowie)
+                army_in_trap = [unit]
+                if hasattr(unit, 'garrison'):
+                    army_in_trap.extend([u for u in unit.garrison if u is not None])
+                
+                import random
+                for u in army_in_trap:
+                    obrona = getattr(u, 'defense', 5) 
+                    
+                    if obrona < 3: dmg_pct = random.randint(95, 100)
+                    elif 3 <= obrona <= 5: dmg_pct = random.randint(70, 85)
+                    elif 6 <= obrona <= 9: dmg_pct = random.randint(50, 60)
+                    elif 10 <= obrona <= 15: dmg_pct = random.randint(35, 45)
+                    else: dmg_pct = random.randint(12, 20)
+                    
+                    max_hp = getattr(u, 'max_hp', 100)
+                    dmg_value = int(max_hp * (dmg_pct / 100.0))
+                    u.hp -= dmg_value
+                    
+                    if u.hp <= 0:
+                        if u in self.units: self.units.remove(u)
+                        if u.owner and u in u.owner.units: u.owner.units.remove(u)
+                        if self.selected_unit == u: self.selected_unit = None
+                        if hasattr(unit, 'garrison') and u in unit.garrison:
+                            unit.garrison[unit.garrison.index(u)] = None
+
+                original_bg = getattr(self, 'trap_backgrounds', {}).get((nx, ny), ".")
+                self.map[ny][nx] = original_bg
+                if (nx, ny) in self.traps:
+                    del self.traps[(nx, ny)]
+                
+                # ========================================================================
+                # KLUCZ: Zatrzymujemy jednostkę bezwzględnie w miejscu wybuchu!
+                # ========================================================================
+                unit.planned_path = []
+                unit.target_x = None
+                unit.target_y = None
+                
+                if unit.hp <= 0:
+                    ocalali = [u for u in getattr(unit, 'garrison', []) if u is not None and u.hp > 0]
+                    
+                    if ocalali:
+                        nowy_lider = ocalali[0]
+                        nowy_lider.x, nowy_lider.y = nx, ny 
+                        nowy_lider.garrison = [None] * 10
+                        for i, u in enumerate(ocalali[1:]):
+                            if i < 10: nowy_lider.garrison[i] = u
+                        
+                        if nowy_lider not in self.units: self.units.append(nowy_lider)
+                        if nowy_lider.owner and nowy_lider not in nowy_lider.owner.units:
+                            nowy_lider.owner.units.append(nowy_lider)
+                            
+                        self.selected_unit = nowy_lider 
+                        print(f"Nowym dowódcą armii na polu ({nx}, {ny}) zostaje: {nowy_lider.type}!")
+                    else:
+                        print("Oddział unicestwiony.")
+                        if self.selected_unit == unit: self.selected_unit = None
+                        
+                    return True # Wychodzimy, bo stary lider nie żyje
+                
+                # Reszta kodu rusza się na pole wybuchu jeśli przeżyła, ale już NIE PÓJDZIE DALEJ
+                
+        # ==========================================
+        # 5. TEREN (Zwykłe chodzenie po mapie)
+        # ==========================================
+        # Dodałem "X" do listy, aby zapobiec ewentualnym błędom silnika
+        walkable_chars = [".", "l", "g", "p", "_", "#", "$", "x", "X", " "] 
         map_char = self.map[ny][nx]
         if map_char not in walkable_chars:
             return False
 
-        # 5. PUŁAPKI (Nowość!)
+        # ==========================================
+        # 6. NIEWIDOCZNE PUŁAPKI (Zatrzymanie i pop-up)
+        # ==========================================
         pos = (nx, ny)
         if pos in self.traps and self.traps[pos]["active"]:
             # Jeśli wdepnęliśmy w pułapkę wroga
@@ -662,43 +783,7 @@ class World(BuildingsMixin):
                 unit.x, unit.y = nx, ny
                 print("Wdepnięto w pułapkę!")
                 return True # Zwracamy True, żeby jednostka "stanęła" na polu
-         # ==========================================
-        # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
-        # ==========================================
-        if self.map[ny][nx] == "X":
-            print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
-            
-            # 1. Usuwamy jednostkę z gry (ginie)
-            if unit in self.units: 
-                self.units.remove(unit)
-            if unit in unit.owner.units: 
-                unit.owner.units.remove(unit)
-            if self.selected_unit == unit: 
-                self.selected_unit = None
-                
-            #2. Usuwamy pułapkę z mapy i przywracamy oryginalne tło
-            original_bg = getattr(self, 'trap_backgrounds', {}).get((nx, ny), ".")
-            self.map[ny][nx] = original_bg
-            
-            # 3. Zwracamy True, bo ruch się wykonał (choć jednostka go nie przeżyła)
-            return True
         
-        # ==========================================
-        # 4.6. INTERAKCJA Z PORTEM (Odbieranie wojska)
-        # ==========================================
-        if self.map[ny][nx] == "R":
-            # Szukamy, w który dokładnie port weszliśmy
-            target_port = next((p for p in getattr(self, 'ports', []) if p["x"] <= nx <= p["x"]+1 and p["y"] <= ny <= p["y"]+1), None)
-            
-            if target_port:
-                if target_port.get("has_ship") and target_port.get("garrison"):
-                    self.unload_port(target_port, unit)
-                else:
-                    print("Port jest pusty, statek jeszcze nie przypłynął.")
-            
-            # WAŻNE: Zwracamy False, by nasza jednostka nie weszła do wody/portu,
-            # tylko bezpiecznie zatrzymała się na brzegu!
-            return False
         # 6. WALKA I ŁĄCZENIE
         for other in self.units[:]:
             if other.x == nx and other.y == ny:
@@ -746,8 +831,36 @@ class World(BuildingsMixin):
             for pas in unit.garrison:
                 if pas is not None:
                     pas.move_points -= cost
+        self.check_trap_detection()
         return True
     
+    def check_trap_detection(self):
+        """Uruchamia radar jednostek i wykrywa ukryte pułapki."""
+        current_player = self.players[self.current_player]
+        my_units = [u for u in self.units if u.owner == current_player and u.x >= 0]
+        
+        # Definicje elitarnych klas do radaru
+        zlote_ladowe = ["Rycerstwo", "Dragon", "Mag", "Kapłan", "Mnich", "Kusznik z gildii"]
+        zlote_latajace = ["Gryf", "Orzeł", "Smok", "Pegaz", "Ważka"]
+        
+        for tx, ty in list(getattr(self, 'traps', {}).keys()):
+            trap = self.traps[(tx, ty)]
+            if trap["owner"] == current_player: continue
+            if current_player in trap.get("detected_by", set()): continue
+            
+            for u in my_units:
+                dystans = ((u.x - tx)**2 + (u.y - ty)**2)**0.5
+                zasieg_radaru = 0
+                
+                if u.type in zlote_latajace: zasieg_radaru = 6.5
+                elif u.type in zlote_ladowe or u.type == "Generał" or getattr(u, 'is_general', False): zasieg_radaru = 3.5
+                
+                if zasieg_radaru > 0 and dystans <= zasieg_radaru:
+                    if "detected_by" not in trap: trap["detected_by"] = set()
+                    trap["detected_by"].add(current_player)
+                    print(f"!!! Pułapka na ({tx},{ty}) została WYKRYTA przez {u.type} !!!")
+                    break # Wykryto tę pułapkę, sprawdzamy kolejne
+
     def reset_units(self, old_player=None):
         # Funkcja wewnętrzna resetująca pojedynczego żołnierza
         def _reset_single(u_obj):
@@ -1520,6 +1633,7 @@ class World(BuildingsMixin):
         # 3. ZAWSZE OTWIERAMY EKRAN ŚWIĄTYNI NA KONIEC!
         # =========================================================
         self.screen = "temple_event"
+    
     def trigger_treasure_ui(self, unit, gx, gy):
         loot = self.loot_manager.get_digging_loot()
         

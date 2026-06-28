@@ -61,6 +61,8 @@ class Castle:
     def __init__(self, x, y, owner=None, building_type="Zamek"):
         self.x = x
         self.y = y
+        self.owner = owner
+        self.original_owner = owner
         self._owner_data = owner        
         self.building_type = building_type # Tutaj przechowamy: "Strażnica", "Twierdza" lub "Zamek"
         self.gold = 0

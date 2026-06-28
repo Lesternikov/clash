@@ -162,7 +162,7 @@ STEP_RED_SINGLE = {
 # ================================================================
  
 #  Folder ze stopami — zmień jeśli gdzie indziej
-STEP_FOLDER = os.path.join("assets", "STEP_S32")
+STEP_FOLDER = os.path.join("assets", "minimum", "STEP_S32")
  
 #  Rozmiar stopy na ekranie (oryginał: 64x64)
 #  Zwiększ żeby były bardziej widoczne, zmniejsz jeśli za duże
@@ -217,8 +217,10 @@ class Pathfinder:
             0: (14, 20),  # Czerwony (Don Marek)
             1: (90, 8),  # Niebieski (Lech VI) - prawy górny róg (do poprawki)
             2: (47, 80),  # Zielony (Mściwój) - dół środek (do poprawki)
-            3: (90, 72),  # Biały (Biały Kieł) - prawy dół (do poprawki)
-            4: (60, 46)   # Żółty (Złoty Pan) - środek prawo (do poprawki)
+            3:(14, 24),
+            #3: (90, 72),  # Biały (Biały Kieł) - prawy dół (do poprawki)
+            #4: (60, 46)   # Żółty (Złoty Pan) - środek prawo (do poprawki)
+            4: (20, 20)
         } 
 
         w.castles = []
@@ -279,7 +281,11 @@ class Pathfinder:
  
     def get_tile_at(self, x, y):
         if 0 <= y < len(self.world.map) and 0 <= x < len(self.world.map[y]):
-            return self.world.map[y][x]
+            tile = self.world.map[y][x]
+            # Oszukujemy system dla dróg: jeśli na drodze leży pułapka, sąsiedzi nadal widzą tu drogę!
+            if tile == "X" and getattr(self.world, 'trap_backgrounds', {}).get((x, y)) == "_":
+                return "_"
+            return tile
         return " "
  
     def get_bg_tile_at(self, x, y):
@@ -315,21 +321,39 @@ class Pathfinder:
                 return False
  
         bg_tile  = w.bg_map[y][x]
-        obj_tile = w.map[y][x]
+        raw_obj_tile = w.map[y][x] # Prawdziwy kafel (np. "X")
+ 
+        # =======================================================
+        # LOGIKA PUŁAPEK - ZANIM SPRAWDZIMY TEREN!
+        # =======================================================
+        if raw_obj_tile == "X":
+            trap = getattr(w, 'traps', {}).get((x, y))
+            if trap:
+                current_player = w.players[w.current_player]
+                # 1. Nasza pułapka - ZAWSZE traktowana jako przeszkoda (omijamy własne miny)
+                if trap["owner"] == current_player:
+                    return False 
+                # 2. Obca, ale WYKRYTA pułapka - też traktowana jako mur
+                if current_player in trap.get("detected_by", set()):
+                    return False 
+
+        # Jeśli pułapka jest obca i NIEWYKRYTA, zachowujemy się tak, jakby jej tu nie było!
+        # get_tile_at "oszukuje" i zwraca "_" (drogę), jeśli była pod pułapką.
+        obj_tile = self.get_tile_at(x, y)
  
         if obj_tile == "_":
-            return True
-        if "cost" not in TERRAIN_TYPES.get(bg_tile, {}):
-            return False
+            pass # Droga (most) pozwala przejść niezależnie od tego czy to woda
+        else:
+            if "cost" not in TERRAIN_TYPES.get(bg_tile, {}):
+                return False
  
-        unwalkable = ["S", "&", "R", "W", "G", "B", "M"]
+        unwalkable = ["S", "&", "R", "W", "G", "B", "M"] # "X" usunięte z listy blokad!
         if obj_tile != " " and obj_tile in unwalkable:
-            # === NOWOŚĆ: Pozwalamy "kliknąć" w port, żeby odebrać wojsko! ===
             if obj_tile == "R" and dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
-                pass # Algorytm pozwala zarysować czarną stopę na porcie
+                pass
             else:
                 return False
-
+            
         # =======================================================
         # Omijanie WSZYSTKICH jednostek (wrogów i sojuszników)
         # =======================================================
@@ -376,12 +400,12 @@ class Pathfinder:
  
             for dx, dy in [(0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1)]:
                 nx, ny = cx + dx, cy + dy
-                # ---> TUTAJ DODAJEMY dest_x, dest_y DO ZAPYTANIA <---
                 if not self.is_walkable(nx, ny, unit, target_castle, dest_x, dest_y):
                     continue
  
                 bg_tile  = w.bg_map[ny][nx]
-                obj_tile = w.map[ny][nx]
+                # ZMIANA: używamy get_tile_at, aby niewidoczna pułapka na drodze kosztowała tyle co droga!
+                obj_tile = self.get_tile_at(nx, ny) 
  
                 base_cost = TERRAIN_TYPES.get("_", {}).get("cost", 3) \
                             if obj_tile == "_" \
@@ -391,7 +415,6 @@ class Pathfinder:
                 new_total_cost = current_cost + base_cost * move_modifier
  
                 heapq.heappush(queue, (new_total_cost, nx, ny, path + [(nx, ny)]))
- 
         return []
  
     # -------------------------------------------------------
@@ -591,8 +614,9 @@ class Pathfinder:
         obj_terrain = w.map[y][x]   # Warstwa obiektów (zamki, fundamenty)
 
         # 1. Blokada ze względu na podłoże
-        if bg_terrain in ["l", "g", "G", "W", "M", "B", "b"]: 
-            return False
+        if bg_terrain in ["l", "g", "G", "W", "M", "B", "b", "V"]: 
+            if obj_terrain != "_": # Zezwalamy na budowę TYLKO, jeśli jest tam most (droga)!
+                return False
             
         # 2. Blokada ze względu na obiekty na mapie
         if obj_terrain in ["#", "&", "S", "x", "X"]: 
@@ -602,7 +626,7 @@ class Pathfinder:
         if obj_terrain.isupper() and obj_terrain not in ["P"]: 
             return False
             
-        return True           
+        return True
             
     def can_build_road(self, x, y):
         # gdzie można budować drogę

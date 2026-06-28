@@ -49,63 +49,103 @@ class BuildingsMixin:
         TARGET_SIZE = (32, 32)
 
         self.castle_color_frames = {
-            "blue": {
-                0: [189, 190, 191, 192],
-                1: [193, 194, 195, 196],
-                2: [197, 198, 199, 200],
-                3: [205, 206, 207, 208],
-                4: [185, 186, 187, 188]
-            },
             "red": {
                 0: [225, 226, 227, 228],
                 1: [229, 230, 231, 232],
                 2: [233, 234, 235, 236],
                 3: [237, 238, 239, 240],
-                4: [221, 222, 223, 224]
+                4: [221, 222, 223, 224],
+                "take by":{
+                    "blue":[241, 242, 243, 244],
+                    "yellow":[245, 246, 247, 248],
+                    "white":[249, 250, 251, 252],
+                    "green":[253, 254, 255, 256],}
             },
-            "yellow": {
+            "blue": {
                 0: [261, 262, 263, 264],
                 1: [265, 266, 267, 268],
                 2: [269, 270, 271, 272],
-                3: [281, 282, 283, 284],
-                4: [257, 258, 259, 260]
+                3: [273, 274, 275, 276],
+                4: [257, 258, 259, 260],
+                "take by":{
+                    "red":[269, 270, 271, 272],
+                    "yellow":[281, 282, 283, 284],
+                    "white":[285, 286, 287, 288],
+                    "green":[289, 290, 291, 292],}
             },
-            "white": {
+            "yellow": {
                 0: [297, 298, 299, 300],
                 1: [301, 302, 303, 304],
                 2: [305, 306, 307, 308],
-                3: [321, 322, 323, 324],
-                4: [293, 294, 295, 296]
+                3: [317, 318, 319, 320],
+                4: [293, 294, 295, 296],
+                "take by":{
+                    "red":[309, 310, 311, 312],
+                    "blue":[313, 314, 315, 316],
+                    "white":[321, 322, 323, 324],
+                    "green":[325, 326, 327, 328],}
+            },
+            "white": {
+                0: [333, 334, 335, 336],
+                1: [337, 338, 339, 340],
+                2: [341, 342, 343, 344],
+                3: [357, 358, 359, 360],
+                4: [329, 330, 331, 332],
+                "take by":{
+                    "red":[345, 346, 347, 348],
+                    "blue":[349, 350, 351, 352],
+                    "yellow":[353, 354, 355, 356],
+                    "green":[361, 362, 363, 364]}
             },
             "green": {
                 0: [369, 370, 371, 372],
                 1: [373, 374, 375, 376],
                 2: [377, 378, 379, 380],
                 3: [397, 398, 399, 400],
-                4: [365, 366, 367, 368]
+                4: [365, 366, 367, 368],
+                "take by":{
+                    "red":[381, 382, 383, 384],
+                    "blue":[385, 386, 387, 388],
+                    "yellow":[389, 390, 391, 392],
+                    "white":[393, 394, 395, 396],}
             }
-            
-            
         }
 
         self.castle_tiles_by_color = {}
 
         for color, stages in self.castle_color_frames.items():
-            self.castle_tiles_by_color[color] = {0: [], 1: [], 2: [], 3: [], 4: []}
-            
-            for stage_idx, file_numbers in stages.items():
-                for num in file_numbers:
-                    file_name = f"BUILDIN1_S32_{num}.png"
-                    full_path = os.path.join(base_folder, file_name)
-                    try:
-                        img = pygame.image.load(full_path).convert_alpha()
-                        img = pygame.transform.scale(img, TARGET_SIZE)
-                        self.castle_tiles_by_color[color][stage_idx].append(img)
-                    except:
-                        # Jeśli brakuje konkretnego pliku, gra nie wywali błędu
-                        dummy = pygame.Surface(TARGET_SIZE, pygame.SRCALPHA)
-                        dummy.fill((200, 0, 0, 150))
-                        self.castle_tiles_by_color[color][stage_idx].append(dummy)
+            self.castle_tiles_by_color[color] = {0: [], 1: [], 2: [], 3: [], 4: [], "take by":{}}    
+            for key, data in stages.items():
+                if key == "take by":
+                    # KROK 1: Ładowanie specjalnych klatek okupacji
+                    for okupant, file_numbers in data.items():
+                        self.castle_tiles_by_color[color]["take by"][okupant] = []
+                        for num in file_numbers:
+                            file_name = f"BUILDIN1_S32_{num}.png"
+                            full_path = os.path.join(base_folder, file_name)
+                            try:
+                                img = pygame.image.load(full_path).convert_alpha()
+                                img = pygame.transform.scale(img, TARGET_SIZE)
+                                self.castle_tiles_by_color[color]["take by"][okupant].append(img)
+                            except:
+                                dummy = pygame.Surface(TARGET_SIZE, pygame.SRCALPHA)
+                                dummy.fill((200, 0, 200, 150)) # Fioletowy na testy "take by"
+                                self.castle_tiles_by_color[color]["take by"][okupant].append(dummy)
+                else:
+                    # KROK 2: Standardowe ładowanie normalnych poziomów zamku
+                    stage_idx = key
+                    file_numbers = data
+                    for num in file_numbers:
+                        file_name = f"BUILDIN1_S32_{num}.png"
+                        full_path = os.path.join(base_folder, file_name)
+                        try:
+                            img = pygame.image.load(full_path).convert_alpha()
+                            img = pygame.transform.scale(img, TARGET_SIZE)
+                            self.castle_tiles_by_color[color][stage_idx].append(img)
+                        except:
+                            dummy = pygame.Surface(TARGET_SIZE, pygame.SRCALPHA)
+                            dummy.fill((200, 0, 0, 150))
+                            self.castle_tiles_by_color[color][stage_idx].append(dummy)
 
         # --- TUTAJ JEST ROZWIĄZANIE DLA RENDERERA ---
         # Tworzymy bezpieczne aliasy na wypadek, gdyby renderer pytał o kolor 
@@ -485,6 +525,17 @@ class BuildingsMixin:
             if self.pathfinder.can_build_trap(gx, gy):
                 self.trap_backgrounds[(gx, gy)] = self.map[gy][gx]
                 self.map[gy][gx] = "X"
+                # =======================================================
+                # KLUCZOWE: Pełna rejestracja pułapki do radaru!
+                # =======================================================
+                if not hasattr(self, 'traps'): self.traps = {}
+                self.traps[(gx, gy)] = {
+                    "owner": u.owner, 
+                    "active": True, 
+                    "detected_by": set() # Tu wpadają gracze, którzy ją zeskanują
+                }
+                
+                # Zabijamy budowniczego za postawienie
                 self.remove_unit_or_builder(u, u)
                 
                 self.trap_build_mode = False

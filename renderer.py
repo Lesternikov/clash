@@ -8,7 +8,7 @@ from utils import draw_text
 from custom_font import BitmapFont
 class Renderer:
     def __init__(self, world_instance, gfx, ):
-        self.custom_font = BitmapFont("assets/RED_S32") # Ścieżka do Twoich plików RED_S32_
+        self.custom_font = BitmapFont("assets/minimum/RED_S32/") # Ścieżka do Twoich plików RED_S32_
         # 1. Definiujesz swoją paletę z posta (Złota)
         GOLDEN_COLOR_MAP = {
             (255, 255, 255, 255): (0, 0, 0, 255),
@@ -85,9 +85,6 @@ class Renderer:
 
     def draw(self, screen):
         w = self.world
-        # Rysowanie okienka portu (na samym wierzchu)
-        if getattr(w, 'inspected_port', None):
-            self.draw_port_ui(screen)
 
         # Stoper powrotu
         if getattr(w, 'back_anim_timer', 0) > 0:
@@ -184,6 +181,10 @@ class Renderer:
 
         if getattr(w, "demolish_confirm", False):
             self.draw_demolish_confirm(screen)
+        
+        # Rysowanie okienka portu (na samym wierzchu)
+        if getattr(w, 'inspected_port', None):
+            self.draw_port_ui(screen)
 
     def draw_map(self, screen):
         w = self.world
@@ -872,8 +873,8 @@ class Renderer:
                             kolor_hp = (255, 100, 100)
                             
                         # Formatujemy np. "100 HP"
-                        hp_txt = self.font_main.render(f"{hp_val} HP", True, kolor_hp)
-                        hp_shadow = self.font_main.render(f"{hp_val} HP", True, (0, 0, 0)) 
+                        hp_txt = self.font_main.render(f"{hp_val}", True, kolor_hp)
+                        hp_shadow = self.font_main.render(f"{hp_val}", True, (0, 0, 0)) 
                         
                         wysokosc_liczby = 24 
                         
@@ -945,8 +946,8 @@ class Renderer:
   
     def draw_castle_on_map(self, screen, castle):
         """
-        Rysuje zamek na mapie świata z uwzględnieniem koloru gracza i stanu zniszczenia.
-        Używa bezpiecznego pobierania z w.castle_tiles_by_color.
+        Rysuje zamek na mapie świata z uwzględnieniem "Pierworodnego" twórcy 
+        oraz grafiki okupacji ("take by").
         """
         w = self.world
         
@@ -954,30 +955,47 @@ class Renderer:
         px = castle.x * TILE_SIZE - w.camera_x
         py = castle.y * TILE_SIZE - w.camera_y
         
-        # 2. Ustalamy stan (etap) zamku (0-3 sprawny, 4 zniszczony)
-        s_idx = 3  # Domyślny, pełny zamek
+        # 2. Ustalamy stan (etap) zamku. Domyślnie 3 (pełny). Zniszczony = 4.
+        poziom = getattr(castle, 'build_stage', 3)
         if getattr(castle, 'destroyed', False):
-            s_idx = 4
+            poziom = 4
             
-        # 3. Pobieramy kolor właściciela zamku (w małych literach)
-        raw_color = castle.owner.color_name if getattr(castle, 'owner', None) else "red"
-        color = str(raw_color).lower()
+        # 3. Wyciągamy Pierwotnego twórcy i Obecnego właściciela
+        orig_owner = getattr(castle, 'original_owner', castle.owner)
         
-        # 4. Bezpiecznie wyciągamy kafelki (w razie błędu fallback na czerwony zamek)
-        color_dict = w.castle_tiles_by_color.get(color, w.castle_tiles_by_color.get("red", {}))
-        tiles = color_dict.get(s_idx, [])
+        orig_owner_obj = w.players[orig_owner] if isinstance(orig_owner, int) else orig_owner
+        curr_owner_obj = w.players[castle.owner] if isinstance(castle.owner, int) else castle.owner
         
-        # 5. Rysujemy 4 kafelki tworzące zamek (wymiar 2x2)
+        orig_color = orig_owner_obj.color_name.lower() if orig_owner_obj else "red"
+        curr_color = curr_owner_obj.color_name.lower() if curr_owner_obj else "red"
+        
+        # 4. Pobieramy słownik z kafelkami dla oryginalnego koloru
+        color_dict = w.castle_tiles_by_color.get(orig_color, w.castle_tiles_by_color.get("red", {}))
+        
+        # 5. INTELIGENTNY WYBÓR GRAFIKI
+        if orig_color == curr_color or poziom == 4:
+            # Zamek u prawowitego właściciela (lub ruina, która nie ma barw)
+            tiles = color_dict.get(poziom, [])
+        else:
+            # ZAMEK ZDOBYTY: Używamy grafiki okupanta z "take by"
+            take_by_dict = color_dict.get("take by", {})
+            tiles = take_by_dict.get(curr_color, [])
+            
+            # System awaryjny: Jeśli np. zapomniałeś dodać [1,1,1,1] dla jakiegoś koloru, załaduje starą bazę
+            if not tiles:
+                tiles = color_dict.get(poziom, [])
+
+        # 6. Rysujemy 4 kafelki tworzące zamek (wymiar 2x2) na mapie
         if len(tiles) == 4:
             offsets = [(0, 0), (1, 0), (0, 1), (1, 1)]
             for i in range(4):
                 dx, dy = offsets[i]
                 screen.blit(tiles[i], (px + dx * TILE_SIZE, py + dy * TILE_SIZE))
         else:
-            # Całkowity failsafe: gdyby nawet czerwony się nie załadował, rysujemy kwadrat zastępczy
+            # Failsafe w postaci kwadratu na skrajne awarie
             owner_color = getattr(castle.owner, 'color', (200, 0, 0)) if getattr(castle, 'owner', None) else (200, 0, 0)
             pygame.draw.rect(screen, owner_color, (px, py, TILE_SIZE * 2, TILE_SIZE * 2))
-     
+
     def draw_ports_on_map(self, screen):
         w = self.world
         if not hasattr(w, 'ports'): return
@@ -1458,58 +1476,52 @@ class Renderer:
         port = getattr(w, 'inspected_port', None)
         if not port: return
         
-        # 1. Ładowanie obrazków (wykona się tylko raz)
+        # 1. PANCERNE ŁADOWANIE OBRAZKÓW (Z Systemem Awaryjnym)
         if not hasattr(self, 'port_ui_empty'):
             try:
-                self.port_ui_empty = pygame.image.load("assets/PORT_S32_0.png").convert_alpha()
-                self.port_ui_full = pygame.image.load("assets/PORT_S32_1.png").convert_alpha()
+                self.port_ui_empty = pygame.image.load("assets/minimum/PORT_S32/PORT_S32_0.png").convert_alpha()
+                self.port_ui_full = pygame.image.load("assets/minimum/PORT_S32/PORT_S32_1.png").convert_alpha()
             except Exception as e:
-                print(f"Błąd ładowania UI Portu: {e}")
-                return
+                print(f"Nie znaleziono pliku UI Portu. Uruchamiam okienko awaryjne: {e}")
+                surf = pygame.Surface((300, 350), pygame.SRCALPHA)
+                surf.fill((40, 30, 20, 230))
+                pygame.draw.rect(surf, (180, 140, 60), surf.get_rect(), 3)
+                self.port_ui_empty = surf
+                self.port_ui_full = surf
                 
-        # 2. Wybór grafiki (Statek obecny vs Pusty port)
-        img = self.port_ui_full if port["has_ship"] else self.port_ui_empty
-        
-        # Opcjonalne skalowanie, jeśli obrazek jest za mały
+        # Sprawdzamy ile wojska czeka
+        ilosc = port.get("pending_count", 0)
+        if ilosc == 0 and port.get("garrison"):
+            ilosc = len(port["garrison"])
+            
+        # 2. Rysowanie tła okienka
+        img = self.port_ui_full if ilosc > 0 else self.port_ui_empty
         skala = 1.5
         nw, nh = int(img.get_width() * skala), int(img.get_height() * skala)
         img_scaled = pygame.transform.smoothscale(img, (nw, nh))
+        x, y = (screen.get_width() - nw) // 2, (screen.get_height() - nh) // 2
         
-        x = (screen.get_width() - nw) // 2
-        y = (screen.get_height() - nh) // 2
-        
-        # Przyciemnienie tła i rysowanie panelu
         overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 160))
         screen.blit(overlay, (0, 0))
         screen.blit(img_scaled, (x, y))
         
-        # 3. Jeśli są jednostki, wypisujemy je!
-        if port["has_ship"] and port["garrison"]:
-            # Grupujemy jednostki żeby wypisać "x2 Lekka Piechota" zamiast wypisywać każdą osobno
-            zestawienie = {}
-            for u in port["garrison"]:
-                zestawienie[u.type] = zestawienie.get(u.type, 0) + 1
-                
-            font = pygame.font.SysFont("Arial", 22, bold=True)
-            start_x = x + 60
-            start_y = y + 100
+        font = pygame.font.SysFont("Arial", 24, bold=True)
+        
+        # 3. Wypisywanie OGÓLNEJ LICZBY LUB odliczania do statku
+        if ilosc > 0:
+            title_txt = font.render("Oczekujące posiłki:", True, (255, 255, 200))
+            screen.blit(title_txt, (x + max(30, nw//4 - 20), y + 60))
             
-            for i, (typ_jednostki, ilosc) in enumerate(zestawienie.items()):
-                kolor_gracza = port["garrison"][0].owner.color_name
-                ikona = self.gfx.get_unit_image(typ_jednostki, kolor_gracza)
+            info_txt = font.render(f"Liczba jednostek: {ilosc}", True, (255, 255, 255))
+            screen.blit(info_txt, (x + max(30, nw//4 - 20), y + 110))
+        else:
+            info_txt = font.render("Port jest pusty.", True, (200, 200, 200))
+            screen.blit(info_txt, (x + max(50, nw//4), y + 100))
+            if port.get("cooldown", 0) > 0:
+                time_txt = font.render(f"Kolejny statek za: {port['cooldown']} tur", True, (150, 150, 150))
+                screen.blit(time_txt, (x + max(20, nw//4 - 20), y + 140))
                 
-                if ikona:
-                    ikona_scaled = pygame.transform.scale(ikona, (32, 32))
-                    screen.blit(ikona_scaled, (start_x, start_y + i * 45))
-                    
-                txt = font.render(f"x{ilosc}  {typ_jednostki}", True, (240, 240, 200))
-                txt_cien = font.render(f"x{ilosc}  {typ_jednostki}", True, (0, 0, 0))
-                
-                screen.blit(txt_cien, (start_x + 45, start_y + i * 45 + 5))
-                screen.blit(txt, (start_x + 44, start_y + i * 45 + 4))
-                
-
 if __name__ == "__main__":
         import subprocess, sys, os
         main_path = os.path.join(os.path.dirname(__file__), "main.py")
