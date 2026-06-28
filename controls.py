@@ -95,13 +95,10 @@ class ControlsHandler:
                 
                 # =======================================================
                 # NOWOŚĆ: OBSŁUGA ROLKI MYSZY (Scrool)
-                # Przycisk 4 to rolka w górę, Przycisk 5 to rolka w dół
                 # =======================================================
                 if event.button == 4 or event.button == 5:
-                    # Przekazujemy zdarzenie do Koszar
                     if self.world.screen == "recruitment" and hasattr(self.world, 'recruitment_manager'):
                         self.world.recruitment_manager.handle_scroll_wheel(event)
-                    # Przekazujemy zdarzenie do ekranu Chłopów
                     elif self.world.screen == "peasants" and hasattr(self.world, 'peasant_menu'):
                         self.world.peasant_menu.handle_scroll_wheel(event, self.world)
                     
@@ -110,13 +107,16 @@ class ControlsHandler:
 
                 mx, my = event.pos
                 
-                if event.button == 3: # Prawy przycisk
+                # OBSŁUGA PRAWIEGO PRZYCISKU (WCIŚNIĘCIE)
+                if event.button == 3: 
                     self.world.inspected_unit = None
+                    self.world.inspected_port = None
 
                     if self.world.screen == "garrison":
                         self.check_unit_info(mx, my)
                     
                     elif self.world.screen == "map":
+                        # 1. Sprawdzanie jednostek w dolnym panelu
                         if my >= 610 and hasattr(self.world, 'army_slot_rects'):
                             u = self.world.selected_unit
                             if u:
@@ -126,13 +126,30 @@ class ControlsHandler:
                                     if rect.collidepoint(mx, my) and i < len(display_units):
                                         self.world.inspected_unit = display_units[i]
                                         break
+                        
+                        # 2. Sprawdzanie portu na mapie
+                        TILE_SIZE = 32  
+                        tile_x = (mx + self.world.camera_x) // TILE_SIZE
+                        tile_y = (my + self.world.camera_y) // TILE_SIZE
+                        
+                        if hasattr(self.world, 'ports'):
+                            for port in self.world.ports:
+                                if port["x"] <= tile_x <= port["x"] + 1 and port["y"] <= tile_y <= port["y"] + 1:
+                                    self.world.inspected_port = port
+                                    self.world.inspected_unit = None 
+                                    break # Znaleziono port, nie szukamy dalej
 
-                # Wywołanie logiki kliknięć (tutaj self.handle_mouse_click to metoda TEJ klasy)
-                self.handle_mouse_click(mx, my, event.button)
+                # Wywołanie logiki kliknięć (dla lewego przycisku)
+                # Jeśli trzymamy prawym na porcie, blokujemy zwykłe sprawdzanie jednostek pod nim
+                if not (event.button == 3 and getattr(self.world, 'inspected_port', None)):
+                    self.handle_mouse_click(mx, my, event.button)
 
+            # --- 4. PUSZCZENIE MYSZY ---
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 3:
+                    # Gdy puszczamy prawy przycisk, zerujemy wyświetlanie i jednostek, i portów
                     self.world.inspected_unit = None
+                    self.world.inspected_port = None
 
     def handle_mouse_click(self, mx, my, button):
         if button != 1 and button != 3: return
@@ -785,9 +802,16 @@ class ControlsHandler:
             
         # 2. Kliknięcie w interaktywne obiekty mapy (Pułapka X)
         if self.world.map[gy][gx] == "X":
-            self.world.screen = "trap_info"
-            self.world.active_trap_pos = (gx, gy)
-            return True  # <--- ZWRACA TRUE
+            trap = getattr(self.world, 'traps', {}).get((gx, gy))
+            if trap:
+                current_player = self.world.players[self.world.current_player]
+                # Pozwalamy kliknąć w X tylko jeśli jest to nasza pułapka ALBO jeśli ją wykryliśmy!
+                if trap["owner"] == current_player or current_player in trap.get("detected_by", set()):
+                    self.world.screen = "trap_info"
+                    self.world.active_trap_pos = (gx, gy)
+                    return True
+            # Jeśli pułapki nie widzimy, traktujemy to jak kliknięcie w zwykłą ziemię
+            return False
             
         return False # Zwykłe kliknięcie, pozwól grze działać dalej
             

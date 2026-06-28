@@ -223,6 +223,20 @@ class UnitInfoWindow:
             area = pygame.Rect(0, 0, self.sword_full.get_width(), draw_h)
             screen.blit(self.sword_full, (x, y), area)
 
+        # NOWOŚĆ: Rysowanie dokładnych punktów życia pod rękojeścią
+        hp_obecne = int(hp)
+        hp_max = int(max_hp)
+        font_hp = pygame.font.SysFont("Arial", 16, bold=True)
+        txt_hp = font_hp.render(f"{hp_obecne} / {hp_max}", True, (255, 255, 255))
+        txt_hp_cien = font_hp.render(f"{hp_obecne} / {hp_max}", True, (0, 0, 0))
+        
+        # Wyśrodkowanie tekstu względem miecza
+        txt_x = x + (self.sword_full.get_width() // 2) - (txt_hp.get_width() // 2)
+        txt_y = y + full_h + 2  # Trochę pod rękojeścią
+        
+        screen.blit(txt_hp_cien, (txt_x + 1, txt_y + 1)) # Cień
+        screen.blit(txt_hp, (txt_x, txt_y))              # Główny tekst
+
     def get_experience_icon(self, experience_level):
         """Zwraca teksturę posągu na podstawie poziomu doświadczenia."""
         if experience_level < 3:

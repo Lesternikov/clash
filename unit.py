@@ -127,9 +127,10 @@ class Unit:
             final_cost = base_cost * move_modifier
 
             if self.move_points >= final_cost:
-                # Pamiętaj, żeby tu też przekazać final_cost
                 if world.move_unit(self, dx, dy, cost=final_cost):
-                    self.planned_path.pop(0)
+                    # Zabezpieczenie: usuwamy krok tylko wtedy, gdy trasa nie została nagle skasowana (np. przez pułapkę)
+                    if self.planned_path:
+                        self.planned_path.pop(0)
                 else:
                     break
             else:
