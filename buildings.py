@@ -54,35 +54,40 @@ class BuildingsMixin:
                 1: [193, 194, 195, 196],
                 2: [197, 198, 199, 200],
                 3: [205, 206, 207, 208],
-                4: [185, 186, 187, 188]
+                4: [185, 186, 187, 188],
+                #"captured_by":{
+                #    "red": [185, 186, 187, 188],
+                #    "yellow":[185, 186, 187, 188],
+                #    "white":[185, 186, 187, 188],
+                #    "green":[185, 186, 187, 188],}
             },
             "red": {
                 0: [225, 226, 227, 228],
                 1: [229, 230, 231, 232],
                 2: [233, 234, 235, 236],
                 3: [237, 238, 239, 240],
-                4: [221, 222, 223, 224]
+                4: [221, 222, 223, 224],
             },
             "yellow": {
                 0: [261, 262, 263, 264],
                 1: [265, 266, 267, 268],
                 2: [269, 270, 271, 272],
                 3: [281, 282, 283, 284],
-                4: [257, 258, 259, 260]
+                4: [257, 258, 259, 260],
             },
             "white": {
                 0: [297, 298, 299, 300],
                 1: [301, 302, 303, 304],
                 2: [305, 306, 307, 308],
                 3: [321, 322, 323, 324],
-                4: [293, 294, 295, 296]
+                4: [293, 294, 295, 296],
             },
             "green": {
                 0: [369, 370, 371, 372],
                 1: [373, 374, 375, 376],
                 2: [377, 378, 379, 380],
                 3: [397, 398, 399, 400],
-                4: [365, 366, 367, 368]
+                4: [365, 366, 367, 368],
             }
             
             
@@ -134,6 +139,43 @@ class BuildingsMixin:
             self.tower_tiles[4] = pygame.transform.scale(img, TARGET_SIZE)
         except:
             print("Brak pliku zniszczonej strażnicy (BUILDIN1_S32_8.png)")
+
+    def capture_building(self, castle, new_owner):
+        """
+        Zmienia właściciela zamku, twierdzy lub strażnicy.
+        Aktualizuje listy posiadanych obiektów u obu graczy.
+        """
+        if not castle or castle.owner == new_owner:
+            return
+
+        old_owner = castle.owner
+
+        # 1. Usunięcie struktury z listy poprzedniego właściciela
+        if old_owner and castle in old_owner.castles:
+            old_owner.castles.remove(castle)
+            print(f"Gracz {old_owner.id} stracił kontrolę nad obiektem {castle.building_type}.")
+
+        # 2. Przypisanie nowego właściciela
+        castle.owner = new_owner
+        if castle not in new_owner.castles:
+            new_owner.castles.append(castle)
+            print(f"Gracz {new_owner.id} przejął obiekt {castle.building_type} na pozycji ({castle.x}, {castle.y})!")
+
+        # 3. Wyczyszczenie ewentualnych starych flag stanów
+        castle.under_construction = False  # Przejęty budynek traktujemy jako gotowy lub przerywamy wrogą budowę
+        
+        # Jeśli budynek był zniszczony/ruiną, przywracamy mu podstawowy stan funkcjonalny
+        if getattr(castle, 'destroyed', False):
+            castle.destroyed = False
+
+        # 4. Aktualizacja symbolu na mapie (jeśli to konieczne dla renderera)
+        # Przykładowo: 'C' dla zamku gracza, 'P' dla placu budowy itp.
+        size = 2 if castle.building_type in ["Twierdza", "Zamek"] else 1
+        sym = "C" if castle.building_type in ["Twierdza", "Zamek"] else "H"
+        
+        for dy in range(size):
+            for dx in range(size):
+                self.map[castle.y + dy][castle.x + dx] = sym
 
     def demolish_castle(self, castle):
         if not castle:
@@ -279,43 +321,45 @@ class BuildingsMixin:
         return False
 
     def destroy_straznica(self, castle):
-        """Niszczy strażnicę, wyrzuca załogę (bez klonowania) i zostawia ruiny 'r'."""
-        from unit import Unit 
+
+        """Niszczy strażnicę, tworzy jedną armię z jej załogi i zostawia ruiny."""
+        from unit import Unit  # Import lokalny, żeby uniknąć problemów
         
+        # 1. Sprawdzamy czy w środku ktoś jest
         units_in_garrison = [u for u in castle.garrison if u is not None]
         
         if units_in_garrison:
             print("Ewakuacja: Formowanie armii z garnizonu...")
+            
+            # Szukamy miejsca wokół strażnicy dla JEDNEJ armii
             spawn_pos = self.find_free_space_around(castle.x, castle.y)
             if spawn_pos:
                 nx, ny = spawn_pos
                 
-                # ROZWIĄZANIE KLONOWANIA: Nie tworzymy nowej jednostki! 
-                # Bierzemy pierwszego, istniejącego żołnierza z garnizonu na "Lidera".
-                lider = units_in_garrison[0]
-                lider.x, lider.y = nx, ny
-                lider.garrison = [None] * 10
+                # Tworzymy nową jednostkę-matkę (lidera armii)
+                # Jako typ bierzemy typ pierwszej jednostki z garnizonu
+                leader_type = units_in_garrison[0].type
+                new_army = Unit(leader_type, nx, ny, castle.owner)
+                new_army.garrison = [None] * 10
                 
-                # Resztę załogi pakujemy do jego plecaka (garnizonu)
-                for i, u in enumerate(units_in_garrison[1:]):
+                # Przepisujemy jednostki ze slotów strażnicy do slotów nowej armii
+                for i, u in enumerate(units_in_garrison):
                     if i < 10:
-                        lider.garrison[i] = u
-                        u.x, u.y = -1, -1 # Pasażerowie znikają z mapy
+                        new_army.garrison[i] = u
                 
-                # Dodajemy zjednoczoną armię do gry
-                self.units.append(lider)
-                if hasattr(lider, 'owner') and lider.owner:
-                    lider.owner.units.append(lider)
+                # Dodajemy nową armię do gry
+                self.units.append(new_army)
+                castle.owner.units.append(new_army)
                 print(f"Armia ewakuowana na pole {nx, ny}")
             else:
                 print("Brak miejsca wokół! Garnizon zginął w gruzach.")
 
-        # Usuwamy budynek i zostawiamy ruiny
+        # 2. Usuwamy budynek i zostawiamy ruiny
         if castle in self.castles:
             self.castles.remove(castle)
         
-        # ZMIANA: Zmieniamy kafel na małe 'r' (Ruiny), aby duże 'R' zostało dla PORTU!
-        self.map[castle.y][castle.x] = "r"
+        # Zmieniamy kafel na 'R' (Ruiny)
+        self.map[castle.y][castle.x] = "R"
         
         self.selected_castle = None
         self.screen = "map"

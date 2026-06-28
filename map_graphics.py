@@ -269,10 +269,10 @@ class MapGraphics:
                 p = os.path.join(path, f"BACKGR3_S32_{img_id}.png")
                 self.road_gfx[terrain][mask] = self.load_single_img(p)
 
-        self.road_gfx["trans"]["poziom_trawa_gora_pustynia_dol"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_949.png"))
+        self.road_gfx["trans"]["poziom_trawa_gora_pustynia_dol"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_824.png"))
         self.road_gfx["trans"]["poziom_pustynia_gora_trawa_dol"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_950.png"))
-        self.road_gfx["trans"]["pion_trawa_lewo_pustynia_prawo"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_951.png"))
-        self.road_gfx["trans"]["pion_pustynia_lewo_trawa_prawo"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_952.png"))
+        self.road_gfx["trans"]["pion_trawa_lewo_pustynia_prawo"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_954.png"))
+        self.road_gfx["trans"]["pion_pustynia_lewo_trawa_prawo"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_954.png"))
 
         self.road_gfx["trans"]["pion_trawa_gora_pustynia_dol"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_953.png"))
         self.road_gfx["trans"]["pion_pustynia_gora_trawa_dol"] = self.load_single_img(os.path.join(path, "BACKGR3_S32_954.png"))
@@ -283,7 +283,7 @@ class MapGraphics:
         path_base = os.path.join("assets", "BACKGR3_S32")
         frames = []
         for i in range(595, 603):
-            p = os.path.join(path_base, f"BACKGR3_S32_{i}.png")
+            p = os.path.join(path_base, f"BACKGR3_S32_3.png")
             if os.path.exists(p):
                 frames.append(self.load_single_img(p))
         if not frames:

@@ -273,8 +273,8 @@ class World(BuildingsMixin):
         self.port_tiles = {}
         # Wpisz tu poprawne numery z końcówek plików BACKGR3_S32_***.png
         port_gfx = {
-            "pos1_base": ["718", "719", "718", "719"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
-            "pos1_ship": ["718", "719"],               # Statki dla Pozycji 1 (Lewy Dół, Prawy Dół)
+            "pos1_base": ["716", "717", "718", "719"], # Baza Pozycji 1 (L-Góra, P-Góra, L-Dół, P-Dół)
+            "pos1_ship": ["720", "721"],               # Statki dla Pozycji 1 (Lewy Dół, Prawy Dół)
             "pos2_base": ["722", "723", "724", "725"], # Baza Pozycji 2 
             "pos2_ship": ["726", "727"]                # <--- Wpisz tu poprawne numery statków dla portu nr 2!
         }
@@ -315,6 +315,16 @@ class World(BuildingsMixin):
             self.court.selected_prison_action = self.court_states[self.players[0].id]["action"]
         self.units_to_split = [] # Tu trafiają jednostki zaznaczone kliknięciem w panelu
     
+        #dodajemy słownik przejęcia zamku przez innych graczy
+        self.castle_color_frames = {
+            "blue": {"captured_by": {}},
+            "red": {"captured_by": {}},
+            "yellow": {"captured_by": {}},
+            "white": {"captured_by": {}},
+            "green": {"captured_by": {}}
+}
+# Dzięki temu każdy kolor ma już gotową "szufladkę" na captured_by
+
     def spawn_port_reinforcements(self, port):
         """Generuje statek i losowe jednostki w porcie."""
         import random
@@ -611,8 +621,6 @@ class World(BuildingsMixin):
                             self.combat_cost = cost
                             self.screen = "combat_setup"
                             self.center_camera_on(nx, ny)
-                            
-                            # Flaga oznaczająca, że tocząca się bitwa dotyczy tego placu budowy!
                             self.combat_target_castle = castle
                             return False
                         else:
@@ -621,28 +629,37 @@ class World(BuildingsMixin):
                             castle.destroyed = True
                             if castle in self.castles:
                                 self.castles.remove(castle)
-                            
-                            # Zmazujemy literę "P" z mapy
                             for dy in range(size):
                                 for dx in range(size):
                                     self.map[castle.y + dy][castle.x + dx] = "."
-
                             unit.x, unit.y = nx, ny
                             unit.move_points -= cost
                             return True
                     else:
-                        # Normalne zdobycie gotowego zamku
-                        print(f"Zamek na ({castle.x}, {castle.y}) został ZDOBYTY przez {unit.owner.color_name}!")
-                        castle.owner = unit.owner
-                        castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
-                        castle.production_enabled = False
-                        castle.production_unit_type = None
-                        
-                        unit.move_points -= cost
-                        if self.enter_castle(unit, castle):
-                            return True
+                        # --- GOTOWY ZAMEK: PRZEJĘCIE ---
+                        defenders = sum(1 for u in castle.garrison if u is not None)
+
+                        if defenders == 0:
+                            # 1. Zmiana właściciela
+                            castle.owner = unit.owner
+                            
+                            # 2. AKTUALIZACJA GRAFIKI (Wywołanie nowej metody)
+                            self.update_castle_visuals(castle, unit.owner)
+                            
+                            # 3. Reszta logiki przejęcia
+                            castle.garrison = [None] * getattr(castle, 'garrison_limit', 12) 
+                            castle.production_enabled = False
+                            castle.production_unit_type = None
+                            
+                            unit.move_points -= cost
+                            if self.enter_castle(unit, castle):
+                                return True
+                            else:
+                                unit.move_points += cost
+                                return False
                         else:
-                            unit.move_points += cost
+                            # Zamek jest broniony!
+                            print(f"Zamek jest broniony przez {defenders} jednostek! Nie można przejąć bez walki.")
                             return False
                         
         # 4. TEREN
@@ -864,6 +881,29 @@ class World(BuildingsMixin):
 
             self.selected_castle = None
             print("Pudło! Kliknięto w:", x, y)
+
+    def update_castle_visuals(self, castle, new_owner):
+        """
+        Aktualizuje grafikę zamku.
+        Sprawdza, czy istnieje specjalna grafika dla przejęcia (captured_by),
+        w przeciwnym razie używa grafiki dla aktualnego etapu budowy.
+        """
+        current_color = castle.owner.color.lower()
+        new_color = new_owner.color.lower()
+        
+        # Pobieramy bazowy słownik dla koloru zamku
+        color_data = self.castle_color_frames.get(current_color, {})
+        
+        # Sprawdzamy czy istnieje sekcja 'captured_by' i czy jest tam wpis dla nowego właściciela
+        if "captured_by" in color_data and new_color in color_data["captured_by"]:
+            # Zastosuj grafikę dla przejęcia
+            castle.current_tiles = color_data["captured_by"][new_color]
+        else:
+            # W przeciwnym razie użyj standardowego etapu budowy
+            stage = getattr(castle, 'construction_stage', 0)
+            castle.current_tiles = color_data.get(stage, [0, 0, 0, 0])
+            
+        print(f"DEBUG: Zamek na ({castle.x}, {castle.y}) zmieniony na {new_color}")
 
     def create_unit(self, unit_type, x, y, owner):
         u = Unit(unit_type, x, y, owner)
