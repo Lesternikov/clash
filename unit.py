@@ -1,35 +1,46 @@
 import pygame
 import os
 from settings import UNIT_STATS, UNIT_NAMES, COLOR_TO_ID
-        
+
+# =======================================================
+# SŁOWNIK KIERUNKÓW: Przesunięcie o (X, Y) -> Numer Klatki startowej
+# =======================================================
+DIRECTION_MAP = {
+    (0, -1): 0,   # Północ (N)
+    (1, -1): 8,   # Północny Wschód (NE)
+    (1, 0): 16,   # Wschód (E)
+    (1, 1): 24,   # Południowy Wschód (SE)
+    (0, 1): 32,   # Południe (S)
+    (-1, 1): 40,  # Południowy Zachód (SW)
+    (-1, 0): 48,  # Zachód (W)
+    (-1, -1): 56  # Północny Zachód (NW)
+}
+
 class Unit:
+    # --- Pamięć podręczna (Cache) dla grafik, by nie zapchać RAM-u! ---
+    _sprite_cache = {}
+
     def __init__(self, type_code, x, y, owner, level=1):
-        # type_code musi być kodem (np. "INFL", "BUDOW")
         self.type_code = type_code
         
-        # WYMUSZAMY LICZBY - to usunie TypeError w draw_map
         try:
             self.x = int(x)
             self.y = int(y)
         except (ValueError, TypeError):
             print(f"!!! KRYTYCZNY BŁĄD ARGUMENTÓW !!!")
-            print(f"Dostałem: code={type_code}, x={x}, y={y}")
             self.x = 0
             self.y = 0
 
         self.owner = owner
         self.level = level
 
-        # Jeśli type_code to już jest pełna nazwa (przychodzi z produkcji w zamku)
         if type_code in UNIT_STATS:
             self.type = type_code
         else:
-            # Jeśli type_code to 3-literowy kod (przychodzi z ładowania mapy)
             self.type = UNIT_NAMES.get(type_code, "Nieznany")
             
         self.name = self.type
 
-        # Statystyki
         stats = UNIT_STATS.get(self.type, {})
         self.hp = stats.get("hp", 10)
         self.max_hp = self.hp
@@ -38,9 +49,9 @@ class Unit:
         self.experience = stats.get("exp", 0)
         self.morale = stats.get("morale", 100)
         self.fatigue = stats.get("fatigue", 0)
-        self.attack = 1 if UNIT_STATS == "Budowniczy" else 5 # Przykład
+        self.attack = 1 if UNIT_STATS == "Budowniczy" else 5
         self.defense = 1
-        # Inne atrybuty
+        
         self.carried_peasants = 0
         self.carried_gold = 0
         self.production_unit_type = None
@@ -54,69 +65,68 @@ class Unit:
         self.planned_path = []
         self.short_name = self.type[:2].upper()
 
-        # 5. ŁADOWANIE GRAFIKI
-        # Wywołujemy funkcję load_unit_sprites, która korzysta z type_code
+        # Domyślny kierunek patrzenia (Południe - klatka 32)
+        self.facing = 32
+
+        # Wywołujemy funkcję wczytującą całe 64 klatki!
         self.sprites = self.load_unit_sprites()
-        self.current_frame = 0
-        self.animation_speed = 0.1
-
-    def get_effective_move_points(self):
-        """Oblicza ruch armii na podstawie najsłabszej jednostki."""
-        min_mp = self.move_points
-        # Zakładamy, że lista 'garrison' zawiera obiekty jednostek (pasażerów)
-        for u in self.garrison:
-            if u is not None:
-                min_mp = min(min_mp, u.move_points)
-        return min_mp
-
-    def has_fatigue_paralysis(self):
-        """Sprawdza, czy ktokolwiek w armii ma 100 zmęczenia."""
-        if getattr(self, 'fatigue', 0) >= 100: return True
-        return any(u and getattr(u, 'fatigue', 0) >= 100 for u in self.garrison)
 
     def load_unit_sprites(self):
-        sprites = []
-        # Pobieramy ID koloru gracza
+        # 1. Sprawdzamy, czy grafiki tego koloru nie są już w pamięci RAM
         p_color_name = getattr(self.owner, 'color_name', 'red')
         c_id = COLOR_TO_ID.get(p_color_name, 1)
 
         from settings import NAME_TO_CODE
         u_code = NAME_TO_CODE.get(self.type, self.type_code)
 
-        # Folder to np. assets/minimum/INFL1_I_S32
-        base_name = f"{u_code}{c_id}_I_S32"
-        folder_path = f"assets/minimum/{base_name}"
+        cache_key = (u_code, c_id)
+        if cache_key in Unit._sprite_cache:
+            return Unit._sprite_cache[cache_key]
 
-        # Spróbujmy wczytać 8 klatek
-        for i in range(8):
+        sprites = []
+        base_name = f"{u_code}{c_id}_S32"
+        folder_path = f"assets/normal/{base_name}"
+
+        # 2. Ładujemy ZAWSZE 64 klatki (0 do 63)
+        for i in range(64):
             file_path = os.path.join(folder_path, f"{base_name}_{i}.png")
             if os.path.exists(file_path):
                 try:
                     img = pygame.image.load(file_path).convert_alpha()
                     w, h = img.get_size()
-                    # Skalowanie o 15%
-                    img = pygame.transform.smoothscale(img, (int(w * 1.15), int(h * 1.15)))
+                    # Lekkie powiększenie
+                    img = pygame.transform.smoothscale(img, (int(w * 0.8), int(h * 0.8)))
                     sprites.append(img)
                 except Exception as e:
-                    print(f"Błąd ładowania klatki {i}: {e}")
+                    sprites.append(self._create_fallback_surface())
             else:
-                # Jeśli brakuje choćby jednej klatki, robimy różowy kwadrat (fallback)
-                surf = pygame.Surface((36, 36), pygame.SRCALPHA)
-                pygame.draw.rect(surf, (200, 0, 200), (0,0,36,36), 1)
-                sprites.append(surf)
+                sprites.append(self._create_fallback_surface())
         
+        # 3. Zapisujemy wynik do pamięci na przyszłość
+        Unit._sprite_cache[cache_key] = sprites
         return sprites
-        
+
+    def _create_fallback_surface(self):
+        """Kwadrat błędu, jeśli brakuje jakiejś klatki, żeby gra nie crashowała."""
+        surf = pygame.Surface((36, 36), pygame.SRCALPHA)
+        pygame.draw.rect(surf, (200, 0, 200), (0,0,36,36), 1)
+        return surf
+
     def move_along_path(self, world):
-        from world import TERRAIN_TYPES # Import lokalny
+        from world import TERRAIN_TYPES 
+        import pygame 
+        
+        # Pobieramy ekran, by móc go odświeżać NA ŻYWO!
+        screen = pygame.display.get_surface()
+        
+        # ---> NOWOŚĆ: Włączamy flagę faktycznego ruchu! <---
+        self.is_moving = True  
+        
         while getattr(self, 'planned_path', []):
             next_step = self.planned_path[0]
             nx, ny = next_step
             
             tile_char = world.map[ny][nx]
-            
-            # POPRAWKA: Odwołujemy się do world.TERRAIN_TYPES
-            # Zakładając, że w world.py wkleiłeś ten słownik do klasy World
             terrain_info = TERRAIN_TYPES.get(tile_char, {})
             base_cost = terrain_info.get("cost", 4)
             
@@ -127,15 +137,28 @@ class Unit:
             final_cost = base_cost * move_modifier
 
             if self.move_points >= final_cost:
+                
+                # Odwracamy jednostkę w stronę, w którą idzie
+                if (dx, dy) in DIRECTION_MAP:
+                    self.facing = DIRECTION_MAP[(dx, dy)]
+                    
                 if world.move_unit(self, dx, dy, cost=final_cost):
-                    # Zabezpieczenie: usuwamy krok tylko wtedy, gdy trasa nie została nagle skasowana (np. przez pułapkę)
                     if self.planned_path:
                         self.planned_path.pop(0)
+                        
+                    # Płynna animacja chodzenia krok po kroku
+                    if screen and hasattr(world, 'renderer'):
+                        world.renderer.draw(screen) 
+                        pygame.display.flip()       
+                        pygame.time.delay(120)      
                 else:
                     break
             else:
                 print(f"Za mało MP ({self.move_points} < {final_cost}). Koniec ruchu.")
                 break
+                
+        # ---> NOWOŚĆ: Wyłączamy flagę po dotarciu na miejsce! <---
+        self.is_moving = False
     # -----------------------
     # BASIC
     # -----------------------

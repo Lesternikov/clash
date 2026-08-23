@@ -752,3 +752,4 @@ class MapGraphics:
         import subprocess, sys, os
         main_path = os.path.join(os.path.dirname(__file__), "main.py")
         subprocess.run([sys.executable, main_path])
+        

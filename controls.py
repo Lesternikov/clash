@@ -8,7 +8,7 @@ class ControlsHandler:
         # Definicje przycisków, żeby nie było błędu przy klikaniu
         self.action_buttons = [pygame.Rect(870, 450 + i * 40, 140, 35) for i in range(6)]
         self.army_slot_rects = [pygame.Rect(10 + i * 75, 620, 70, 140) for i in range(10)]
-        
+    
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.QUIT:
@@ -17,14 +17,13 @@ class ControlsHandler:
             
             # --- 1. KLAWIATURA ---
             elif event.type == pygame.KEYDOWN:
-                # --- NOWY WARUNEK: Zamknięcie ekranu INFO dowolnym klawiszem ---
+                # Zamknięcie ekranu INFO dowolnym klawiszem
                 if self.world.screen == "unit_info":
-                    # Wracamy do zapisanego ekranu lub awaryjnie do rekrutacji
                     self.world.screen = getattr(self.world, 'previous_screen', 'recruitment')
-                    self.world.inspected_unit = None  # <--- DODAJ TĘ LINIJĘ
-                    continue # Pomija resztę pętli, aby jedno kliknięcie nie robiło dwóch rzeczy
+                    self.world.inspected_unit = None
+                    continue 
 
-                # --- DEBUG: MAGIGCZNY KLAWISZ F1 ---
+                # Debug
                 if event.key == pygame.K_F1:
                     print("DEBUG: Teleportacja do koszar!")
                     for c in self.world.castles:
@@ -46,7 +45,6 @@ class ControlsHandler:
                             self.world.selected_castle = c
                             self.world.screen = "school" 
                             break
-
                 if event.key == pygame.K_F3:
                     print("DEBUG: Teleportacja do dworu!")
                     for c in self.world.castles:
@@ -54,7 +52,7 @@ class ControlsHandler:
                             self.world.selected_castle = c
                             self.world.screen = "court"
                             break
-                # Zamiast self.screen używamy self.world.screen
+                            
                 if event.key == pygame.K_ESCAPE:
                     self.world.road_build_mode = False
                     self.world.trap_build_mode = False
@@ -78,32 +76,24 @@ class ControlsHandler:
                         self.world.show_grid = not self.world.show_grid
                         print(f"Siatka: {self.world.show_grid}")
                 elif event.key == pygame.K_b:
-                    # Dodaj tę flagę w __init__: self.show_only_biome = False
                     self.show_only_biome = not getattr(self, 'show_only_biome', False)
-                    print(f"Widok samej mapy biomów: {self.show_only_biome}")
-                elif event.key == pygame.K_h:  # Klawisz 'M' przełącza podgląd maski
-                    self.debug_show_masks = not self.debug_show_masks
-                    print(f"DEBUG: Podgląd masek: {self.debug_show_masks}")
+                elif event.key == pygame.K_h: 
+                    self.debug_show_masks = not getattr(self, 'debug_show_masks', False)
             
             # --- 3. WCIŚNIĘCIE MYSZY ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                # --- Zamykanie ekranu INFO dowolnym przyciskiem myszy ---
                 if self.world.screen == "unit_info":
                     self.world.screen = getattr(self.world, 'previous_screen', 'recruitment')
                     self.world.inspected_unit = None  
                     continue 
                 
-                # =======================================================
-                # NOWOŚĆ: OBSŁUGA ROLKI MYSZY (Scrool)
-                # =======================================================
+                # OBSŁUGA ROLKI MYSZY
                 if event.button == 4 or event.button == 5:
                     if self.world.screen == "recruitment" and hasattr(self.world, 'recruitment_manager'):
                         self.world.recruitment_manager.handle_scroll_wheel(event)
                     elif self.world.screen == "peasants" and hasattr(self.world, 'peasant_menu'):
                         self.world.peasant_menu.handle_scroll_wheel(event, self.world)
-                    
-                    continue # Ważne: przerywamy dalszą logikę, rolka obsłużona!
-                # =======================================================
+                    continue 
 
                 mx, my = event.pos
                 
@@ -116,7 +106,7 @@ class ControlsHandler:
                         self.check_unit_info(mx, my)
                     
                     elif self.world.screen == "map":
-                        # 1. Sprawdzanie jednostek w dolnym panelu
+                        # 1. Sprawdzanie jednostek w dolnym panelu (PRAWY KLIK)
                         if my >= 610 and hasattr(self.world, 'army_slot_rects'):
                             u = self.world.selected_unit
                             if u:
@@ -124,7 +114,20 @@ class ControlsHandler:
                                 display_units = [unit for unit in garrison if unit is not None]
                                 for i, rect in enumerate(self.world.army_slot_rects):
                                     if rect.collidepoint(mx, my) and i < len(display_units):
-                                        self.world.inspected_unit = display_units[i]
+                                        clicked_u = display_units[i]
+                                        self.world.inspected_unit = clicked_u
+                                        
+                                        curr_p = self.world.players[self.world.current_player]
+                                        
+                                        if getattr(clicked_u, 'type_code', '') in ["GOLD", "PEAS", "SPECK", "SPECM"] or \
+                                             getattr(clicked_u, 'type', '') in ["Generał", "Złoto", "Chłopi", "Chłop"]:
+                                            self.world.info_mode = "SIMPLE"
+                                        elif getattr(clicked_u, 'owner', None) != curr_p:
+                                            self.world.info_mode = "ENEMY"
+                                        else:
+                                            self.world.info_mode = "COMBAT"
+                                            
+                                        # USUNĄŁEM ZMIANĘ EKRANU TUTAJ RÓWNIEŻ!
                                         break
                         
                         # 2. Sprawdzanie portu na mapie
@@ -132,25 +135,24 @@ class ControlsHandler:
                         tile_x = (mx + self.world.camera_x) // TILE_SIZE
                         tile_y = (my + self.world.camera_y) // TILE_SIZE
                         
-                        if hasattr(self.world, 'ports'):
+                        if hasattr(self.world, 'ports') and not self.world.inspected_unit:
                             for port in self.world.ports:
                                 if port["x"] <= tile_x <= port["x"] + 1 and port["y"] <= tile_y <= port["y"] + 1:
                                     self.world.inspected_port = port
                                     self.world.inspected_unit = None 
-                                    break # Znaleziono port, nie szukamy dalej
+                                    break 
 
-                # Wywołanie logiki kliknięć (dla lewego przycisku)
-                # Jeśli trzymamy prawym na porcie, blokujemy zwykłe sprawdzanie jednostek pod nim
                 if not (event.button == 3 and getattr(self.world, 'inspected_port', None)):
                     self.handle_mouse_click(mx, my, event.button)
 
             # --- 4. PUSZCZENIE MYSZY ---
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 3:
-                    # Gdy puszczamy prawy przycisk, zerujemy wyświetlanie i jednostek, i portów
-                    self.world.inspected_unit = None
-                    self.world.inspected_port = None
-
+                    # Jeśli puszczamy myszkę, zdejmujemy wyświetlanie panelu na mapie
+                    if self.world.screen != "unit_info":
+                        self.world.inspected_unit = None
+                        self.world.inspected_port = None
+                        
     def handle_mouse_click(self, mx, my, button):
         if button != 1 and button != 3: return
         w = self.world 
@@ -184,8 +186,8 @@ class ControlsHandler:
             return # Ważne: Zatrzymujemy sprawdzanie reszty mapy!
         
         if w.screen == "combat_tactical":
-            if button == 1 and hasattr(w, 'tactical_combat'):
-                w.tactical_combat.handle_click(mx, my)
+            if hasattr(w, 'tactical_combat'):
+                w.tactical_combat.handle_click(mx, my, button)
             return
 
         # 1. PRIORYTET: Ekrany specjalne
@@ -343,10 +345,11 @@ class ControlsHandler:
                         if unit:
                             self.world.inspected_unit = unit
                             break
+    
     def handle_map_click(self, mx, my, button):
         # Wyjście z ekranu INFO po kliknięciu
         if self.world.screen == "unit_info":
-            # Wracamy do zapisanego poprzedniego ekranu (np. 'recruitment')
+            # Wracamy do zapisanego poprzedniego ekranu
             self.world.screen = getattr(self.world, 'previous_screen', 'castle')
             return
         
@@ -354,25 +357,37 @@ class ControlsHandler:
         tile_x = (mx + self.world.camera_x) // TILE_SIZE
         tile_y = (my + self.world.camera_y) // TILE_SIZE
 
-       # --- PRAWY PRZYCISK: TYLKO INFORMACJA (O pojedynczych jednostkach) ---
+       # --- PRAWY PRZYCISK: TYLKO INFORMACJA (O pojedynczych jednostkach na mapie) ---
         if button == 3:
             target_unit = self.world.get_unit_at(tile_x, tile_y) 
             if target_unit:
-                # Sprawdzamy czy to armia (czy ma kogoś w garnizonie)
+                # Sprawdzamy czy to armia
                 garrison = getattr(target_unit, 'garrison', [])
                 has_passengers = any(p is not None for p in garrison)
                 
-                # Jeśli to armia, NIC NIE RÓB (nie zaznaczaj, nie otwieraj info)
+                # Jeśli to armia, statystyki oglądamy na dolnym panelu
                 if has_passengers:
                     print("To jest armia! Statystyki sprawdzaj w dolnym panelu.")
                 else:
-                    # Jeśli to pojedyncza jednostka, pokazujemy statystyki
                     self.world.inspected_unit = target_unit
-            return # Zwracamy, żeby nie zaznaczyć jednostki lewym przyciskiem
+                    
+                    curr_p = self.world.players[self.world.current_player]
+                    
+                    if getattr(target_unit, 'type_code', '') in ["GOLD", "PEAS", "SPECK", "SPECM"] or \
+                         getattr(target_unit, 'type', '') in ["Generał", "Złoto", "Chłopi", "Chłop"]:
+                        self.world.info_mode = "SIMPLE"
+                    elif getattr(target_unit, 'owner', None) != curr_p:
+                        self.world.info_mode = "ENEMY"
+                    else:
+                        self.world.info_mode = "COMBAT"
+                        
+                    # USUNĄŁEM ZMIANĘ EKRANU! Gra zostaje na self.world.screen = "map",
+                    # dzięki czemu renderer narysuje mały panel nad mapą!
+            return 
 
        # --- LEWY PRZYCISK ---
         if button == 1:
-            # 0. TRYB PODZIAŁU ARMII (Najwyższy priorytet na mapie)
+            # 0. TRYB PODZIAŁU ARMII 
             if hasattr(self.world, 'units_to_split') and len(self.world.units_to_split) > 0:
                 self.world.execute_army_split(tile_x, tile_y)
                 return
@@ -381,7 +396,7 @@ class ControlsHandler:
             
             if target_unit and target_unit.owner == self.world.players[self.world.current_player]:
                 
-                # A. SCENARIUSZ: Przycisk POŁĄCZ JEST WŁĄCZONY i klikamy w inną naszą jednostkę
+                # A. SCENARIUSZ: Przycisk POŁĄCZ JEST WŁĄCZONY
                 if self.world.selected_unit and target_unit != self.world.selected_unit and getattr(self.world, 'merge_mode', False):
                     u = self.world.selected_unit
                     
@@ -397,13 +412,10 @@ class ControlsHandler:
                     # Szukamy standardowej trasy
                     u.planned_path = self.world.pathfinder.find_path(u, tile_x, tile_y)
                     
-                    # Jeśli nie ma trasy (bo algorytm uważa, że na pole sojusznika nie da się wejść):
                     if not u.planned_path:
-                        # A) Jeśli jesteśmy bezpośrednio obok niego - trasa to po prostu wejście w niego
                         if abs(u.x - tile_x) <= 1 and abs(u.y - tile_y) <= 1:
                             u.planned_path = [(tile_x, tile_y)]
                             print("Jesteś obok. Kliknij jeszcze raz, aby połączyć.")
-                        # B) Jeśli jest daleko, szukamy trasy na pole OBOK sojusznika
                         else:
                             sasiedzi = [
                                 (tile_x-1, tile_y), (tile_x+1, tile_y), (tile_x, tile_y-1), (tile_x, tile_y+1),
@@ -419,7 +431,6 @@ class ControlsHandler:
                                             najlepsza_trasa = t
                                             
                             if najlepsza_trasa is not None:
-                                # Doklejamy "ręcznie" ostatni krok - wskoczenie w pole sojusznika
                                 u.planned_path = najlepsza_trasa + [(tile_x, tile_y)]
                                 print("Trasa wyznaczona obok. Kliknij jeszcze raz, aby połączyć.")
                             else:
@@ -429,12 +440,12 @@ class ControlsHandler:
                         print("Trasa wyznaczona bezpośrednio. Kliknij jeszcze raz, aby połączyć.")
                     return
 
-                # B. SCENARIUSZ: Przycisk POŁĄCZ JEST WYŁĄCZONY (albo klikamy tę samą jednostkę) -> ZAZNACZAMY JĄ
+                # B. SCENARIUSZ: Przycisk POŁĄCZ JEST WYŁĄCZONY -> ZAZNACZAMY JĄ
                 self.world.selected_unit = target_unit
-                self.world.units_to_split = [] # <--- NOWOŚĆ: Resetowanie krzyżyków!
+                self.world.units_to_split = [] 
                 target_unit.target_x = target_unit.target_y = None
                 target_unit.planned_path = []
-                self.world.merge_mode = False # Na wszelki wypadek resetujemy tryb
+                self.world.merge_mode = False 
                 print(f"Wybrano jednostkę: {target_unit.type}")
                 return
 
@@ -457,45 +468,33 @@ class ControlsHandler:
                     u.target_x = u.target_y = None
                     print("Nie można tam dojść!")
                 return
-            # 3. WEJŚCIE DO MENU ZAMKU/STRAŻNICY (Z blokadą właściciela i rozmiarem)
+            
+            # 3. WEJŚCIE DO MENU ZAMKU/STRAŻNICY
             for castle in self.world.castles:
-                # Ubezpieczamy się przed spacjami w nazwie
                 b_type = str(getattr(castle, 'building_type', 'Zamek')).strip()
                 size = 2 if b_type in ["Zamek", "Twierdza"] else 1
                 
                 if castle.x <= tile_x < castle.x + size and castle.y <= tile_y < castle.y + size:
                     if not getattr(castle, 'destroyed', False):
-                        
-                        print(f"\n--- KLIKNIĘTO BUDYNEK ---")
-                        print(f"Typ: '{b_type}', W budowie?: {getattr(castle, 'under_construction', False)}")
-                        
-                        # ========================================================
-                        # --- NOWA BLOKADA: Z użyciem flagi under_construction ---
-                        # ========================================================
                         if getattr(castle, 'under_construction', False):
-                            print(f"Blokada! {b_type} jest w trakcie budowy. Musisz poczekać na ukończenie!")
-                            return # Przerywamy całkowicie kliknięcie!
-                        # ========================================================
-
-                        # SPRAWDZENIE WŁAŚCICIELA 
+                            print(f"Blokada! {b_type} jest w trakcie budowy.")
+                            return
+                            
                         current_player_obj = self.world.players[self.world.current_player]
                         
                         if castle.owner == current_player_obj:
                             self.world.selected_castle = castle
-                            
-                            # --- ROZDZIELENIE EKRANÓW JUŻ NA MAPIE ---
                             if b_type == "Strażnica":
                                 self.world.screen = "Strażnica"
-                                print("Sukces: Otwieram menu Strażnicy!")
                                 return
                             else:
                                 self.world.screen = "castle"
                                 if hasattr(self.world, 'recruitment_manager'):
                                     self.world.recruitment_manager.selected_patent_index = None
-                                print("Sukces: Otwieram menu Zamku!")
                                 return
                         else:
-                            print("Odmowa: To nie jest Twój budynek!")     
+                            print("Odmowa: To nie jest Twój budynek!")
+
     def handle_ui_click(self, mx, my, button=1):
         w = self.world
         
@@ -638,7 +637,9 @@ class ControlsHandler:
     def handle_camera(self):
         w = self.world  # Alias dla wygody
         keys = pygame.key.get_pressed()
-        
+        # --- DODAJ TO: Blokada przesuwania mapy w tle podczas walki! ---
+        if w.screen == "combat_tactical":
+            return
         # --- ZMIANA PRĘDKOŚCI KAMERY ---
         scroll_speed = 30  # <--- Zmień tę liczbę, aby przyspieszyć/zwolnić (np. 10, 15, 20)
         
@@ -958,13 +959,23 @@ class ControlsHandler:
         if not self.world.inspected_unit:
             self.world.inspected_unit = self.world.get_unit_at(mx, my)
 
-        # 3. Jeśli coś znalazłeś, ustal tryb
+        # 3. Ustalenie trybu panelu
         if self.world.inspected_unit:
-            if self.world.inspected_unit.type_code in ["GOLD", "PEAS", "SPECK", "SPECM"]:
+            u = self.world.inspected_unit
+            current_player = self.world.players[self.world.current_player]
+            
+            # --- PRIORYTET 1: Gospodarka i Generałowie ZAWSZE mają prosty panel ---
+            if getattr(u, 'type_code', '') in ["GOLD", "PEAS", "SPECK", "SPECM"] or \
+               getattr(u, 'type', '') in ["Generał", "Złoto", "Chłopi", "Chłop"]:
                 self.world.info_mode = "SIMPLE"
+                
+            # --- PRIORYTET 2: Mgła Wojny dla obcego wojska bojowego ---
+            elif getattr(u, 'owner', None) != current_player:
+                self.world.info_mode = "ENEMY"
+                
+            # --- PRIORYTET 3: Nasze własne wojsko bojowe ---
             else:
                 self.world.info_mode = "COMBAT"
-
     
     def handle_tryb_mapy_button(self):
         """Resetuje interfejs do stanu 'Globus'."""

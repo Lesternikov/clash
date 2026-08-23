@@ -31,6 +31,7 @@ class Renderer:
         # self.custom_font.add_palette("evil_red", RED_COLOR_MAP)
 
         self.world = world_instance
+        self.world.renderer = self  # <--- To pozwala jednostce narysować krok podczas marszu!
         self.font_small = pygame.font.SysFont("Arial", 12)
         self.font_main  = pygame.font.SysFont("Arial", 18)
         self.gfx = gfx # Zapisujemy grafikę lokalnie
@@ -82,6 +83,34 @@ class Renderer:
 
         self.mark_red = pygame.image.load("assets/minimum/MARKS_S32/MARKS_S32_4.png").convert_alpha()
         self.mark_grey = pygame.image.load("assets/minimum/MARKS_S32/MARKS_S32_5.png").convert_alpha()
+
+        # =========================================================
+        # ŁADOWANIE KURSORÓW MAPY GŁÓWNEJ
+        # =========================================================
+        self.cursors = {}
+        c_scale = 1.2 # Możesz zwiększyć/zmniejszyć kursory!
+        
+        def load_c(name):
+            path = os.path.join("assets", "minimum", "MOUSE_S32", f"{name}.png")
+            if os.path.exists(path):
+                img = pygame.image.load(path).convert_alpha()
+                w, h = img.get_size()
+                return pygame.transform.smoothscale(img, (int(w * c_scale), int(h * c_scale)))
+            return None
+
+        # Numery dokładnie z Twojego opisu!
+        self.cursors["mace"] = load_c("MOUSE_S32_2")          # 1. Buława
+        self.cursors["sword"] = load_c("MOUSE_S32_3")         # 2. Zwykły Miecz
+        self.cursors["attack"] = load_c("MOUSE_S32_4")        # 3. Skrzyżowane Miecze
+        self.cursors["castle"] = load_c("MOUSE_S32_5")        # 4. Wejście do Zamku/Portu
+        self.cursors["merge"] = load_c("MOUSE_S32_39")        # 5. Połączenie Jednostek
+        self.cursors["attack_castle"] = load_c("MOUSE_S32_40")# 6. Atak na Zamek
+        self.cursors["no_attack"] = load_c("MOUSE_S32_41")    # 7. Chłop nie może bić jednostki
+        self.cursors["no_castle"] = load_c("MOUSE_S32_42")    # 8. Chłop nie zaatakuje Zamku
+        self.cursors["no_temple"] = load_c("MOUSE_S32_43")    # 9. Chłop nie wejdzie do Świątyni
+        # --- NOWOŚCI ---
+        self.cursors["go"] = load_c("MOUSE_S32_51")           # 10. GO (Potwierdzenie ruchu)
+        self.cursors["castle_anim"] = [load_c(f"MOUSE_S32_{i}") for i in range(31, 39)] # Animacja wchodzenia!
 
     def draw(self, screen):
         w = self.world
@@ -186,6 +215,20 @@ class Renderer:
         if getattr(w, 'inspected_port', None):
             self.draw_port_ui(screen)
 
+        # =========================================================
+        # RYSOWANIE KURSORA (Zawsze rysowany na samym końcu!)
+        # =========================================================
+        mx, my = pygame.mouse.get_pos()
+        cursor_img = self.get_map_cursor(mx, my)
+        
+        if cursor_img:
+            pygame.mouse.set_visible(False)
+            screen.blit(cursor_img, (mx, my))
+        else:
+            # Upewniamy się, że jeśli funkcja zwraca None, wraca myszka Windows
+            if w.screen not in ["combat_tactical"]:
+                pygame.mouse.set_visible(True)
+
     def draw_map(self, screen):
         w = self.world
 
@@ -211,32 +254,63 @@ class Renderer:
             px = int(u.x * TILE_SIZE) - w.camera_x
             py = int(u.y * TILE_SIZE) - w.camera_y
 
-            owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
-            pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
+            # ========================================================
+            # NOWY SYSTEM RYSOWANIA (PEŁNA ANIMACJA KIERUNKOWA)
+            # ========================================================
+            if hasattr(u, 'sprites') and len(u.sprites) == 64:
+                # 1. Pobieramy kierunek bazowy (0, 8, 16, 24, 32, 40, 48, 56)
+                base_frame = getattr(u, 'facing', 32)
+                
+                # 2. ZMIANA: Sprawdzamy czy jednostka FAKTYCZNIE się rusza (flaga z move_along_path)
+                if getattr(u, 'is_moving', False):
+                    anim_offset = (pygame.time.get_ticks() // 120) % 8
+                    current_frame = base_frame + anim_offset
+                else:
+                    # Jednostka tylko sobie stoi lub gracz jej wyznacza ścieżkę
+                    current_frame = base_frame 
+                    
+                # 3. ZMIANA: Usunięto podrzucanie jednostki do góry (-10). 
+                # Dodano +2, aby idealnie osadzić jej stopy na środku kratki.
+                img = u.sprites[current_frame]
+                img_x = px + (TILE_SIZE - img.get_width()) // 2
+                img_y = py + (TILE_SIZE - img.get_height()) // 2 + 2         
+                
+                #img_y = py + (TILE_SIZE - img.get_height()) // 2 - 10 # Jednostka jest trochę wyższa           
 
-            label = getattr(u, 'short_name', str(u.type)[:2].upper())
-            txt_surface = unit_font.render(label, True, (255, 255, 255))
-            text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
-            pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
-            screen.blit(txt_surface, text_rect)
+                #owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
+                # Kółko (elipsa) pod nogami
+                #pygame.draw.ellipse(screen, owner_color, (px + 4, py + 22, 24, 10), 2)
+                
+                # Samo wojsko
+                screen.blit(img, (img_x, img_y))
+            else:
+                # ========================================================
+                # STARY SYSTEM (AWARYJNY) - Używany, gdy brakuje plików png
+                # ========================================================
+                owner_color = u.owner.color if (u.owner and hasattr(u.owner, 'color')) else (200, 200, 200)
+                pygame.draw.rect(screen, owner_color, (px + 4, py + 4, 24, 24))
 
+                label = getattr(u, 'short_name', str(u.type)[:2].upper())
+                txt_surface = unit_font.render(label, True, (255, 255, 255))
+                text_rect = txt_surface.get_rect(center=(px + 16, py + 16))
+                pygame.draw.rect(screen, (0, 0, 0), text_rect.inflate(2, 2))
+                screen.blit(txt_surface, text_rect)
+
+            # Rysowanie białej ramki po zaznaczeniu
             if u == w.selected_unit:
                 pygame.draw.rect(screen, (255, 255, 255), (px, py, TILE_SIZE, TILE_SIZE), 2)
 
             # ==========================================
-            # NOWOŚĆ: RYSOWANIE ZNACZNIKA ILOŚCI ARMII
+            # ZNACZNIK ILOŚCI ARMII (Na swoim starym miejscu!)
             # ==========================================
             garrison = getattr(u, 'garrison', [])
             pasażerowie = [pas for pas in garrison if pas is not None]
-            wielkosc_armii = len(pasażerowie) + 1 # Lider + to co ma w środku
+            wielkosc_armii = len(pasażerowie) + 1 
             
             if wielkosc_armii >= 2:
-                # Ograniczamy indeks do max 10 (bo nie mamy grafik dla >10)
                 index_grafiki = min(wielkosc_armii, 10)
                 znacznik = getattr(self, 'army_size_marks', {}).get(index_grafiki)
-                
                 if znacznik:
-                    # Rysujemy znaczek nad prawym górnym rogiem jednostki
                     screen.blit(znacznik, (px + TILE_SIZE - 12, py - 8))
 
         # W funkcji draw_map, pod pętlą rysowania jednostek
@@ -846,13 +920,13 @@ class Renderer:
                         frame = (pygame.time.get_ticks() // 150) % 8
                         if hasattr(unit, 'sprites') and unit.sprites:
                             img = unit.sprites[frame % len(unit.sprites)]
-                            img = pygame.transform.scale(img, (img.get_width() * 1.7, img.get_height() * 1.6))
+                            img = pygame.transform.scale(img, (int(img.get_width() * 1.7), int(img.get_height() * 1.6)))
                             
                             # ===================================================
-                            # KOREKTA POZYCJI LUDZIKA (Zmień te liczby!)
+                            # KOREKTA POZYCJI LUDZIKA
                             # ===================================================
-                            przesuniecie_x = 0   # Zwiększ na plus (w prawo) / minus (w lewo)
-                            przesuniecie_y = 2  # ZWIĘKSZ, żeby opuścić w dół (wcześniej było 15)
+                            przesuniecie_x = 0   
+                            przesuniecie_y = 2  
                             
                             rys_x = rect.centerx - img.get_width() // 2 + przesuniecie_x
                             rys_y = rect.y + przesuniecie_y
@@ -860,22 +934,28 @@ class Renderer:
                             screen.blit(img, (rys_x, rys_y))
                         
                         # ===================================================
-                        # TEKST: TYLKO PUNKTY ŻYCIA (HP) ZAMIAST NAZWY
+                        # TEKST: PUNKTY ŻYCIA (HP) LUB PYTAJNIKI ZAMIAST NAZWY
                         # ===================================================
-                        hp_val = int(getattr(unit, 'hp', 100)) # Pobieramy HP (domyślnie 100)
+                        current_player_obj = self.world.players[self.world.current_player]
                         
-                        # Zmienia kolor w zależności od ran (zielony -> żółty -> czerwony)
-                        if hp_val > 50:
-                            kolor_hp = (100, 255, 100)
-                        elif hp_val > 25:
-                            kolor_hp = (255, 255, 0)
-                        else:
-                            kolor_hp = (255, 100, 100)
+                        # Sprawdzamy, czy to nasze wojsko (tylko wtedy widzimy dokładne życie)
+                        if getattr(unit, 'owner', None) == current_player_obj:
+                            hp_val = int(getattr(unit, 'hp', 100))
                             
-                        # Formatujemy np. "100 HP"
-                        hp_txt = self.font_main.render(f"{hp_val}", True, kolor_hp)
-                        hp_shadow = self.font_main.render(f"{hp_val}", True, (0, 0, 0)) 
-                        
+                            if hp_val > 50:
+                                kolor_hp = (100, 255, 100)
+                            elif hp_val > 25:
+                                kolor_hp = (255, 255, 0)
+                            else:
+                                kolor_hp = (255, 100, 100)
+                                
+                            hp_txt = self.font_main.render(f"{hp_val}", True, kolor_hp)
+                            hp_shadow = self.font_main.render(f"{hp_val}", True, (0, 0, 0)) 
+                        else:
+                            # NOWOŚĆ (Mgła wojny): Zamiast HP wroga, wyświetlamy tajemnicze pytajniki!
+                            hp_txt = self.font_main.render("???", True, (150, 150, 150))
+                            hp_shadow = self.font_main.render("???", True, (0, 0, 0))
+                            
                         wysokosc_liczby = 24 
                         
                         # Rysowanie
@@ -886,18 +966,16 @@ class Renderer:
                         screen.blit(hp_txt, (txt_x, txt_y))            # Właściwy tekst
                         
                         # ===================================================
-                        # NOWOŚĆ: ZNACZNIKI ZAZNACZENIA W PANELU ARMII
+                        # ZNACZNIKI ZAZNACZENIA W PANELU ARMII
+                        # (Ograniczone tylko do gracza)
                         # ===================================================
-                        if hasattr(self.world, 'units_to_split') and unit in self.world.units_to_split:
-                            # Szary (biały) ma ruch, czerwony nie ma ruchu (minimum 2 PA do podziału)
-                            mark = self.mark_grey if unit.move_points >= 3  else self.mark_red
-                            
-                            # Rysujemy mały krzyżyk (16x16) w lewym górnym rogu slota
-                            small_mark = pygame.transform.smoothscale(mark, (20, 20))
-                            screen.blit(small_mark, (rect.x + 5, rect.y + 5))
+                        if getattr(unit, 'owner', None) == current_player_obj:
+                            if hasattr(self.world, 'units_to_split') and unit in self.world.units_to_split:
+                                mark = self.mark_grey if unit.move_points >= 3  else self.mark_red
+                                small_mark = pygame.transform.smoothscale(mark, (20, 20))
+                                screen.blit(small_mark, (rect.x + 5, rect.y + 5))
 
         # 3. PRZYCISKI AKCJI (Zawsze widoczne na ekranie)
-        # Wyciągnięte poza "if u:", więc będą widoczne od startu gry
         self.draw_bottom_bar(screen)
     
     def draw_unit_info(self, screen, w):
@@ -1039,13 +1117,11 @@ class Renderer:
         if not stats_source:
             return
 
-        u_type = getattr(stats_source, 'type_code', None)
-        if not u_type and isinstance(stats_source, dict):
-            u_type = stats_source.get('type_code') 
-
-        mode = "COMBAT"
-        if u_type in ["GOLD", "PEAS", "SPECK", "SPECM"]:
-            mode = "SIMPLE"
+        # ========================================================
+        # KLUCZOWA ZMIANA: Pobieramy tryb, który ustaliliśmy
+        # w controls.py (Czyli uwzględniamy naszą Mgłę Wojny!)
+        # ========================================================
+        mode = getattr(w, 'info_mode', "COMBAT")
 
         w.unit_info_window.draw(screen, x, y, stats_source, mode)
 
@@ -1249,7 +1325,6 @@ class Renderer:
 
     # -------------------------------------------------------
     # RYSOWANIE BUDYNKÓW (teksty opisowe)
-    # -------------------------------------------------------
 
     def draw_forge(self, screen):
         lines = [
@@ -1329,6 +1404,7 @@ class Renderer:
             curr_y += int(35 * c["scale_tekst"])
 
         self.draw_building_footer(screen)
+    # -------------------------------------------------------
 
     def draw_watchtower_interior(self, screen, world):
         castle = world.selected_castle
@@ -1521,7 +1597,123 @@ class Renderer:
             if port.get("cooldown", 0) > 0:
                 time_txt = font.render(f"Kolejny statek za: {port['cooldown']} tur", True, (150, 150, 150))
                 screen.blit(time_txt, (x + max(20, nw//4 - 20), y + 140))
+
+    def get_map_cursor(self, mx, my):
+        """Mózg kursorów: analizuje teren, jednostki i wybiera odpowiednią ikonę."""
+        w = self.world
+        default_cursor = self.cursors["mace"]
+
+        # 1. Kursor w menu taktycznym jest obsługiwany przez klasę walki!
+        if w.screen == "combat_tactical":
+            return None 
+            
+        # 2. Wewnątrz budynków (Koszary, Szkoła itd.) pokaż zwykłą myszkę Windows
+        if w.screen not in ["map", "trap_info"]:
+            pygame.mouse.set_visible(True)
+            return None
+
+        # 3. Na interfejsie dolnym i górnym zawsze pokazujemy Buławę
+        if my >= 610 or (getattr(w, 'show_top_ui', False) and my <= 45):
+            return default_cursor
+
+        TILE_SIZE = 32
+        gx = (mx + w.camera_x) // TILE_SIZE
+        gy = (my + w.camera_y) // TILE_SIZE
+
+        # Zabezpieczenie poza krawędzią mapy
+        if not (0 <= gy < len(w.map) and 0 <= gx < len(w.map[0])):
+            return default_cursor
+
+        u = w.selected_unit
+        target_u = w.get_unit_at(gx, gy)
+        current_player = w.players[w.current_player]
+        
+        # Funkcja pomocnicza: czy to chłop / złoto?
+        def is_non_combat(unit):
+            if not unit: return False
+            return getattr(unit, 'type_code', '') in ["GOLD", "PEAS"] or getattr(unit, 'type', '') in ["Złoto", "Chłopi", "Chłop"]
+
+        # Szukamy zamku/portu pod kursorem
+        target_castle = None
+        for c in w.castles:
+            size = 2 if getattr(c, 'building_type', 'Zamek') in ["Zamek", "Twierdza"] else 1
+            if c.x <= gx < c.x + size and c.y <= gy < c.y + size:
+                if not getattr(c, 'destroyed', False):
+                    target_castle = c
+                break
+
+        is_port = False
+        if not target_castle and hasattr(w, 'ports'):
+            for p in w.ports:
+                if p["x"] <= gx <= p["x"] + 1 and p["y"] <= gy <= p["y"] + 1:
+                    is_port = True
+                    break
+
+        map_obj = w.map[gy][gx]
+        is_temple = map_obj in ["S", "&"]
+
+        # ====================================================
+        # ANALIZA REGUŁ (Od najwyższego priorytetu)
+        # ====================================================
+        
+        # REGUŁA 10: GO (Potwierdzenie ruchu/akcji)
+        # Ma NAJWYŻSZY priorytet - jeśli pole to nasz wyznaczony cel (drugi klik), pokaż GO
+        if u and getattr(u, 'target_x', None) == gx and getattr(u, 'target_y', None) == gy:
+            return self.cursors["go"]
+
+        # Świątynia / Miejsce Kultu
+        if is_temple:
+            if not u:
+                return default_cursor # Brak jednostki = brak reakcji (zostaje buława)
+            else:
+                if is_non_combat(u): 
+                    return self.cursors["no_temple"] # ZAKAZ DLA CHŁOPA/ZŁOTA
                 
+                # Zaznaczona normalna jednostka wchodzi do świątyni -> Animacja
+                anim_frames = self.cursors.get("castle_anim", [])
+                if anim_frames and None not in anim_frames:
+                    frame_idx = (pygame.time.get_ticks() // 100) % len(anim_frames)
+                    return anim_frames[frame_idx]
+                return self.cursors["castle"]
+
+        # Zamek lub Port
+        if target_castle or is_port:
+            if not u:
+                return self.cursors["castle"] # Brak jednostki = statyczny zamek nad każdym portem/zamkiem
+            else:
+                if target_castle and target_castle.owner != current_player:
+                    # WROGI ZAMEK
+                    if is_non_combat(u): 
+                        return self.cursors["no_castle"] # CHŁOP ZGINIE (ZAKAZ)
+                    return self.cursors["attack_castle"] # ATAK NA ZAMEK WROGA
+                else:
+                    # SWÓJ / PUSTY ZAMEK LUB PORT (Mamy jednostkę -> Animacja wejścia!)
+                    anim_frames = self.cursors.get("castle_anim", [])
+                    if anim_frames and None not in anim_frames:
+                        frame_idx = (pygame.time.get_ticks() // 100) % len(anim_frames)
+                        return anim_frames[frame_idx]
+                    return self.cursors["castle"] 
+
+        # Opcje z Jednostką (Wróg lub Sojusznik)
+        if target_u:
+            if target_u.owner != current_player:
+                # WROGA JEDNOSTKA
+                if u:
+                    if is_non_combat(u): 
+                        return self.cursors["no_attack"] # CHŁOP NIE UMIE WALCZYĆ
+                    return self.cursors["attack"]        # ATAK WROGA
+            else:
+                # SOJUSZNICZA JEDNOSTKA
+                if u and getattr(w, 'merge_mode', False) and target_u != u:
+                    return self.cursors["merge"]         # POŁĄCZENIE
+        
+        # Puste pole i zaznaczona jednostka (Ruch)
+        if u:
+            return self.cursors["sword"] 
+
+        # Domyślny kursor na mapie (Buława)
+        return default_cursor
+    
 if __name__ == "__main__":
         import subprocess, sys, os
         main_path = os.path.join(os.path.dirname(__file__), "main.py")

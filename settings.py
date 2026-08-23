@@ -426,6 +426,8 @@ UNIT_STATS = {
     "Generał":{"hp":100,"moves":36},
 
     "Złoto":{"hp":100,"moves":36},
+
+    "Chłopi":{"hp": 100, "moves":36},
    }
 
 TERRAIN_TYPES = {

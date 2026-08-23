@@ -217,10 +217,11 @@ class Pathfinder:
             0: (14, 20),  # Czerwony (Don Marek)
             1: (90, 8),  # Niebieski (Lech VI) - prawy górny róg (do poprawki)
             2: (47, 80),  # Zielony (Mściwój) - dół środek (do poprawki)
-            3:(14, 24),
-            #3: (90, 72),  # Biały (Biały Kieł) - prawy dół (do poprawki)
-            #4: (60, 46)   # Żółty (Złoty Pan) - środek prawo (do poprawki)
-            4: (20, 20)
+            
+            3: (90, 72),  # Biały (Biały Kieł) - prawy dół (do poprawki)
+            4: (60, 46)   # Żółty (Złoty Pan) - środek prawo (do poprawki)
+            #0:(14, 24),
+            #1:(20, 20)
         } 
 
         w.castles = []
@@ -228,7 +229,7 @@ class Pathfinder:
             # Upewniamy się, że gracz o danym ID został załadowany w world.py
             if owner_id < len(w.players):
                 c = Castle(cx, cy, w.players[owner_id])
-                c.gold = 250 # Ilość startowego złota w zamku
+                c.gold = 2500 # Ilość startowego złota w zamku
                 w.castles.append(c)
 
         # === INTELIGENTNE SZUKANIE PORTÓW Z MAPY ("R") ===
@@ -330,14 +331,18 @@ class Pathfinder:
             trap = getattr(w, 'traps', {}).get((x, y))
             if trap:
                 current_player = w.players[w.current_player]
-                # 1. Nasza pułapka - ZAWSZE traktowana jako przeszkoda (omijamy własne miny)
+                
+                # 1. Nasza pułapka - ZAWSZE traktowana jako przeszkoda
                 if trap["owner"] == current_player:
                     return False 
-                # 2. Obca, ale WYKRYTA pułapka - też traktowana jako mur
+                    
+                # 2. Obca, ale WYKRYTA pułapka - też traktowana jako mur (omijamy)
                 if current_player in trap.get("detected_by", set()):
                     return False 
 
-        # Jeśli pułapka jest obca i NIEWYKRYTA, zachowujemy się tak, jakby jej tu nie było!
+                # Niewykryta pułapka wroga - algorytm ślepo uważa, że można tędy iść!
+
+        # Jeśli pułapka jest obca, NIEWYKRYTA i idzie w nią zwykły żołnierz:
         # get_tile_at "oszukuje" i zwraca "_" (drogę), jeśli była pod pułapką.
         obj_tile = self.get_tile_at(x, y)
  
@@ -349,8 +354,34 @@ class Pathfinder:
  
         unwalkable = ["S", "&", "R", "W", "G", "B", "M"] # "X" usunięte z listy blokad!
         if obj_tile != " " and obj_tile in unwalkable:
-            if obj_tile == "R" and dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
-                pass
+            
+            # =======================================================
+            # ZMIANA: Złożona logika wejścia do Portu, Świątyni i Kultu
+            # =======================================================
+            if obj_tile in ["R", "S", "&"] and dest_x is not None and dest_y is not None and x == dest_x and y == dest_y:
+                
+                # Blokada dla armii bez wsparcia wojowników (Tylko dla Świątyń i Miejsc Kultu)
+                if obj_tile in ["S", "&"] and unit is not None:
+                    # Rozpakowujemy armię do sprawdzenia
+                    army = [unit]
+                    if hasattr(unit, 'garrison'):
+                        army.extend([u for u in unit.garrison if u is not None])
+                        
+                    has_combat = False
+                    for u in army:
+                        u_type = getattr(u, 'type', '')
+                        u_code = getattr(u, 'type_code', '')
+                        is_gen = getattr(u, 'is_general', False)
+                        
+                        # Jeśli to NIE jest Generał, Chłop ani Złoto, uznajemy to za zbrojną eskortę
+                        if u_type not in ["Generał", "Złoto", "Chłop"] and u_code not in ["GOLD", "PEAS"] and not is_gen:
+                            has_combat = True
+                            break
+                            
+                    if not has_combat:
+                        return False # Brak wojowników = algorytm uważa to pole za twardy mur!
+
+                pass # Mamy wsparcie (lub to Port "R"), puszczamy dalej!
             else:
                 return False
             
@@ -368,7 +399,6 @@ class Pathfinder:
                         return False # Każda inna jednostka w połowie drogi działa jak mur!
                             
         return True
-  
     # -------------------------------------------------------
     # ZNAJDOWANIE ŚCIEŻKI
     # -------------------------------------------------------

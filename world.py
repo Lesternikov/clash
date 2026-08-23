@@ -197,7 +197,7 @@ class World(BuildingsMixin):
             print(f"Błąd ładowania dodatkowych kafelków: {e}")
 
         # Inicjalizacja Graczy z przypisaniem frakcji
-        num_players = 5 
+        num_players = 5
         player_data = [
             ("Don Marek", (200, 0, 0), "red", "catholic"),  # Katolik
             ("Lech VI", (0, 0, 200), "blue", "pagan"),      # Poganin
@@ -322,7 +322,8 @@ class World(BuildingsMixin):
             "yellow": {"captured_by": {}},
             "white": {"captured_by": {}},
             "green": {"captured_by": {}}
-}
+    }
+
 # Dzięki temu każdy kolor ma już gotową "szufladkę" na captured_by
 
     def spawn_port_reinforcements(self, port):
@@ -462,6 +463,34 @@ class World(BuildingsMixin):
                 self.add_unit(general)
                 
                 generals_created.append(general)
+
+        # ========================================================
+        # TYMCZASOWE NA POTRZEBY WALKI - NIEBIESKI BUDOWNICZY
+        # ========================================================
+        # 1. Szukamy niebieskiego gracza
+        blue_player = None
+        for p in self.players:
+            if getattr(p, 'color_name', '').lower() == 'blue':
+                blue_player = p
+                break
+
+        # 2. Szukamy czerwonego zamku
+        red_castle = None
+        for c in self.castles:
+            owner = self.players[c.owner] if isinstance(c.owner, int) else c.owner
+            if getattr(owner, 'color_name', '').lower() == 'red':
+                red_castle = c
+                break
+
+        # 3. Dodajemy go na mapę!
+        if red_castle and blue_player:
+            spawn_x = int(red_castle.x + 3)
+            spawn_y = int(red_castle.y)
+            
+            new_builder = Unit("BUDOW", spawn_x, spawn_y, blue_player)
+            self.add_unit(new_builder) # Używamy bezpiecznej funkcji gry
+            
+            print(f"DEBUG: Dodano niebieskiego Budowniczego na pozycję ({spawn_x}, {spawn_y}) obok Czerwonego Zamku!")
                 
     def add_player(self, player):
         self.players.append(player)
@@ -535,9 +564,20 @@ class World(BuildingsMixin):
                     for u in getattr(castle, 'garrison', []):
                         if u:
                             # ================================================
-                            # NOWOŚĆ: Odpoczynek w zamku zdejmuje 20 zmęczenia
+                            # ZMIANA: Odpoczynek w zamku zdejmuje aż 50 zmęczenia!
                             # ================================================
-                            u.fatigue = max(0, getattr(u, 'fatigue', 0) - 20)
+                            u.fatigue = max(0, getattr(u, 'fatigue', 0) - 50)
+                            
+                            # Odzyskiwanie morale do poziomu podstawowego
+                            base_morale = 10 
+                            from settings import UNIT_STATS
+                            u_name = getattr(u, 'type_code', getattr(u, 'type', ''))
+                            if u_name in UNIT_STATS:
+                                base_morale = UNIT_STATS[u_name].get("morale", 10)
+                                
+                            if getattr(u, 'morale', 10) < base_morale:
+                                u.morale += 1
+
                             base_moves = getattr(u, 'moves', 5)
                             u.move_points = base_moves
                             u.turn_start_mp = base_moves
@@ -560,33 +600,46 @@ class World(BuildingsMixin):
         self.check_trap_detection()
 
     def move_unit(self, unit, dx, dy, cost=1):
-        """
-        ZAKTUALIZOWANA LOGIKA RUCHU:
-        Dodano: Blokadę tur, obsługę pułapek i poprawne przejmowanie zamków.
-        """
-        # 0. BLOKADA TURY (Bezpieczeństwo)
-        # Sprawdzamy, czy jednostka należy do gracza, który ma teraz turę
+        # 0. BLOKADA ZOMBIE I TURY (Bezpieczeństwo absolutne)
+        if getattr(unit, 'hp', 100) <= 0:
+            print("Mroczne siły zablokowane: Zombie nie mają prawa ruchu!")
+            if self.selected_unit == unit:
+                self.selected_unit = None
+            return False
+
         if unit.owner != self.players[self.current_player]:
             print("DEBUG: Nie Twoja tura!")
             return False
 
-        # 1. Sprawdzenie punktów ruchu
-        if unit.move_points < cost:
-            print(f"DEBUG: Jednostka {unit.type} nie ma MP ({unit.move_points} < {cost}).")
-            return False
-        # ========================================================
-        # WLEP TUTAJ LOGIKĘ ZMĘCZENIA (Pkt 3)
-        # ========================================================
-        # Sprawdzamy czy ktokolwiek w armii nie jest sparaliżowany
-        if unit.has_fatigue_paralysis():
-            print("Armia nie może się ruszyć - ktoś jest skrajnie wyczerpany!")
-            return False
-            
-        # Obliczamy ruch armii na podstawie najsłabszego ogniwa
-        effective_mp = unit.get_effective_move_points()
-        if effective_mp < cost:
-            print("Armia nie może się ruszyć - ogranicza ją najsłabszy członek!")
-            return False
+        nx, ny = unit.x + dx, unit.y + dy
+
+        # Sprawdzamy czy na tym polu stoi wróg (jednostka lub budowany zamek)
+        is_attack = False
+        for other in self.units:
+            if other.x == nx and other.y == ny and other.owner != unit.owner:
+                is_attack = True
+                break
+                
+        if not is_attack:
+            for castle in self.castles:
+                size = 2 if getattr(castle, 'building_type', 'Zamek') in ["Zamek", "Twierdza"] else 1
+                if castle.x <= nx < castle.x + size and castle.y <= ny < castle.y + size:
+                    if castle.owner != unit.owner and getattr(castle, 'under_construction', False):
+                        is_attack = True
+                        break
+
+        # 1. Sprawdzenie punktów ruchu (Ignorujemy przy ataku na sąsiada!)
+        if not is_attack:
+            if unit.move_points < cost:
+                print(f"DEBUG: Jednostka {unit.type} nie ma MP ({unit.move_points} < {cost}).")
+                return False
+            if unit.has_fatigue_paralysis():
+                print("Armia nie może się ruszyć - ktoś jest skrajnie wyczerpany!")
+                return False
+            effective_mp = unit.get_effective_move_points()
+            if effective_mp < cost:
+                print("Armia nie może się ruszyć - ogranicza ją najsłabszy członek!")
+                return False
         # ========================================================
 
         nx, ny = unit.x + dx, unit.y + dy
@@ -696,13 +749,21 @@ class World(BuildingsMixin):
             # Jednostka zostaje na brzegu
             return False
 
-       # ==========================================
+        # ==========================================
         # 4.5. INTERAKCJA Z PUŁAPKĄ (BUM!)
         # ==========================================
         if self.map[ny][nx] == "X":
             trap = getattr(self, 'traps', {}).get((nx, ny))
             
             if trap and trap["owner"] != unit.owner:
+                
+                # ---> NOWOŚĆ: Awaryjne hamowanie! <---
+                # Jeśli pułapka została już odkryta przez nasz radar, zatrzymujemy marsz!
+                if unit.owner in trap.get("detected_by", set()):
+                    print("Dowódca: Zauważono pułapkę! Zatrzymuję oddział.")
+                    unit.planned_path = [] # Kasujemy dotychczasowy plan marszu
+                    return False # Jednostka się zatrzymuje przed pułapką, nie tracąc PA!
+                
                 print(f"BUM! Jednostka {unit.type} wpadła w pułapkę na ({nx}, {ny})!")
                 
                 # Zbieramy całą armię (lider + pasażerowie)
@@ -845,7 +906,6 @@ class World(BuildingsMixin):
         current_player = self.players[self.current_player]
         my_units = [u for u in self.units if u.owner == current_player and u.x >= 0]
         
-        # Definicje elitarnych klas do radaru
         zlote_ladowe = ["Rycerstwo", "Dragon", "Mag", "Kapłan", "Mnich", "Kusznik z gildii"]
         zlote_latajace = ["Gryf", "Orzeł", "Smok", "Pegaz", "Ważka"]
         
@@ -858,25 +918,33 @@ class World(BuildingsMixin):
                 dystans = ((u.x - tx)**2 + (u.y - ty)**2)**0.5
                 zasieg_radaru = 0
                 
-                if u.type in zlote_latajace: zasieg_radaru = 6.5
-                elif u.type in zlote_ladowe or u.type == "Generał" or getattr(u, 'is_general', False): zasieg_radaru = 3.5
+                # ---> ZMIENIONE: Weterani (lvl >= 12) i Generał widzą pułapkę z 3,5 pola <---
+                if u.type in zlote_latajace: 
+                    zasieg_radaru = 6.5
+                elif u.type in zlote_ladowe or u.type == "Generał" or getattr(u, 'is_general', False) or getattr(u, 'experience', 0) >= 12: 
+                    zasieg_radaru = 3.5
                 
                 if zasieg_radaru > 0 and dystans <= zasieg_radaru:
                     if "detected_by" not in trap: trap["detected_by"] = set()
                     trap["detected_by"].add(current_player)
                     print(f"!!! Pułapka na ({tx},{ty}) została WYKRYTA przez {u.type} !!!")
-                    break # Wykryto tę pułapkę, sprawdzamy kolejne
+                    break
 
     def reset_units(self, old_player=None):
-        # Funkcja wewnętrzna resetująca pojedynczego żołnierza
+        # Funkcja wewnętrzna resetująca pojedynczego żołnierza (nawet tego w armii)
         def _reset_single(u_obj):
             if old_player and u_obj.owner == old_player:
                 start_mp = getattr(u_obj, 'turn_start_mp', getattr(u_obj, 'moves', 5))
+                
+                # 1. Jeśli jednostka W OGÓLE się nie ruszyła (odpoczynek w polu)
                 if u_obj.move_points >= start_mp:
                     u_obj.fatigue = max(0, getattr(u_obj, 'fatigue', 0) - 20)
-                elif u_obj.move_points < 5:
+                # 2. Jeśli jednostce zostało MNIEJ niż 4 PA (rośnie zmęczenie)
+                elif u_obj.move_points < 4:
                     u_obj.fatigue = min(100, getattr(u_obj, 'fatigue', 0) + 10)
+                # 3. W przeciwnym razie (ruszyła się, ale ma 4 lub więcej PA) -> zmęczenie bez zmian.
             
+            # Wpływ zmęczenia na max punkty ruchu w nowej turze
             base_moves = getattr(u_obj, 'moves', 5)
             fatigue = getattr(u_obj, 'fatigue', 0)
             if fatigue >= 100: new_mp = 0
@@ -887,7 +955,7 @@ class World(BuildingsMixin):
             u_obj.move_points = new_mp
             u_obj.turn_start_mp = new_mp
 
-        # Pętla przez wszystkie jednostki i ich pasażerów
+        # Pętla przez wszystkie jednostki na mapie oraz ich pasażerów w armii
         for u in self.units:
             if u.x < 0:
                 continue
@@ -1172,40 +1240,72 @@ class World(BuildingsMixin):
         return False
                   
     def enter_castle(self, unit, castle):
-        """Przenosi lidera i wszystkich jego pasażerów do osobnych slotów w zamku."""
-        # 1. Przygotowujemy listę wszystkich jednostek, które chcą wejść
-        to_enter = [unit]
+        """Przenosi lidera i wojsko do garnizonu, a Złoto do skarbca."""
+        
+        # 1. Zbieramy całą armię z pola
+        raw_to_enter = [unit]
         if hasattr(unit, 'garrison') and unit.garrison:
-            # Wyciągamy wszystkich pasażerów, którzy nie są None
-            to_enter.extend([u for u in unit.garrison if u is not None])
+            raw_to_enter.extend([u for u in unit.garrison if u is not None])
 
-        # 2. Sprawdzamy, czy w zamku jest dość miejsca dla wszystkich
+        # ============================================================
+        # NOWOŚĆ: Oddzielamy Złoto od wojska! Złoto zasila skarbiec.
+        # ============================================================
+        # ============================================================
+        # NOWOŚĆ: Oddzielamy Złoto i Chłopów od wojska! 
+        # ============================================================
+        to_enter = []
+        for u in raw_to_enter:
+            # --- ZŁOTO ---
+            if u.type == "Złoto" or getattr(u, 'type_code', '') == "GOLD":
+                wartosc_zlota = getattr(u, 'hp', 100)
+                castle.gold += wartosc_zlota
+                print(f"[{castle.x},{castle.y}] Do skarbca trafiło {wartosc_zlota} złota! Obecny stan: {castle.gold}")
+                
+                u.x, u.y = -1, -1
+                if u in self.units: self.units.remove(u)
+                if u.owner and u in u.owner.units: u.owner.units.remove(u)
+            
+            # --- CHŁOPI ---
+            elif u.type == "Chłop" or getattr(u, 'type_code', '') == "PEAS":
+                ilosc_chlopow = getattr(u, 'hp', 100) # Ilość przechowujemy w HP
+                castle.peasants = getattr(castle, 'peasants', 0) + ilosc_chlopow
+                print(f"[{castle.x},{castle.y}] Do zamku weszło {ilosc_chlopow} chłopów! Obecny stan: {castle.peasants}")
+                
+                u.x, u.y = -1, -1
+                if u in self.units: self.units.remove(u)
+                if u.owner and u in u.owner.units: u.owner.units.remove(u)
+                
+            # --- PRAWDZIWE WOJSKO ---
+            else:
+                to_enter.append(u) 
+
+        # Jeśli do zamku wjechał TYLKO sam zasób, zamykamy operację z sukcesem.
+        if not to_enter:
+            if hasattr(unit, 'garrison'): unit.garrison = [None] * 10
+            self.selected_unit = None
+            return True
+        
+        # 2. Sprawdzamy wolne miejsca dla prawdziwego wojska
         free_slots = [i for i, slot in enumerate(castle.garrison) if slot is None]
         
         if len(to_enter) > len(free_slots):
             print(f"Brak miejsca w zamku! Próbujesz wprowadzić {len(to_enter)} oddziałów, a wolnych jest {len(free_slots)}.")
             return False
 
-        # 3. Rozpakowujemy jednostki do osobnych slotów zamku
+        # 3. Rozpakowujemy wojsko do osobnych slotów
         for idx, u_to_add in enumerate(to_enter):
             target_slot = free_slots[idx]
             castle.garrison[target_slot] = u_to_add
             
-            # Czyścimy dane jednostki o pozycji na mapie
             u_to_add.x, u_to_add.y = -1, -1
-            
-            # Jeśli jednostka była fizycznie na mapie (lider), usuwamy ją ze świata
-            if u_to_add in self.units:
-                self.units.remove(u_to_add)
-            if u_to_add.owner and u_to_add in u_to_add.owner.units:
-                u_to_add.owner.units.remove(u_to_add)
+            if u_to_add in self.units: self.units.remove(u_to_add)
+            if u_to_add.owner and u_to_add in u_to_add.owner.units: u_to_add.owner.units.remove(u_to_add)
 
-        # 4. Czyścimy garnizon lidera, bo teraz wszyscy są już w zamku jako osobne byty
+        # 4. Czyścimy "plecak" dowódcy
         if hasattr(unit, 'garrison'):
             unit.garrison = [None] * 10
 
         self.selected_unit = None
-        print(f"DEBUG: Pomyślnie wprowadzono i rozpakowano {len(to_enter)} jednostek w zamku.")
         return True
  
     def remove_unit_or_builder(self, army, builder):
@@ -1562,11 +1662,35 @@ class World(BuildingsMixin):
         if unit in self.units:
             self.units.remove(unit)
         if unit.owner and unit in unit.owner.units:
+
             unit.owner.units.remove(unit)
 
     # world.py -> update the visit_temple function
 
     def visit_temple(self, unit, gx, gy):
+        # =======================================================
+        # 0. KONTROLA DOSTĘPU: Kto próbuje wejść?
+        # =======================================================
+        army = [unit]
+        if hasattr(unit, 'garrison') and unit.garrison:
+            army.extend([u for u in unit.garrison if u is not None])
+            
+        has_combat_unit = False
+        for u in army:
+            u_type = getattr(u, 'type', '')
+            is_gen = getattr(u, 'is_general', False)
+            if u_type not in ["Generał", "Złoto", "Chłop"] and not is_gen:
+                has_combat_unit = True
+                break
+                
+        if not has_combat_unit:
+            # Otwieramy normalny pergamin, ale z informacją o odrzuceniu!
+            self.temple_title = "Zakaz wstępu"
+            self.temple_desc = "Święte miejsca mogą badać tylko wojownicy. Chłopi, wóz ze złotem ani sam głównodowodzący nie mogą tam wejść bez zbrojnej eskorty!"
+            self.temple_current_effect = None 
+            self.screen = "temple_event"
+            return # Przerywamy funkcję - miejsce pozostaje "niezbadane" i czeka na wojsko!
+
         # 1. SPRAWDZAMY LIMIT: Czy ktoś już tu był?
         if (gx, gy) in self.visited_temples:
             self.temple_title = "Pusta Świątynia"
@@ -1652,11 +1776,29 @@ class World(BuildingsMixin):
         else:
             # --- GRACZ JEST NIEGODNY (ZŁA FRAKCJA) ---
             self.temple_title = "Jesteś Niegodny"
-            self.temple_desc = "Głupcze! Jak śmiałeś zakłócać spokój boski. Świętokradcy zostali ukarani."
+            self.temple_desc = "Głupcze! Jak śmiałeś zakłócać spokój boski. Świętokradcy zostali ukarani bezwzględną śmiercią!"
             self.temple_current_effect = getattr(self, 'temple_lightning', None)
             
-            # Kara dla innowiercy! Zabiera połowę HP liderowi
-            unit.hp = max(1, unit.hp // 2)
+            # =======================================================
+            # NOWOŚĆ: Piorun całkowicie unicestwia armię!
+            # =======================================================
+            do_usuniecia = [unit]
+            if hasattr(unit, 'garrison') and unit.garrison:
+                do_usuniecia.extend([u for u in unit.garrison if u is not None])
+                
+            for u in do_usuniecia:
+                u.hp = 0
+                u.x, u.y = -1, -1 # Ściągamy z mapy
+                
+                # Usuwamy ze świata i z zasobów gracza
+                if u in self.units: 
+                    self.units.remove(u)
+                if u.owner and u in u.owner.units: 
+                    u.owner.units.remove(u)
+                
+            # Odznaczamy jednostkę, żeby gracz nie miał podglądu na "ducha"
+            if self.selected_unit == unit:
+                self.selected_unit = None
 
         # =========================================================
         # 3. ZAWSZE OTWIERAMY EKRAN ŚWIĄTYNI NA KONIEC!
@@ -1770,6 +1912,47 @@ class World(BuildingsMixin):
             print(f"SUKCES! Stos na mapie (HP: {lider.hp}). Wewnątrz dodatkowe paczki: {pasazerowie}\n")
         else:
             print("BŁĄD: Brak miejsca na mapie!")
+
+    def spawn_peasant_group(self, owner, start_x, start_y, total_peasants):
+        print(f"\n--- [SYSTEM CHŁOPÓW] Wysyłanie {total_peasants} chłopów z zamku ---")
+        
+        chunks = []
+        while total_peasants > 0:
+            chunk_val = min(total_peasants, 100)
+            chunks.append(chunk_val)
+            total_peasants -= chunk_val
+            
+        if not chunks:
+            return
+            
+        print(f"Utworzono grupy chłopów: {chunks}")
+            
+        # 1. Tworzymy TYLKO JEDNĄ jednostkę na mapie (Lidera grupy)
+        lider = self._spawn_unit_near("Chłopi", owner, start_x, start_y)
+        if lider:
+            lider.hp = chunks[0]
+            lider.max_hp = chunks[0]
+            lider.garrison = [None] * 10
+            
+            # 2. Resztę ładujemy do garnizonu (plecaka) lidera
+            from unit import Unit
+            for i, chunk_val in enumerate(chunks[1:]):
+                if i < 10:
+                    dodatkowi_chlopi = Unit("Chłopi", -1, -1, owner)
+                    dodatkowi_chlopi.hp = chunk_val
+                    dodatkowi_chlopi.max_hp = chunk_val
+                    
+                    lider.garrison[i] = dodatkowi_chlopi
+                    
+                    if dodatkowi_chlopi not in self.units:
+                        self.units.append(dodatkowi_chlopi)
+                    if owner and dodatkowi_chlopi not in owner.units:
+                        owner.units.append(dodatkowi_chlopi)
+                        
+            pasazerowie = sum(1 for u in lider.garrison if u is not None)
+            print(f"SUKCES! Grupa chłopów na mapie (Zasoby: {lider.hp}). Zapas w plecaku: {pasazerowie}\n")
+        else:
+            print("BŁĄD: Brak miejsca wokół zamku, by postawić chłopów!")
 
     def spawn_temple_army(self, owner, start_x, start_y):
         import random

@@ -54,7 +54,7 @@ class BuildingsMixin:
                 1: [229, 230, 231, 232],
                 2: [233, 234, 235, 236],
                 3: [237, 238, 239, 240],
-                4: [221, 222, 223, 224],
+                4: [257, 258, 259, 260],
                 "take by":{
                     "blue":[241, 242, 243, 244],
                     "yellow":[245, 246, 247, 248],
@@ -66,7 +66,7 @@ class BuildingsMixin:
                 1: [265, 266, 267, 268],
                 2: [269, 270, 271, 272],
                 3: [273, 274, 275, 276],
-                4: [257, 258, 259, 260],
+                4: [293, 294, 295, 296],
                 "take by":{
                     "red":[269, 270, 271, 272],
                     "yellow":[281, 282, 283, 284],
@@ -78,7 +78,7 @@ class BuildingsMixin:
                 1: [301, 302, 303, 304],
                 2: [305, 306, 307, 308],
                 3: [317, 318, 319, 320],
-                4: [293, 294, 295, 296],
+                4: [329, 330, 331, 332],
                 "take by":{
                     "red":[309, 310, 311, 312],
                     "blue":[313, 314, 315, 316],
@@ -90,7 +90,7 @@ class BuildingsMixin:
                 1: [337, 338, 339, 340],
                 2: [341, 342, 343, 344],
                 3: [357, 358, 359, 360],
-                4: [329, 330, 331, 332],
+                4: [365, 366, 367, 368],
                 "take by":{
                     "red":[345, 346, 347, 348],
                     "blue":[349, 350, 351, 352],
@@ -102,12 +102,149 @@ class BuildingsMixin:
                 1: [373, 374, 375, 376],
                 2: [377, 378, 379, 380],
                 3: [397, 398, 399, 400],
-                4: [365, 366, 367, 368],
+                4: [401, 402, 403, 404],
                 "take by":{
                     "red":[381, 382, 383, 384],
                     "blue":[385, 386, 387, 388],
                     "yellow":[389, 390, 391, 392],
                     "white":[393, 394, 395, 396],}
+            }
+        }
+
+
+        self.twierdza_color_frames = {
+            "red": {
+                0: [45, 46, 47, 48],
+                1: [49, 50, 51, 52],
+                2: [53, 54, 55, 56],
+                3: [57, 58, 59, 60],
+                4: [77, 78, 79, 80],
+                "take by": {
+                    "blue": [61, 62, 63, 64],
+                    "yellow": [65, 66, 67, 68],
+                    "white": [69, 70, 71, 72],
+                    "green": [73, 74, 75, 76],
+                }
+            },
+            "blue": {
+                0: [81, 82, 83, 84],
+                1: [85, 86, 87, 88],
+                2: [89, 90, 91, 92],
+                3: [93, 94, 95, 96],
+                4: [113, 114, 115, 116],
+                "take by": {
+                    "red": [89, 90, 91, 92],
+                    "yellow": [101, 102, 103, 104],
+                    "white": [105, 106, 107, 108],
+                    "green": [109, 110, 111, 112],
+                }
+            },
+            "yellow": {
+                0: [117, 118, 119, 120],
+                1: [121, 122, 123, 124],
+                2: [125, 126, 127, 128],
+                3: [137, 138, 139, 140],
+                4: [149, 150, 151, 152],
+                "take by": {
+                    "red": [129, 130, 131, 132],
+                    "blue": [133, 134, 135, 136],
+                    "white": [141, 142, 143, 144],
+                    "green": [145, 146, 147, 148],
+                }
+            },
+            "white": {
+                0: [153, 154, 155, 156],
+                1: [157, 158, 159, 160],
+                2: [161, 162, 163, 164],
+                3: [177, 178, 179, 180],
+                4: [185, 186, 187, 188],
+                "take by": {
+                    "red": [165, 166, 167, 168],
+                    "blue": [169, 170, 171, 172],
+                    "yellow": [173, 174, 175, 176],
+                    "green": [181, 182, 183, 184],
+                }
+            },
+            "green": {
+                0: [189, 190, 191, 192],
+                1: [193, 194, 195, 196],
+                2: [197, 198, 199, 200],
+                3: [217, 218, 219, 220],
+                4: [221, 222, 223, 224],
+                "take by": {
+                    "red": [201, 202, 203, 204],
+                    "blue": [205, 206, 207, 208],
+                    "yellow": [209, 210, 211, 212],
+                    "white": [213, 214, 215, 216],
+                }
+            }
+        }
+
+        self.tower_color_frames = {
+            "red": {
+                0: [0],
+                1: [1],
+                2: [2],
+                3: [3],
+                4: [8],
+                "take by": {
+                    "blue": [4],
+                    "yellow": [5],
+                    "white": [6],
+                    "green": [7],
+                }
+            },
+            "blue": {
+                0: [9],
+                1: [10],
+                2: [11],
+                3: [13],
+                4: [17],
+                "take by": {
+                    "red": [12],
+                    "yellow": [14],
+                    "white": [15],
+                    "green": [16],
+                }
+            },
+            "yellow": {
+                0: [18],
+                1: [19],
+                2: [20],
+                3: [22],
+                4: [25],
+                "take by": {
+                    "red": [20],
+                    "blue": [21],
+                    "white": [23],
+                    "green": [24],
+                }
+            },
+            "white": {
+                0: [26],
+                1: [27],
+                2: [28],
+                3: [32],
+                4: [34],
+                "take by": {
+                    "red": [29],
+                    "blue": [30],
+                    "yellow": [31],
+                    "green": [33],
+                }
+            },
+            "green": {
+                0: [35],
+                1: [36],
+                2: [37],
+                3: [42],
+                4: [43],
+                "take by": {
+                    "red": [38],
+                    "blue": [39],
+                    "yellow": [40],
+                    "white": [41],
+                }
             }
         }
 
@@ -146,6 +283,37 @@ class BuildingsMixin:
                             dummy = pygame.Surface(TARGET_SIZE, pygame.SRCALPHA)
                             dummy.fill((200, 0, 0, 150))
                             self.castle_tiles_by_color[color][stage_idx].append(dummy)
+
+        # --- DODAJ ŁADOWANIE TWIERDZ ---
+        self.twierdza_tiles_by_color = {}
+        for color, stages in self.twierdza_color_frames.items():
+            self.twierdza_tiles_by_color[color] = {0: [], 1: [], 2: [], 3: [], 4: [], "take by":{}} 
+            for key, data in stages.items():
+                if key == "take by":
+                    for okupant, file_numbers in data.items():
+                        self.twierdza_tiles_by_color[color]["take by"][okupant] = []
+                        for num in file_numbers:
+                            # Używamy tej samej ścieżki co zamki
+                            file_name = f"BUILDIN1_S32_{num}.png"
+                            full_path = os.path.join(base_folder, file_name)
+                            try:
+                                img = pygame.image.load(full_path).convert_alpha()
+                                img = pygame.transform.scale(img, TARGET_SIZE)
+                                self.twierdza_tiles_by_color[color]["take by"][okupant].append(img)
+                            except:
+                                self.twierdza_tiles_by_color[color]["take by"][okupant].append(pygame.Surface(TARGET_SIZE))
+                else:
+                    stage_idx = key
+                    for num in data:
+                        file_name = f"BUILDIN1_S32_{num}.png"
+                        full_path = os.path.join(base_folder, file_name)
+                        try:
+                            img = pygame.image.load(full_path).convert_alpha()
+                            img = pygame.transform.scale(img, TARGET_SIZE)
+                            self.twierdza_tiles_by_color[color][stage_idx].append(img)
+                        except:
+                            self.twierdza_tiles_by_color[color][stage_idx].append(pygame.Surface(TARGET_SIZE))
+
 
         # --- TUTAJ JEST ROZWIĄZANIE DLA RENDERERA ---
         # Tworzymy bezpieczne aliasy na wypadek, gdyby renderer pytał o kolor 
@@ -260,11 +428,11 @@ class BuildingsMixin:
                 # NOWOŚĆ: Precyzyjne aktualizowanie etapu budowy (0, 1, 2, 3) 
                 # dla silnika graficznego rysującego mapę!
                 # ======================================================
-                if castle.mury_percent < 25:
+                if castle.mury_percent < 33:
                     castle.build_stage = 0
-                elif castle.mury_percent < 50:
+                elif castle.mury_percent < 66:
                     castle.build_stage = 1
-                elif castle.mury_percent < 75:
+                elif castle.mury_percent < 99:
                     castle.build_stage = 2
                 else:
                     castle.build_stage = 3

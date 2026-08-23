@@ -411,14 +411,27 @@ class PeasantMenu:
                         
                     return
                  
-        # Guzik WYSYŁANIA (send_gold)
+        # Guzik WYSYŁANIA (send_gold / send_peasants)
         if self.send_button.collidepoint(mx, my):
             if self.send_peasants_amount <= castle.peasants and self.send_gold_amount <= castle.gold:
-                castle.peasants -= self.send_peasants_amount
-                castle.gold -= self.send_gold_amount
-                print("Zasoby wysłane!")
-                self.send_peasants_amount = 0
-                self.send_gold_amount = 0
+                # Tylko jeśli gracz faktycznie coś wybrał do wysłania
+                if self.send_peasants_amount > 0 or self.send_gold_amount > 0:
+                    # 1. Odejmujemy zasoby z zamku
+                    castle.peasants -= self.send_peasants_amount
+                    castle.gold -= self.send_gold_amount
+                    print(f"Polecenie wysłania: {self.send_peasants_amount} chłopów, {self.send_gold_amount} złota.")
+                    
+                    # 2. Wypuszczamy fizyczne bryłki złota na mapę
+                    if self.send_gold_amount > 0:
+                        w.spawn_gold_chunks(castle.owner, castle.x, castle.y, self.send_gold_amount)
+                        
+                    # 3. Wypuszczamy fizycznych chłopów na mapę
+                    if self.send_peasants_amount > 0:
+                        w.spawn_peasant_group(castle.owner, castle.x, castle.y, self.send_peasants_amount)
+                        
+                    # 4. Wyzerowanie liczników
+                    self.send_peasants_amount = 0
+                    self.send_gold_amount = 0
             return
 
     def handle_scroll_wheel(self, event, w):
